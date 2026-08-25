@@ -1039,12 +1039,6 @@ export default function App() {
                             <span>{student.email}</span>
                           </div>
                         )}
-                        {student.phone && (
-                          <div className="flex items-center gap-1.5 text-slate-300 font-mono">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{student.phone}</span>
-                          </div>
-                        )}
                         {student.mentor_name && student.mentor_name !== 'N/A' && (
                           <div className="flex items-center gap-1.5 text-indigo-400">
                             <User className="w-3.5 h-3.5" />
@@ -1056,13 +1050,13 @@ export default function App() {
                   </div>
 
                   {/* Right Points and Action */}
-                  <div className="w-full md:w-auto flex items-center justify-between md:flex-col md:items-end gap-2 border-t md:border-t-0 pt-4 md:pt-0 border-slate-800">
+                  <div className="w-full md:w-auto flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 sm:gap-4 border-t md:border-t-0 pt-4 md:pt-0 border-slate-800 flex-shrink-0">
                     <div className="text-left md:text-right">
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide block">
-                        Active Balance Points
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        ACTIVE BALANCE POINTS
                       </span>
-                      <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight">
-                        {student.currentPoints} <span className="text-lg sm:text-xl font-bold">RP</span>
+                      <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight leading-tight">
+                        {student.currentPoints} <span className="text-base sm:text-lg font-bold">RP</span>
                       </div>
                     </div>
 
@@ -1071,9 +1065,10 @@ export default function App() {
                         setSelectedStudent(student);
                         setIsModalOpen(true);
                       }}
-                      className="bg-[#4f46e5] hover:bg-[#4338ca] text-white text-xs sm:text-sm font-semibold px-6 py-2.5 rounded-full shadow-sm hover:shadow-md hover:shadow-indigo-500/20 active:scale-95 transition-all duration-150 cursor-pointer"
+                      className="px-5 sm:px-6 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs sm:text-sm tracking-wide shadow-md shadow-indigo-600/30 transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95 flex-shrink-0"
                     >
-                      View Details
+                      <span>View Details</span>
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
 
