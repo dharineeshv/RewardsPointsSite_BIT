@@ -1827,20 +1827,20 @@ export default function App() {
 
       {/* 4. "VIEW DETAILS" INTERACTIVE MODAL */}
       {isModalOpen && selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 bg-slate-900 text-slate-100 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-2xl rounded-3xl p-4 sm:p-6 md:p-8 shadow-2xl border border-slate-800 bg-slate-900 text-slate-100 max-h-[90vh] overflow-y-auto overflow-x-hidden">
             
             {/* Close Button */}
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-6 right-6 p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+              className="absolute top-4 sm:top-6 right-4 sm:right-6 p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
             {/* Modal Header */}
-            <div className="flex items-center gap-4 pb-6 border-b border-slate-800">
-              <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border-2 border-slate-700">
+            <div className="flex items-center gap-3 sm:gap-4 pb-4 sm:pb-6 border-b border-slate-800 pr-8">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border-2 border-slate-700">
                 <AvatarImage
                   src={selectedStudent.picture || selectedStudent.photo_url}
                   alt={selectedStudent.name}
@@ -1848,39 +1848,39 @@ export default function App() {
                   fallbackBg={selectedStudent.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
                 />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-2xl font-black tracking-tight text-white">{selectedStudent.name}</h3>
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <h3 className="text-base sm:text-2xl font-black tracking-tight text-white truncate">{selectedStudent.name}</h3>
+                  <span className="text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 flex-shrink-0">
                     {selectedStudent.year}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1 font-medium">
+                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-medium truncate">
                   {selectedStudent.id} • {selectedStudent.department}
                 </p>
               </div>
             </div>
 
             {/* Modal Points Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 my-6">
-              <div className="p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cumulative RP</span>
-                <div className="text-2xl font-black text-cyan-400 mt-1">{selectedStudent.cumulativePoints || selectedStudent.currentPoints} RP</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 my-4 sm:my-6">
+              <div className="p-3 sm:p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Cumulative RP</span>
+                <div className="text-lg sm:text-2xl font-black text-cyan-400 mt-0.5 truncate">{selectedStudent.cumulativePoints || selectedStudent.currentPoints} RP</div>
               </div>
-              <div className="p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Redeemed RP</span>
-                <div className="text-2xl font-black text-amber-400 mt-1">{selectedStudent.redeemedPoints || '0'} RP</div>
+              <div className="p-3 sm:p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Redeemed RP</span>
+                <div className="text-lg sm:text-2xl font-black text-amber-400 mt-0.5 truncate">{selectedStudent.redeemedPoints || '0'} RP</div>
               </div>
-              <div className="col-span-2 sm:col-span-1 p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Balance</span>
-                <div className="text-2xl font-black text-emerald-400 mt-1">{selectedStudent.currentPoints} RP</div>
+              <div className="col-span-2 sm:col-span-1 p-3 sm:p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Active Balance</span>
+                <div className="text-lg sm:text-2xl font-black text-emerald-400 mt-0.5 truncate">{selectedStudent.currentPoints} RP</div>
               </div>
             </div>
 
             {/* Recent RP Activities */}
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Recent Activity History</h4>
-              <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
                 {rewardsData.length > 0 ? (
                   rewardsData.slice(0, 8).map((act, index) => {
                     const rawPts = act.reward_points ? parseFloat(act.reward_points.replace(/,/g, '')) : 0;
@@ -1888,18 +1888,18 @@ export default function App() {
                     return (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-3 rounded-2xl border border-slate-800 bg-slate-800/40 hover:border-slate-700 transition-all"
+                        className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-800 bg-slate-800/40 hover:border-slate-700 transition-all gap-2"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-indigo-950/70 text-indigo-400 border border-indigo-800/40">
-                            <Trophy className="w-4 h-4" />
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center bg-indigo-950/70 text-indigo-400 border border-indigo-800/40 flex-shrink-0">
+                            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </div>
-                          <div>
-                            <div className="text-xs font-bold text-slate-200 max-w-xs sm:max-w-sm truncate">{act.activity_name || act.course_name}</div>
-                            <div className="text-[11px] text-slate-400">{act.date} • {act.activity_type}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-bold text-slate-200 truncate">{act.activity_name || act.course_name}</div>
+                            <div className="text-[10px] sm:text-[11px] text-slate-400 truncate">{act.date} • {act.activity_type}</div>
                           </div>
                         </div>
-                        <span className={`text-xs font-black px-2.5 py-1 rounded-full whitespace-nowrap ${
+                        <span className={`text-[10px] sm:text-xs font-black px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full whitespace-nowrap flex-shrink-0 ${
                           isPositive ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-800/60' : 'text-rose-400 bg-rose-950/60 border border-rose-800/60'
                         }`}>
                           {isPositive ? `+${rawPts.toLocaleString()}` : `-${rawPts.toLocaleString()}`} RP
@@ -1916,10 +1916,10 @@ export default function App() {
             </div>
 
             {/* Modal Bottom Button */}
-            <div className="mt-8 flex justify-end">
+            <div className="mt-6 sm:mt-8 flex justify-end">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="bg-[#4f46e5] text-white text-xs font-semibold px-6 py-2.5 rounded-full hover:bg-[#4338ca] transition-all shadow-md shadow-indigo-500/30"
+                className="w-full sm:w-auto bg-[#4f46e5] text-white text-xs font-semibold px-6 py-2.5 rounded-full hover:bg-[#4338ca] transition-all shadow-md shadow-indigo-500/30"
               >
                 Close Details
               </button>
