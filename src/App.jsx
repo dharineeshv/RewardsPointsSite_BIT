@@ -1188,29 +1188,19 @@ export default function App() {
                       return (
                         <div 
                           key={card.key}
-                          className="rounded-2xl p-5 shadow-lg shadow-indigo-600/25 bg-[#4f46e5] text-white overflow-hidden flex flex-col justify-between min-h-[115px] transition-all duration-200 ring-2 ring-indigo-400/50"
+                          className="rounded-2xl p-5 sm:p-6 shadow-lg shadow-indigo-600/25 bg-[#4f46e5] text-white overflow-hidden flex flex-col justify-between transition-all duration-200 ring-2 ring-indigo-400/50"
                         >
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-indigo-100">{card.label}</span>
-                              <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white">
-                                Your Year
-                              </span>
-                            </div>
-                            <div className="flex items-baseline gap-1 mt-1">
-                              <span className="text-2xl font-black text-white">
-                                {loadingAverages ? '...' : Number(card.value).toLocaleString()}
-                              </span>
-                              <span className="text-xs font-bold text-indigo-200">RP</span>
-                            </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-indigo-100">{card.label}</span>
+                            <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white">
+                              Your Year
+                            </span>
                           </div>
-
-                          {/* Progress Track */}
-                          <div className="w-full bg-white/20 h-2 rounded-full mt-4 overflow-hidden">
-                            <div 
-                              className="bg-white h-full rounded-full transition-all duration-500" 
-                              style={{ width: `${getProgress(card.value)}%` }}
-                            ></div>
+                          <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                              {loadingAverages ? '...' : Number(card.value).toLocaleString()}
+                            </span>
+                            <span className="text-xs sm:text-sm font-bold text-indigo-200">RP</span>
                           </div>
                         </div>
                       );
@@ -1219,24 +1209,16 @@ export default function App() {
                     return (
                       <div 
                         key={card.key}
-                        className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xs overflow-hidden flex flex-col justify-between min-h-[115px] transition-all duration-200 text-slate-100"
+                        className="rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6 shadow-xs overflow-hidden flex flex-col justify-between transition-all duration-200 text-slate-100"
                       >
-                        <div>
+                        <div className="mb-2">
                           <span className="text-xs font-bold text-slate-300">{card.label}</span>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-2xl font-black text-white">
-                              {loadingAverages ? '...' : Number(card.value).toLocaleString()}
-                            </span>
-                            <span className="text-xs font-bold text-slate-400">RP</span>
-                          </div>
                         </div>
-
-                        {/* Progress Track */}
-                        <div className="w-full bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
-                          <div 
-                            className="bg-[#4f46e5] h-full rounded-full transition-all duration-500" 
-                            style={{ width: `${getProgress(card.value)}%` }}
-                          ></div>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                          <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                            {loadingAverages ? '...' : Number(card.value).toLocaleString()}
+                          </span>
+                          <span className="text-xs sm:text-sm font-bold text-slate-400">RP</span>
                         </div>
                       </div>
                     );
