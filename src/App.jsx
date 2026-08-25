@@ -317,6 +317,12 @@ function LoginPage({ onLogin, isDarkMode }) {
             </span>
           </div>
         </div>
+
+        {/* Top Right Developer Credit */}
+        <div className="text-right text-xs text-slate-400 hidden sm:block">
+          <div>Developed by <span className="font-bold text-indigo-400">Dharineesh V</span></div>
+          <div className="text-[10px] text-slate-400">(Dept. of Computer Technology)</div>
+        </div>
       </header>
 
       {/* Main Login Card Container */}
@@ -834,8 +840,18 @@ export default function App() {
             )}
           </div>
 
-          {/* Right Action Icons */}
-          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {/* Right Action Icons & Developer Info */}
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+            {/* Top Right Developer Details */}
+            <div className="hidden lg:flex flex-col text-right pr-2 border-r border-slate-800 mr-1">
+              <span className="text-[11px] font-semibold text-slate-300">
+                Developed by <span className="font-bold text-indigo-400">Dharineesh V</span>
+              </span>
+              <span className="text-[10px] text-slate-400">
+                (Dept. of Computer Technology)
+              </span>
+            </div>
+
             <button
               onClick={() => setShowInfoModal(true)}
               className="p-1.5 sm:p-2 rounded-full transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200"
