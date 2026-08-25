@@ -371,13 +371,6 @@ function LoginPage({ onLogin, isDarkMode }) {
             <div className="mb-4 p-3 rounded-2xl bg-amber-950/50 border border-amber-800 text-amber-200 text-xs">
               <div className="font-semibold mb-1">Notice:</div>
               <div>{authError}</div>
-              <button
-                type="button"
-                onClick={() => onLogin(STUDENTS_DATABASE[0])}
-                className="mt-2 text-xs font-bold text-indigo-400 underline"
-              >
-                Click here for instant Demo Sign-In
-              </button>
             </div>
           )}
 
