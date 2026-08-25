@@ -1203,13 +1203,13 @@ export default function App() {
 
                   {/* Desktop & Tablet Table (>= 640px) */}
                   <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[560px]">
+                    <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-700 bg-slate-800 text-xs font-extrabold uppercase tracking-wider text-slate-200">
-                          <th className="py-4 px-6 font-extrabold">COURSE NAME</th>
-                          <th className="py-4 px-6 font-extrabold">COMPLETED DATE</th>
-                          <th className="py-4 px-6 font-extrabold">ACTIVITY TYPE</th>
-                          <th className="py-4 px-6 font-extrabold text-right">REWARD POINTS</th>
+                        <tr className="border-b border-slate-700 bg-slate-800 text-[11px] lg:text-xs font-extrabold uppercase tracking-wider text-slate-200">
+                          <th className="py-3.5 px-3 lg:px-4 font-extrabold">COURSE NAME</th>
+                          <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">COMPLETED DATE</th>
+                          <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">ACTIVITY TYPE</th>
+                          <th className="py-3.5 px-3 lg:px-4 font-extrabold text-right whitespace-nowrap">REWARD POINTS</th>
                         </tr>
                       </thead>
                       <tbody className="text-xs divide-y divide-slate-800">
@@ -1248,18 +1248,18 @@ export default function App() {
 
                             return (
                               <tr key={index} className="transition-colors text-slate-200 hover:bg-slate-800/50">
-                                <td className="py-4 px-6 font-bold text-sm text-white max-w-md">
+                                <td className="py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm text-white">
                                   {act.activity_name || act.course_name || 'Academic Course Activity'}
                                 </td>
-                                <td className="py-4 px-6 font-semibold text-slate-300 whitespace-nowrap">
+                                <td className="py-3.5 px-3 lg:px-4 font-semibold text-slate-300 whitespace-nowrap text-xs">
                                   {act.date || 'Recent'}
                                 </td>
-                                <td className="py-4 px-6 whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold shadow-xs ${badgeStyle}`}>
+                                <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
+                                  <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold whitespace-nowrap shadow-xs ${badgeStyle}`}>
                                     {act.activity_type || 'General'}
                                   </span>
                                 </td>
-                                <td className={`py-4 px-6 text-right font-black text-sm whitespace-nowrap ${
+                                <td className={`py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm whitespace-nowrap ${
                                   isPositive ? 'text-emerald-400' : 'text-rose-400'
                                 }`}>
                                   {isPositive ? `+${rawPts.toLocaleString()}` : `-${rawPts.toLocaleString()}`} RP
@@ -1844,14 +1844,14 @@ export default function App() {
 
                 {/* Desktop & Tablet Table (>= 640px) */}
                 <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[600px]">
+                  <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-700 bg-slate-800 text-xs font-extrabold uppercase tracking-wider text-slate-200">
-                        <th className="py-4 px-6">#</th>
-                        <th className="py-4 px-6">COURSE / ACTIVITY NAME</th>
-                        <th className="py-4 px-6">COMPLETED DATE</th>
-                        <th className="py-4 px-6">CATEGORY TYPE</th>
-                        <th className="py-4 px-6 text-right">POINTS</th>
+                      <tr className="border-b border-slate-700 bg-slate-800 text-[11px] lg:text-xs font-extrabold uppercase tracking-wider text-slate-200">
+                        <th className="py-3.5 px-3 w-10 text-center">#</th>
+                        <th className="py-3.5 px-3 lg:px-4 font-extrabold">COURSE / ACTIVITY NAME</th>
+                        <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">COMPLETED DATE</th>
+                        <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">CATEGORY TYPE</th>
+                        <th className="py-3.5 px-3 lg:px-4 font-extrabold text-right whitespace-nowrap">POINTS</th>
                       </tr>
                     </thead>
                     <tbody className="text-xs divide-y divide-slate-800">
@@ -1864,15 +1864,19 @@ export default function App() {
                       ) : (
                         rewardsData.map((item, idx) => (
                           <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
-                            <td className="py-4 px-6 font-mono text-slate-500">{idx + 1}</td>
-                            <td className="py-4 px-6 font-bold text-sm text-white">{item.activity_name || item.course_name}</td>
-                            <td className="py-4 px-6 text-slate-400 font-medium">{item.date}</td>
-                            <td className="py-4 px-6">
-                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                            <td className="py-3.5 px-3 text-center font-mono text-slate-500 text-xs">{idx + 1}</td>
+                            <td className="py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm text-white">
+                              {item.activity_name || item.course_name}
+                            </td>
+                            <td className="py-3.5 px-3 lg:px-4 text-slate-400 font-medium whitespace-nowrap text-xs">
+                              {item.date}
+                            </td>
+                            <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-slate-800 text-slate-300 border border-slate-700">
                                 {item.activity_type}
                               </span>
                             </td>
-                            <td className="py-4 px-6 text-right font-black text-sm text-emerald-400">
+                            <td className="py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm text-emerald-400 whitespace-nowrap">
                               +{item.reward_points} RP
                             </td>
                           </tr>
