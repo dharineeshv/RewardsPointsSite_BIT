@@ -310,21 +310,21 @@ function LoginPage({ onLogin, isDarkMode }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-slate-950 text-slate-100">
+    <div className="h-screen max-h-screen overflow-y-auto sm:overflow-hidden flex flex-col justify-between bg-slate-950 text-slate-100">
       
       {/* Top Navbar */}
-      <header className="w-full px-6 py-4 flex items-center justify-between border-b border-slate-800/60 bg-slate-900/40">
+      <header className="w-full px-5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between border-b border-slate-800/60 bg-slate-900/40 flex-shrink-0">
         <div className="flex items-center gap-3">
           <img 
             src="/bit-logo.png" 
             alt="Bannari Amman Institute of Technology" 
-            className="h-10 sm:h-12 object-contain rounded-md bg-white p-1 shadow-xs"
+            className="h-9 sm:h-10 object-contain rounded-md bg-white p-1 shadow-xs"
           />
           <div>
-            <span className="text-base sm:text-lg font-black tracking-tight text-indigo-400">
+            <span className="text-sm sm:text-base font-black tracking-tight text-indigo-400">
               Reward Points Site
             </span>
-            <span className="block text-[10px] sm:text-xs text-slate-400 font-semibold tracking-wide">
+            <span className="block text-[10px] text-slate-400 font-semibold tracking-wide">
               Bannari Amman Institute of Technology
             </span>
           </div>
@@ -339,30 +339,30 @@ function LoginPage({ onLogin, isDarkMode }) {
 
       {/* Main Login Card Container */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 my-auto">
-        <div className="w-full max-w-md rounded-3xl p-8 sm:p-10 shadow-2xl shadow-black/60 border border-slate-800 bg-slate-900 text-slate-100 backdrop-blur-md">
+        <div className="w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/60 border border-slate-800 bg-slate-900 text-slate-100 backdrop-blur-md">
           
           {/* Logo & Header Title */}
-          <div className="flex flex-col items-center text-center mb-8">
-            <div className="relative mb-4 p-2.5 rounded-2xl bg-white shadow-md border border-slate-200">
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="relative mb-3 p-2 rounded-2xl bg-white shadow-md border border-slate-200">
               <img 
                 src="/bit-logo.png" 
                 alt="BIT Logo" 
-                className="h-16 sm:h-20 object-contain"
+                className="h-12 sm:h-14 object-contain"
               />
             </div>
             
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
               Reward Points Site
             </h1>
-            <p className="text-xs text-slate-400 mt-1 font-medium">
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-medium">
               Bannari Amman Institute of Technology
             </p>
-            <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-950/80 text-indigo-300 text-[11px] font-bold border border-indigo-800/60">
+            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 text-[10px] sm:text-[11px] font-bold border border-indigo-800/60">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
               <span>Student RP Portal</span>
             </div>
             
-            <p className="text-xs text-slate-400 mt-4 leading-relaxed max-w-xs">
+            <p className="text-xs text-slate-400 mt-3 leading-relaxed max-w-xs">
               Sign in with your official BIT Google account to access your reward points, activities, and achievements.
             </p>
           </div>
@@ -386,7 +386,7 @@ function LoginPage({ onLogin, isDarkMode }) {
             type="button"
             onClick={handleLoginClick}
             disabled={googleLoading}
-            className="w-full py-3.5 px-5 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 border border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700/90 hover:border-slate-600 transition-all duration-150 cursor-pointer shadow-lg shadow-black/40 active:scale-98"
+            className="w-full py-3 px-5 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 border border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700/90 hover:border-slate-600 transition-all duration-150 cursor-pointer shadow-lg shadow-black/40 active:scale-98"
           >
             {googleLoading ? (
               <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -397,7 +397,7 @@ function LoginPage({ onLogin, isDarkMode }) {
           </button>
 
           {/* Security / Help hint */}
-          <div className="mt-6 pt-5 border-t border-slate-800 text-center">
+          <div className="mt-5 pt-4 border-t border-slate-800 text-center">
             <p className="text-[11px] text-slate-400 font-medium">
               Use your <span className="font-semibold text-slate-200">@bitsathy.ac.in</span> institutional email
             </p>
@@ -407,12 +407,12 @@ function LoginPage({ onLogin, isDarkMode }) {
       </div>
 
       {/* Login Footer */}
-      <footer className="w-full py-4 px-6 text-center text-xs text-slate-400 border-t border-slate-800/60 bg-slate-900/40">
-        <div className="font-semibold text-slate-300">
+      <footer className="w-full py-2.5 sm:py-3 px-6 text-center text-xs text-slate-400 border-t border-slate-800/60 bg-slate-900/40 flex-shrink-0">
+        <div className="font-semibold text-slate-300 text-[11px] sm:text-xs">
           © 2026 Rewards Points Site
         </div>
-        <div className="mt-1 text-[11px]">
-          Developed by <span className="font-bold text-indigo-400">Dharineesh V</span> (Dept. of Computer Technology • Contact: 9715020320)
+        <div className="mt-0.5 text-[10px] text-slate-400">
+          Developed by <span className="font-bold text-indigo-400">Dharineesh V</span> (Dept. of Computer Technology)
         </div>
       </footer>
 
