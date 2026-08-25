@@ -809,7 +809,7 @@ export default function App() {
       
       {/* 1. TOP HEADER & NAVBAR */}
       <header className="sticky top-0 z-30 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md transition-colors duration-200">
-        <div className="max-w-[1600px] mx-auto px-3 sm:px-6 md:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-[1600px] mx-auto px-3.5 sm:px-6 md:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-3 sm:gap-4">
           
           {/* Logo Section */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
@@ -828,13 +828,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* Search Bar with Live API Autocomplete */}
-          <div className="flex-1 min-w-[130px] max-w-xl mx-1 sm:mx-4 relative">
+          {/* Desktop & Tablet Search Bar (Hidden on Mobile) */}
+          <div className="hidden sm:block flex-1 max-w-xl mx-4 relative">
             <div className="relative flex items-center">
               {isSearching ? (
-                <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-3 sm:left-4"></div>
+                <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-4"></div>
               ) : (
-                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 absolute left-3 sm:left-4 pointer-events-none" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-4 pointer-events-none" />
               )}
               
               <input
@@ -844,29 +844,24 @@ export default function App() {
                 onKeyDown={handleSearchKeyDown}
                 onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
                 placeholder="CT109, CT120..."
-                className="w-full pl-8 sm:pl-11 pr-8 sm:pr-10 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all outline-none border bg-slate-800/90 border-slate-700 text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:bg-slate-800"
+                className="w-full pl-11 pr-10 py-2 rounded-full text-xs sm:text-sm font-medium transition-all outline-none border bg-slate-800/90 border-slate-700 text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:bg-slate-800"
               />
               
               {searchQuery && (
                 <button 
                   onClick={() => { setSearchQuery(''); setShowDropdown(false); }}
-                  className="absolute right-2.5 sm:right-3.5 text-slate-400 hover:text-slate-200 text-xs font-semibold p-1"
+                  className="absolute right-3.5 text-slate-400 hover:text-slate-200 text-xs font-semibold p-1"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            {/* Floating Suggestions Dropdown from API with Mobile Overlay */}
+            {/* Desktop Suggestions Dropdown */}
             {showDropdown && searchResults.length > 0 && (
               <>
-                {/* Click-away backdrop */}
-                <div 
-                  className="fixed inset-0 z-40 bg-black/20 sm:bg-transparent" 
-                  onClick={() => setShowDropdown(false)}
-                />
-
-                <div className="fixed left-3 right-3 top-[56px] sm:absolute sm:left-0 sm:right-0 sm:top-full mt-2 rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/98 backdrop-blur-xl text-slate-100 divide-y divide-slate-800 max-h-[65vh] sm:max-h-80 overflow-y-auto z-50 animate-fadeIn min-w-[280px]">
+                <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
+                <div className="absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/98 backdrop-blur-xl text-slate-100 divide-y divide-slate-800 max-h-80 overflow-y-auto z-50 animate-fadeIn">
                   <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between bg-slate-950/40">
                     <span>API Results ({searchResults.length})</span>
                     <span className="normal-case font-normal text-slate-400">Click to select</span>
@@ -875,7 +870,7 @@ export default function App() {
                     <div
                       key={`${item.roll_no}-${idx}`}
                       onClick={() => handleSelectStudent(item)}
-                      className="px-3.5 sm:px-4 py-2.5 sm:py-3 cursor-pointer flex items-center justify-between transition-colors hover:bg-slate-800/80 active:bg-slate-800"
+                      className="px-4 py-3 cursor-pointer flex items-center justify-between transition-colors hover:bg-slate-800/80 active:bg-slate-800"
                     >
                       <div className="flex items-center gap-3 min-w-0 pr-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#38c4ee] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
@@ -888,7 +883,7 @@ export default function App() {
                               {item.roll_no}
                             </span>
                           </div>
-                          <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate">
+                          <div className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
                             {item.department} {item.year ? `• Year ${item.year}` : ''}
                           </div>
                         </div>
@@ -907,7 +902,7 @@ export default function App() {
           </div>
 
           {/* Right Action Icons & Developer Info */}
-          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             {/* Top Right Developer Details */}
             <div className="hidden lg:flex flex-col text-right pr-2 border-r border-slate-800 mr-1">
               <span className="text-[11px] font-semibold text-slate-300">
@@ -950,7 +945,79 @@ export default function App() {
               <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
+        </div>
 
+        {/* Mobile Search Bar Sub-Strip (Immediately Downwards After Header on Phones) */}
+        <div className="block sm:hidden px-3.5 py-2 bg-slate-950/98 border-t border-slate-800/80 relative">
+          <div className="relative flex items-center">
+            {isSearching ? (
+              <div className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-3"></div>
+            ) : (
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+            )}
+            
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
+              placeholder="Search CT109, CT120..."
+              className="w-full pl-9 pr-9 py-2 rounded-xl text-xs font-medium transition-all outline-none border bg-slate-900 border-slate-700/90 text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:bg-slate-800 shadow-inner"
+            />
+            
+            {searchQuery && (
+              <button 
+                onClick={() => { setSearchQuery(''); setShowDropdown(false); }}
+                className="absolute right-2.5 text-slate-400 hover:text-slate-200 text-xs font-semibold p-1"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Mobile Suggestions Dropdown */}
+          {showDropdown && searchResults.length > 0 && (
+            <>
+              <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowDropdown(false)} />
+              <div className="absolute left-3.5 right-3.5 top-full mt-1.5 rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/98 backdrop-blur-xl text-slate-100 divide-y divide-slate-800 max-h-[65vh] overflow-y-auto z-50 animate-fadeIn">
+                <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between bg-slate-950/60">
+                  <span>API Results ({searchResults.length})</span>
+                  <span className="normal-case font-normal text-slate-400">Click to select</span>
+                </div>
+                {searchResults.map((item, idx) => (
+                  <div
+                    key={`${item.roll_no}-${idx}`}
+                    onClick={() => handleSelectStudent(item)}
+                    className="px-3.5 py-3 cursor-pointer flex items-center justify-between transition-colors hover:bg-slate-800/80 active:bg-slate-800"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#38c4ee] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
+                        {(item.student_name || 'ST').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-slate-200 flex flex-wrap items-center gap-1.5 truncate">
+                          <span className="truncate">{item.student_name}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-300 border border-slate-700 flex-shrink-0">
+                            {item.roll_no}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
+                          {item.department} {item.year ? `• Year ${item.year}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0 pl-2">
+                      <span className="text-xs font-black text-emerald-400 block whitespace-nowrap">
+                        +{item.balance_points ? parseFloat(item.balance_points.replace(/,/g, '')).toLocaleString() : '0'} RP
+                      </span>
+                      <span className="text-[9px] text-slate-400">Balance</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </header>
 
