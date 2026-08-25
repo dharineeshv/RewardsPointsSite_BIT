@@ -797,7 +797,7 @@ export default function App() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
-                placeholder="Search students..."
+                placeholder="7376232CT109"
                 className="w-full pl-8 sm:pl-11 pr-8 sm:pr-10 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all outline-none border bg-slate-800/90 border-slate-700 text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:bg-slate-800"
               />
               
