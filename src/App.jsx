@@ -1142,10 +1142,68 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Overview Activity Table */}
+                {/* Overview Activity Container */}
                 <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden shadow-xs transition-all duration-200">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                  
+                  {/* Mobile Responsive Activity Cards (Phones < 640px) */}
+                  <div className="block sm:hidden divide-y divide-slate-800">
+                    {loadingRewards ? (
+                      <div className="py-8 text-center text-slate-400 font-semibold">
+                        <div className="inline-flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                          <span>Loading activities for {student.id}...</span>
+                        </div>
+                      </div>
+                    ) : rewardsData.length === 0 ? (
+                      <div className="py-8 text-center text-slate-500 font-semibold text-xs">
+                        No reward activity records found for {student.id}.
+                      </div>
+                    ) : (
+                      rewardsData.map((act, index) => {
+                        const rawPts = act.reward_points ? parseFloat(act.reward_points.replace(/,/g, '')) : 0;
+                        const isPositive = act.type !== 'negative' && rawPts >= 0;
+                        const t = (act.activity_type || '').toUpperCase();
+                        let badgeStyle = 'bg-slate-800 text-slate-200 border border-slate-700';
+                        if (t.includes('TECHNICAL') || t.includes('EVENT')) {
+                          badgeStyle = 'bg-cyan-950/80 text-cyan-300 border border-cyan-800/80';
+                        } else if (t.includes('P SKILL') || t.includes('SKILL')) {
+                          badgeStyle = 'bg-indigo-950/80 text-indigo-300 border border-indigo-800/80';
+                        } else if (t.includes('INITIATIVE') || t.includes('CHALLENGE')) {
+                          badgeStyle = 'bg-amber-950/80 text-amber-300 border border-amber-800/80';
+                        } else if (t.includes('ACADEMIC')) {
+                          badgeStyle = 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/80';
+                        }
+
+                        return (
+                          <div key={index} className="p-3.5 hover:bg-slate-800/40 transition-colors">
+                            <div className="flex items-start justify-between gap-2.5 mb-2">
+                              <h4 className="text-xs font-bold text-white leading-snug flex-1">
+                                {act.activity_name || act.course_name || 'Academic Course Activity'}
+                              </h4>
+                              <span className={`text-xs font-black px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${
+                                isPositive ? 'text-emerald-400 bg-emerald-950/70 border border-emerald-800/70' : 'text-rose-400 bg-rose-950/70 border border-rose-800/70'
+                              }`}>
+                                {isPositive ? `+${rawPts.toLocaleString()}` : `-${rawPts.toLocaleString()}`} RP
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-slate-400 pt-0.5">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeStyle}`}>
+                                {act.activity_type || 'General'}
+                              </span>
+                              <span className="font-medium text-slate-400 text-[10px]">
+                                {act.date || 'Recent'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Desktop & Tablet Table (>= 640px) */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[560px]">
                       <thead>
                         <tr className="border-b border-slate-700 bg-slate-800 text-xs font-extrabold uppercase tracking-wider text-slate-200">
                           <th className="py-4 px-6 font-extrabold">COURSE NAME</th>
