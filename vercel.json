@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/bitcentral/:path*",
+      "destination": "https://bitcentral-api.onrender.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

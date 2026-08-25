@@ -8,5 +8,14 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  server: {
+    proxy: {
+      '/api/bitcentral': {
+        target: 'https://bitcentral-api.onrender.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/bitcentral/, ''),
+      },
+    },
+  },
 })
 

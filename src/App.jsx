@@ -187,6 +187,18 @@ function AvatarImage({ src, alt = "Avatar", initials = "ST", className = "w-full
 import { useGoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 
+// Unified Bitcentral API proxy fetcher (CORS-safe on Vercel and local dev)
+async function bitcentralFetch(pathAndQuery) {
+  const cleanPath = pathAndQuery.startsWith('/') ? pathAndQuery : `/${pathAndQuery}`;
+  try {
+    const proxyRes = await fetch(`/api/bitcentral${cleanPath}`);
+    if (proxyRes.ok) return proxyRes;
+  } catch (err) {
+    console.warn(`Proxy fetch failed for ${cleanPath}, attempting direct connection:`, err);
+  }
+  return fetch(`https://bitcentral-api.onrender.com${cleanPath}`);
+}
+
 // Standalone Login Page Component
 function LoginPage({ onLogin, isDarkMode }) {
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -216,7 +228,7 @@ function LoginPage({ onLogin, isDarkMode }) {
         // Fetch v2/profile endpoint
         let profileApiData = null;
         try {
-          const v2Res = await fetch(`https://bitcentral-api.onrender.com/v2/profile?email=${encodeURIComponent(email)}`);
+          const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(email)}`);
           if (v2Res.ok) {
             const v2Json = await v2Res.json();
             if (v2Json && v2Json.data) profileApiData = v2Json.data;
@@ -229,7 +241,7 @@ function LoginPage({ onLogin, isDarkMode }) {
         const rollId = profileApiData?.roll_no || profileApiData?.register_no || email.split('@')[0].toUpperCase();
         let searchApiData = null;
         try {
-          const sRes = await fetch(`https://bitcentral-api.onrender.com/search?q=${encodeURIComponent(rollId)}`);
+          const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(rollId)}`);
           if (sRes.ok) {
             const sJson = await sRes.json();
             if (sJson && sJson.data && sJson.data.length > 0) {
@@ -510,7 +522,7 @@ export default function App() {
     try {
       const studentMap = new Map();
       for (const prefix of dept.prefixes) {
-        const res = await fetch(`https://bitcentral-api.onrender.com/search?q=${prefix}`);
+        const res = await bitcentralFetch(`/search?q=${prefix}`);
         if (res.ok) {
           const json = await res.json();
           if (json && Array.isArray(json.data)) {
@@ -551,7 +563,7 @@ export default function App() {
     async function fetchRewards() {
       setLoadingRewards(true);
       try {
-        const res = await fetch(`https://bitcentral-api.onrender.com/rewards?roll_no=${encodeURIComponent(displayedStudent.id)}&page=1&limit=100`);
+        const res = await bitcentralFetch(`/rewards?roll_no=${encodeURIComponent(displayedStudent.id)}&page=1&limit=100`);
         if (res.ok) {
           const json = await res.json();
           if (json && Array.isArray(json.data)) {
@@ -577,7 +589,7 @@ export default function App() {
       const defaultEmail = 'dharineesh.ct23@bitsathy.ac.in';
       try {
         let profileApi = null;
-        const v2Res = await fetch(`https://bitcentral-api.onrender.com/v2/profile?email=${encodeURIComponent(defaultEmail)}`);
+        const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(defaultEmail)}`);
         if (v2Res.ok) {
           const v2Json = await v2Res.json();
           if (v2Json && v2Json.data) profileApi = v2Json.data;
@@ -585,7 +597,7 @@ export default function App() {
 
         const roll = profileApi?.roll_no || '7376232CT109';
         let searchApi = null;
-        const sRes = await fetch(`https://bitcentral-api.onrender.com/search?q=${encodeURIComponent(roll)}`);
+        const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(roll)}`);
         if (sRes.ok) {
           const sJson = await sRes.json();
           if (sJson && sJson.data && sJson.data.length > 0) {
@@ -638,7 +650,7 @@ export default function App() {
   useEffect(() => {
     async function fetchAverages() {
       try {
-        const res = await fetch('https://bitcentral-api.onrender.com/averages');
+        const res = await bitcentralFetch('/averages');
         if (res.ok) {
           const data = await res.json();
           if (data && data.averages) {
@@ -672,7 +684,7 @@ export default function App() {
     setIsSearching(true);
     const timeout = setTimeout(async () => {
       try {
-        const res = await fetch(`https://bitcentral-api.onrender.com/search?q=${encodeURIComponent(query)}`);
+        const res = await bitcentralFetch(`/search?q=${encodeURIComponent(query)}`);
         if (res.ok) {
           const json = await res.json();
           if (json && Array.isArray(json.data)) {
