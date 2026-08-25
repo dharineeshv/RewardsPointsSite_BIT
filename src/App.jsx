@@ -1421,40 +1421,40 @@ export default function App() {
                 <div>
                   {/* Back Button & Header */}
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-6 border-b border-slate-800">
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                       <button
                         onClick={() => setSelectedDeptLeaderboard(null)}
-                        className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                        className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer w-fit"
                       >
                         <ChevronLeft className="w-4 h-4" />
                         <span>All Departments</span>
                       </button>
 
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{selectedDeptLeaderboard.icon}</span>
-                          <h1 className="text-2xl md:text-3xl font-extrabold text-white">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xl sm:text-2xl">{selectedDeptLeaderboard.icon}</span>
+                          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white">
                             {selectedDeptLeaderboard.name}
                           </h1>
-                          <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${selectedDeptLeaderboard.badgeColor}`}>
+                          <span className={`text-[10px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full border ${selectedDeptLeaderboard.badgeColor}`}>
                             {selectedDeptLeaderboard.id}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">
+                        <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
                           Ranked in <span className="text-emerald-400 font-bold">descending order</span> of Reward Points • {selectedDeptLeaderboard.degree}
                         </p>
                       </div>
                     </div>
 
                     {/* Filter Within Department */}
-                    <div className="relative max-w-xs w-full">
+                    <div className="relative max-w-full md:max-w-xs w-full">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
                       <input
                         type="text"
                         value={deptStudentSearch}
                         onChange={(e) => setDeptStudentSearch(e.target.value)}
                         placeholder="Search student in department..."
-                        className="w-full pl-10 pr-4 py-2 rounded-xl text-sm border bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        className="w-full pl-10 pr-4 py-2 rounded-xl text-xs sm:text-sm border bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                       />
                     </div>
                   </div>
@@ -1610,9 +1610,9 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Full Rankings Table */}
+                        {/* Full Rankings Container */}
                         <div className="rounded-3xl border border-slate-800 bg-slate-900 overflow-hidden shadow-xl">
-                          <div className="px-6 py-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300">
                                 {selectedLeaderboardYear === 'ALL' ? 'All Years Leaderboard' : `${selectedLeaderboardYear} Leaderboard`}
@@ -1626,8 +1626,80 @@ export default function App() {
                             </span>
                           </div>
 
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
+                          {/* Mobile Responsive Ranking Cards (Phones < 640px) */}
+                          <div className="block sm:hidden divide-y divide-slate-800">
+                            {filteredList.length === 0 ? (
+                              <div className="py-8 text-center text-slate-500 font-medium text-xs">
+                                No students matching the selected year and search criteria.
+                              </div>
+                            ) : (
+                              filteredList.map((st, index) => {
+                                const rank = index + 1;
+                                let rankBadge = (
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full font-extrabold text-[11px] bg-slate-800 text-slate-300 border border-slate-700">
+                                    {rank}
+                                  </span>
+                                );
+                                if (rank === 1) {
+                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/60">🥇 1</span>;
+                                } else if (rank === 2) {
+                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-slate-700 text-slate-200 border border-slate-500">🥈 2</span>;
+                                } else if (rank === 3) {
+                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-amber-950/60 text-amber-400 border border-amber-800">🥉 3</span>;
+                                }
+
+                                return (
+                                  <div 
+                                    key={st.roll_no}
+                                    className={`p-3.5 flex items-center justify-between gap-2.5 hover:bg-slate-800/40 transition-colors ${rank <= 3 ? 'bg-slate-900/40' : ''}`}
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                      <div className="flex-shrink-0">
+                                        {rankBadge}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-1.5 truncate">
+                                          <h4 className="text-xs font-bold text-white truncate">{st.student_name}</h4>
+                                          <span className="text-[9px] px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-400 border border-slate-700 flex-shrink-0">
+                                            {st.roll_no}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5 truncate">
+                                          <span className="text-indigo-400 font-semibold">{st.normalizedYear}</span>
+                                          {st.mentor_name && st.mentor_name !== 'N/A' && (
+                                            <>
+                                              <span>•</span>
+                                              <span className="truncate">{st.mentor_name}</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <span className="text-xs font-black text-emerald-400 whitespace-nowrap">
+                                        +{st.displayBalance} RP
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          const transformed = transformApiStudent(st);
+                                          setSelectedStudent(transformed);
+                                          setIsModalOpen(true);
+                                        }}
+                                        className="px-2.5 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                                      >
+                                        Inspect
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {/* Desktop & Tablet Table (>= 640px) */}
+                          <div className="hidden sm:block overflow-x-auto">
+                            <table className="w-full text-left border-collapse min-w-[650px]">
                               <thead>
                                 <tr className="border-b border-slate-700 bg-slate-800/80 text-xs font-extrabold uppercase tracking-wider text-slate-200">
                                   <th className="py-4 px-6 text-center w-16">RANK</th>
