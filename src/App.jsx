@@ -1164,14 +1164,9 @@ export default function App() {
 
               {/* SECTION 3: AVERAGE REWARD POINTS BY YEAR */}
               <section>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xs font-black text-slate-300 tracking-wider uppercase">
-                    AVERAGE REWARD POINTS BY YEAR
-                  </h2>
-                  <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-                    Highlighted based on your current year ({normalizeStudentYear(currentUser?.year, currentUser?.id)})
-                  </span>
-                </div>
+                <h2 className="text-xs font-black text-slate-300 tracking-wider uppercase mb-3">
+                  AVERAGE REWARD POINTS BY YEAR
+                </h2>
 
                 {/* 4 Year Cards Grid (Dynamic from API & Highlighted for Current User) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
