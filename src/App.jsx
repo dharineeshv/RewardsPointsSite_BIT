@@ -459,8 +459,22 @@ function transformApiStudent(apiItem) {
 }
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(STUDENTS_DATABASE[0]);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      return localStorage.getItem('bit_rp_is_logged_in') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bit_rp_user');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return STUDENTS_DATABASE[0];
+  });
+
   const [activeNav, setActiveNav] = useState('Dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -468,7 +482,14 @@ export default function App() {
   const [showDropdown, setShowDropdown] = useState(false);
   
   // Selected student currently displayed in dashboard
-  const [displayedStudent, setDisplayedStudent] = useState(STUDENTS_DATABASE[0]);
+  const [displayedStudent, setDisplayedStudent] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bit_rp_user');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return STUDENTS_DATABASE[0];
+  });
+
   const [selectedStudent, setSelectedStudent] = useState(STUDENTS_DATABASE[0]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -583,19 +604,27 @@ export default function App() {
     fetchRewards();
   }, [displayedStudent.id]);
 
-  // Initial load: fetch default logged-in user profile from v2/profile
+  // Initial load: fetch profile from v2/profile (uses logged-in user email or default)
   useEffect(() => {
     async function fetchInitialStudent() {
-      const defaultEmail = 'dharineesh.ct23@bitsathy.ac.in';
+      let targetEmail = 'dharineesh.ct23@bitsathy.ac.in';
+      try {
+        const saved = localStorage.getItem('bit_rp_user');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed?.email) targetEmail = parsed.email;
+        }
+      } catch (e) {}
+
       try {
         let profileApi = null;
-        const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(defaultEmail)}`);
+        const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(targetEmail)}`);
         if (v2Res.ok) {
           const v2Json = await v2Res.json();
           if (v2Json && v2Json.data) profileApi = v2Json.data;
         }
 
-        const roll = profileApi?.roll_no || '7376232CT109';
+        const roll = profileApi?.roll_no || profileApi?.register_no || targetEmail.split('@')[0].toUpperCase();
         let searchApi = null;
         const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(roll)}`);
         if (sRes.ok) {
@@ -623,13 +652,12 @@ export default function App() {
           course_code: searchApi?.course_code || "B. Tech.",
           batch: profileApi?.batch || "2023 - 2027",
           year: searchApi?.year ? `Year ${searchApi.year}` : "Year IV",
-          phone: profileApi?.phone || "9715020320",
           mentor_name: searchApi?.mentor_name || "Dr. ANANDAKUMAR K ISE",
           picture: photoUrl,
           photo_url: photoUrl,
           avatarBg: "from-[#38c4ee] to-[#0ea5e9]",
           badge: "Verified BIT Student",
-          email: defaultEmail,
+          email: targetEmail,
           currentPoints: balancePts,
           cumulativePoints: cumulativePts,
           redeemedPoints: redeemedPts,
@@ -639,6 +667,12 @@ export default function App() {
 
         setDisplayedStudent(userObj);
         setCurrentUser(userObj);
+
+        try {
+          if (localStorage.getItem('bit_rp_is_logged_in') === 'true') {
+            localStorage.setItem('bit_rp_user', JSON.stringify(userObj));
+          }
+        } catch (e) {}
       } catch (err) {
         console.error('Error fetching initial student from v2/profile:', err);
       }
@@ -742,10 +776,22 @@ export default function App() {
     setCurrentUser(user);
     setDisplayedStudent(user);
     setIsLoggedIn(true);
+    try {
+      localStorage.setItem('bit_rp_is_logged_in', 'true');
+      localStorage.setItem('bit_rp_user', JSON.stringify(user));
+    } catch (e) {
+      console.warn('Failed to save session to localStorage:', e);
+    }
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    try {
+      localStorage.removeItem('bit_rp_is_logged_in');
+      localStorage.removeItem('bit_rp_user');
+    } catch (e) {
+      console.warn('Failed to clear session from localStorage:', e);
+    }
   };
 
   // If user is not logged in, render the dedicated Login Page
