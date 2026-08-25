@@ -1699,16 +1699,16 @@ export default function App() {
 
                           {/* Desktop & Tablet Table (>= 640px) */}
                           <div className="hidden sm:block overflow-x-auto">
-                            <table className="w-full text-left border-collapse min-w-[650px]">
+                            <table className="w-full text-left border-collapse">
                               <thead>
-                                <tr className="border-b border-slate-700 bg-slate-800/80 text-xs font-extrabold uppercase tracking-wider text-slate-200">
-                                  <th className="py-4 px-6 text-center w-16">RANK</th>
-                                  <th className="py-4 px-6">STUDENT NAME</th>
-                                  <th className="py-4 px-6">ROLL NUMBER</th>
-                                  <th className="py-4 px-6">ACADEMIC YEAR</th>
-                                  <th className="py-4 px-6">FACULTY MENTOR</th>
-                                  <th className="py-4 px-6 text-right">REWARD POINTS</th>
-                                  <th className="py-4 px-6 text-center">ACTION</th>
+                                <tr className="border-b border-slate-700 bg-slate-800/80 text-[11px] lg:text-xs font-extrabold uppercase tracking-wider text-slate-200">
+                                  <th className="py-3.5 px-3 text-center w-12">RANK</th>
+                                  <th className="py-3.5 px-3 lg:px-4">STUDENT NAME</th>
+                                  <th className="py-3.5 px-3">ROLL NO</th>
+                                  <th className="py-3.5 px-2.5 text-center">YEAR</th>
+                                  <th className="py-3.5 px-3 lg:px-4">FACULTY MENTOR</th>
+                                  <th className="py-3.5 px-3 lg:px-4 text-right">REWARD POINTS</th>
+                                  <th className="py-3.5 px-3 text-center">ACTION</th>
                                 </tr>
                               </thead>
                               <tbody className="text-xs divide-y divide-slate-800">
@@ -1727,11 +1727,11 @@ export default function App() {
                                       </span>
                                     );
                                     if (rank === 1) {
-                                      rankBadge = <span className="inline-block px-2.5 py-1 rounded-full font-black text-xs bg-amber-500/20 text-amber-300 border border-amber-500/60">🥇 1</span>;
+                                      rankBadge = <span className="inline-block px-2.5 py-0.5 rounded-full font-black text-xs bg-amber-500/20 text-amber-300 border border-amber-500/60">🥇 1</span>;
                                     } else if (rank === 2) {
-                                      rankBadge = <span className="inline-block px-2.5 py-1 rounded-full font-black text-xs bg-slate-700 text-slate-200 border border-slate-500">🥈 2</span>;
+                                      rankBadge = <span className="inline-block px-2.5 py-0.5 rounded-full font-black text-xs bg-slate-700 text-slate-200 border border-slate-500">🥈 2</span>;
                                     } else if (rank === 3) {
-                                      rankBadge = <span className="inline-block px-2.5 py-1 rounded-full font-black text-xs bg-amber-950/60 text-amber-400 border border-amber-800">🥉 3</span>;
+                                      rankBadge = <span className="inline-block px-2.5 py-0.5 rounded-full font-black text-xs bg-amber-950/60 text-amber-400 border border-amber-800">🥉 3</span>;
                                     }
 
                                     return (
@@ -1739,34 +1739,38 @@ export default function App() {
                                         key={st.roll_no}
                                         className={`transition-colors hover:bg-slate-800/60 ${rank <= 3 ? 'bg-slate-900/40' : ''}`}
                                       >
-                                        <td className="py-4 px-6 text-center font-bold">
+                                        <td className="py-3.5 px-3 text-center font-bold">
                                           {rankBadge}
                                         </td>
-                                        <td className="py-4 px-6 font-bold text-sm text-white whitespace-nowrap">
-                                          {st.student_name}
+                                        <td className="py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm text-white">
+                                          <div className="truncate max-w-[180px] lg:max-w-[240px] xl:max-w-none">
+                                            {st.student_name}
+                                          </div>
                                         </td>
-                                        <td className="py-4 px-6 font-mono font-semibold text-slate-300 whitespace-nowrap">
+                                        <td className="py-3.5 px-3 font-mono font-medium text-slate-300 whitespace-nowrap text-[11px] lg:text-xs">
                                           {st.roll_no}
                                         </td>
-                                        <td className="py-4 px-6 whitespace-nowrap">
-                                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                        <td className="py-3.5 px-2.5 text-center whitespace-nowrap">
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                                             {st.normalizedYear}
                                           </span>
                                         </td>
-                                        <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
-                                          {st.mentor_name || 'N/A'}
+                                        <td className="py-3.5 px-3 lg:px-4 font-medium text-slate-400 text-xs">
+                                          <div className="truncate max-w-[140px] lg:max-w-[180px] xl:max-w-none">
+                                            {st.mentor_name || 'N/A'}
+                                          </div>
                                         </td>
-                                        <td className="py-4 px-6 text-right font-black text-sm text-emerald-400 whitespace-nowrap">
+                                        <td className="py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm text-emerald-400 whitespace-nowrap">
                                           +{st.displayBalance} RP
                                         </td>
-                                        <td className="py-4 px-6 text-center whitespace-nowrap">
+                                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
                                           <button
                                             onClick={() => {
                                               const transformed = transformApiStudent(st);
                                               setSelectedStudent(transformed);
                                               setIsModalOpen(true);
                                             }}
-                                            className="px-3.5 py-1.5 rounded-full bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold text-[11px] transition-all cursor-pointer shadow-xs"
+                                            className="px-3 py-1 rounded-full bg-indigo-600/80 hover:bg-indigo-600 active:bg-indigo-700 text-white font-bold text-[11px] transition-all cursor-pointer shadow-xs"
                                           >
                                             Inspect
                                           </button>
