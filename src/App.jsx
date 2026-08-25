@@ -811,44 +811,52 @@ export default function App() {
               )}
             </div>
 
-            {/* Floating Suggestions Dropdown from API */}
+            {/* Floating Suggestions Dropdown from API with Mobile Overlay */}
             {showDropdown && searchResults.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl border border-slate-800 bg-slate-900 text-slate-100 divide-y divide-slate-800 max-h-80 overflow-y-auto z-50 animate-fadeIn">
-                <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                  <span>API Results ({searchResults.length})</span>
-                  <span className="normal-case font-normal text-slate-400">Click to select</span>
-                </div>
-                {searchResults.map((item, idx) => (
-                  <div
-                    key={`${item.roll_no}-${idx}`}
-                    onClick={() => handleSelectStudent(item)}
-                    className="px-3 sm:px-4 py-2.5 sm:py-3 cursor-pointer flex items-center justify-between transition-colors hover:bg-slate-800/80"
-                  >
-                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[#38c4ee] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
-                        {(item.student_name || 'ST').slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5 truncate">
-                          <span className="truncate">{item.student_name}</span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-400 border border-slate-700 flex-shrink-0">
-                            {item.roll_no}
-                          </span>
-                        </div>
-                        <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate">
-                          {item.department} {item.year ? `• Year ${item.year}` : ''}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0 ml-2">
-                      <span className="text-xs font-black text-emerald-400 block">
-                        {item.balance_points ? parseFloat(item.balance_points.replace(/,/g, '')).toLocaleString() : '0'} RP
-                      </span>
-                      <span className="text-[9px] text-slate-400">Balance</span>
-                    </div>
+              <>
+                {/* Click-away backdrop */}
+                <div 
+                  className="fixed inset-0 z-40 bg-black/20 sm:bg-transparent" 
+                  onClick={() => setShowDropdown(false)}
+                />
+
+                <div className="fixed left-3 right-3 top-[56px] sm:absolute sm:left-0 sm:right-0 sm:top-full mt-2 rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/98 backdrop-blur-xl text-slate-100 divide-y divide-slate-800 max-h-[65vh] sm:max-h-80 overflow-y-auto z-50 animate-fadeIn min-w-[280px]">
+                  <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between bg-slate-950/40">
+                    <span>API Results ({searchResults.length})</span>
+                    <span className="normal-case font-normal text-slate-400">Click to select</span>
                   </div>
-                ))}
-              </div>
+                  {searchResults.map((item, idx) => (
+                    <div
+                      key={`${item.roll_no}-${idx}`}
+                      onClick={() => handleSelectStudent(item)}
+                      className="px-3.5 sm:px-4 py-2.5 sm:py-3 cursor-pointer flex items-center justify-between transition-colors hover:bg-slate-800/80 active:bg-slate-800"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 pr-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#38c4ee] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
+                          {(item.student_name || 'ST').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-slate-200 flex flex-wrap items-center gap-1.5 truncate">
+                            <span className="truncate">{item.student_name}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-300 border border-slate-700 flex-shrink-0">
+                              {item.roll_no}
+                            </span>
+                          </div>
+                          <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate">
+                            {item.department} {item.year ? `• Year ${item.year}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 pl-2">
+                        <span className="text-xs font-black text-emerald-400 block whitespace-nowrap">
+                          +{item.balance_points ? parseFloat(item.balance_points.replace(/,/g, '')).toLocaleString() : '0'} RP
+                        </span>
+                        <span className="text-[9px] text-slate-400">Balance</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
