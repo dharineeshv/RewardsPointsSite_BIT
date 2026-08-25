@@ -931,10 +931,10 @@ export default function App() {
           <div className="mt-auto p-4 rounded-2xl border bg-slate-800/50 border-slate-700/60 text-slate-300">
             <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>RP Portal 2026</span>
+              <span>About Rewards Site</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Reward points updated automatically per semester events and achievements.
+              Rewards Site is the official academic and extracurricular rewards management platform. It tracks student rewards point and leaderboards.
             </p>
           </div>
         </aside>
@@ -1940,7 +1940,7 @@ export default function App() {
             </div>
             
             <p className="text-sm text-slate-400 leading-relaxed mb-5">
-              Rewards Site is the official academic and extracurricular rewards management platform. It tracks student participation in hackathons, academic excellence, leadership roles, and research projects.
+              Rewards Site is the official academic and extracurricular rewards management platform. It tracks student rewards point and leaderboards.
             </p>
 
             {/* Developer Details Box */}
