@@ -1164,97 +1164,83 @@ export default function App() {
 
               {/* SECTION 3: AVERAGE REWARD POINTS BY YEAR */}
               <section>
-                <h2 className="text-xs font-black text-slate-300 tracking-wider uppercase mb-3">
-                  AVERAGE REWARD POINTS BY YEAR
-                </h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-xs font-black text-slate-300 tracking-wider uppercase">
+                    AVERAGE REWARD POINTS BY YEAR
+                  </h2>
+                  <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                    Highlighted based on your current year ({normalizeStudentYear(currentUser?.year, currentUser?.id)})
+                  </span>
+                </div>
 
-                {/* 4 Year Cards Grid (Dynamic from API) */}
+                {/* 4 Year Cards Grid (Dynamic from API & Highlighted for Current User) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  
-                  {/* Year I */}
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xs overflow-hidden flex flex-col justify-between min-h-[115px] transition-all duration-200">
-                    <div>
-                      <span className="text-xs font-bold text-slate-300">Year I</span>
-                      <div className="flex items-baseline gap-1 mt-1">
-                        <span className="text-2xl font-black text-white">
-                          {loadingAverages ? '...' : Number(yearlyAverages.year_1).toLocaleString()}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400">RP</span>
-                      </div>
-                    </div>
+                  {[
+                    { key: 'year_1', label: 'Year I', value: yearlyAverages.year_1 },
+                    { key: 'year_2', label: 'Year II', value: yearlyAverages.year_2 },
+                    { key: 'year_3', label: 'Year III', value: yearlyAverages.year_3 },
+                    { key: 'year_4', label: 'Year IV', value: yearlyAverages.year_4 },
+                  ].map(card => {
+                    const userYear = normalizeStudentYear(currentUser?.year, currentUser?.id);
+                    const isHighlighted = userYear === card.label;
 
-                    {/* Progress Track */}
-                    <div className="w-full bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
+                    if (isHighlighted) {
+                      return (
+                        <div 
+                          key={card.key}
+                          className="rounded-2xl p-5 shadow-lg shadow-indigo-600/25 bg-[#4f46e5] text-white overflow-hidden flex flex-col justify-between min-h-[115px] transition-all duration-200 ring-2 ring-indigo-400/50"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-indigo-100">{card.label}</span>
+                              <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                Your Year
+                              </span>
+                            </div>
+                            <div className="flex items-baseline gap-1 mt-1">
+                              <span className="text-2xl font-black text-white">
+                                {loadingAverages ? '...' : Number(card.value).toLocaleString()}
+                              </span>
+                              <span className="text-xs font-bold text-indigo-200">RP</span>
+                            </div>
+                          </div>
+
+                          {/* Progress Track */}
+                          <div className="w-full bg-white/20 h-2 rounded-full mt-4 overflow-hidden">
+                            <div 
+                              className="bg-white h-full rounded-full transition-all duration-500" 
+                              style={{ width: `${getProgress(card.value)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
                       <div 
-                        className="bg-[#4f46e5] h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${getProgress(yearlyAverages.year_1)}%` }}
-                      ></div>
-                    </div>
-                  </div>
+                        key={card.key}
+                        className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xs overflow-hidden flex flex-col justify-between min-h-[115px] transition-all duration-200 text-slate-100"
+                      >
+                        <div>
+                          <span className="text-xs font-bold text-slate-300">{card.label}</span>
+                          <div className="flex items-baseline gap-1 mt-1">
+                            <span className="text-2xl font-black text-white">
+                              {loadingAverages ? '...' : Number(card.value).toLocaleString()}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400">RP</span>
+                          </div>
+                        </div>
 
-                  {/* Year II */}
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xs overflow-hidden flex flex-col justify-between min-h-[115px] transition-all duration-200">
-                    <div>
-                      <span className="text-xs font-bold text-slate-300">Year II</span>
-                      <div className="flex items-baseline gap-1 mt-1">
-                        <span className="text-2xl font-black text-white">
-                          {loadingAverages ? '...' : Number(yearlyAverages.year_2).toLocaleString()}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400">RP</span>
+                        {/* Progress Track */}
+                        <div className="w-full bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
+                          <div 
+                            className="bg-[#4f46e5] h-full rounded-full transition-all duration-500" 
+                            style={{ width: `${getProgress(card.value)}%` }}
+                          ></div>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Progress Track */}
-                    <div className="w-full bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
-                      <div 
-                        className="bg-[#4f46e5] h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${getProgress(yearlyAverages.year_2)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Year III */}
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xs overflow-hidden flex flex-col justify-between min-h-[115px] transition-all duration-200">
-                    <div>
-                      <span className="text-xs font-bold text-slate-300">Year III</span>
-                      <div className="flex items-baseline gap-1 mt-1">
-                        <span className="text-2xl font-black text-white">
-                          {loadingAverages ? '...' : Number(yearlyAverages.year_3).toLocaleString()}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400">RP</span>
-                      </div>
-                    </div>
-
-                    {/* Progress Track */}
-                    <div className="w-full bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
-                      <div 
-                        className="bg-[#4f46e5] h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${getProgress(yearlyAverages.year_3)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Year IV (Highlighted Active Solid Indigo Card) */}
-                  <div className="rounded-2xl p-5 shadow-xs bg-[#4f46e5] text-white overflow-hidden flex flex-col justify-between min-h-[115px]">
-                    <div>
-                      <span className="text-xs font-bold text-indigo-100">Year IV</span>
-                      <div className="flex items-baseline gap-1 mt-1">
-                        <span className="text-2xl font-black text-white">
-                          {loadingAverages ? '...' : Number(yearlyAverages.year_4).toLocaleString()}
-                        </span>
-                        <span className="text-xs font-bold text-indigo-200">RP</span>
-                      </div>
-                    </div>
-
-                    {/* Progress Track */}
-                    <div className="w-full bg-white/20 h-2 rounded-full mt-4 overflow-hidden">
-                      <div 
-                        className="bg-white h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${getProgress(yearlyAverages.year_4)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
+                    );
+                  })}
                 </div>
               </section>
             </>
@@ -1857,42 +1843,6 @@ export default function App() {
               <div className="col-span-2 sm:col-span-1 p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Balance</span>
                 <div className="text-2xl font-black text-emerald-400 mt-1">{selectedStudent.currentPoints} RP</div>
-              </div>
-            </div>
-
-            {/* Category Breakdown */}
-            <div className="mb-6">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Points Distribution</h4>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className="text-slate-300">Active Balance RP</span>
-                    <span className="text-emerald-400 font-bold">{selectedStudent.currentPoints} RP</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-emerald-500" style={{ width: '80%' }}></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className="text-slate-300">Cumulative Earned RP</span>
-                    <span className="text-cyan-400 font-bold">{selectedStudent.cumulativePoints || selectedStudent.currentPoints} RP</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-cyan-400" style={{ width: '100%' }}></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className="text-slate-300">Redeemed RP</span>
-                    <span className="text-amber-400 font-bold">{selectedStudent.redeemedPoints || '0'} RP</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-amber-500" style={{ width: selectedStudent.redeemedPoints && parseFloat(selectedStudent.redeemedPoints) > 0 ? '25%' : '4%' }}></div>
-                  </div>
-                </div>
               </div>
             </div>
 
