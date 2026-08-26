@@ -39,6 +39,14 @@ import {
   Medal,
   Monitor,
   Menu,
+  ShieldCheck,
+  FileSpreadsheet,
+  Download,
+  RefreshCw,
+  Smartphone,
+  Laptop,
+  Activity,
+  ExternalLink,
   Terminal,
   Cpu,
   Database,
@@ -640,6 +648,355 @@ export default function App() {
   const [deptStudentSearch, setDeptStudentSearch] = useState('');
   const [selectedLeaderboardYear, setSelectedLeaderboardYear] = useState('ALL');
 
+  // Admin Console & Google Sheets Analytics State
+  const [googleSheetUrl, setGoogleSheetUrl] = useState(() => {
+    try {
+      return localStorage.getItem('bit_gsheet_url') || '';
+    } catch (e) {
+      return '';
+    }
+  });
+
+  const [sheetInputUrl, setSheetInputUrl] = useState(() => {
+    try {
+      return localStorage.getItem('bit_gsheet_url') || '';
+    } catch (e) {
+      return '';
+    }
+  });
+
+  const [sheetSyncStatus, setSheetSyncStatus] = useState(() => {
+    try {
+      return localStorage.getItem('bit_gsheet_url') ? 'connected' : 'standby';
+    } catch (e) {
+      return 'standby';
+    }
+  });
+
+  const [showScriptCode, setShowScriptCode] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
+  const [logFilterQuery, setLogFilterQuery] = useState('');
+  const [logFilterAction, setLogFilterAction] = useState('ALL');
+  const [logFilterDept, setLogFilterDept] = useState('ALL');
+
+  // Restricted Admin Permission: Only Dharineesh V (dharineesh.ct23@bitsathy.ac.in / 7376232CT109)
+  const isAdminUser = useMemo(() => {
+    if (!currentUser) return false;
+    const email = (currentUser.email || '').toLowerCase().trim();
+    const id = (currentUser.id || '').toUpperCase().trim();
+    return email === 'dharineesh.ct23@bitsathy.ac.in' || id === '7376232CT109';
+  }, [currentUser]);
+
+  const [cloudProvider, setCloudProvider] = useState(() => {
+    try {
+      return localStorage.getItem('bit_cloud_provider') || 'firebase';
+    } catch (e) {
+      return 'firebase';
+    }
+  });
+
+  const DEFAULT_FIREBASE_DB_URL = 'https://rewards-site-7a5a8-default-rtdb.firebaseio.com';
+
+  const [firebaseDbUrl, setFirebaseDbUrl] = useState(() => {
+    try {
+      return localStorage.getItem('bit_firebase_url') || DEFAULT_FIREBASE_DB_URL;
+    } catch (e) {
+      return DEFAULT_FIREBASE_DB_URL;
+    }
+  });
+
+  const [firebaseInputUrl, setFirebaseInputUrl] = useState(() => {
+    try {
+      return localStorage.getItem('bit_firebase_url') || DEFAULT_FIREBASE_DB_URL;
+    } catch (e) {
+      return DEFAULT_FIREBASE_DB_URL;
+    }
+  });
+
+  const [activityLogs, setActivityLogs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bit_activity_logs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(l => l && !['log-1', 'log-2', 'log-3', 'log-4', 'log-5', 'log-6', 'log-7', 'log-8'].includes(l.id));
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  // Fetch real-time logs from Firebase Database
+  const fetchFirebaseLogs = async (urlOverride) => {
+    const targetUrl = (urlOverride || firebaseDbUrl || localStorage.getItem('bit_firebase_url') || DEFAULT_FIREBASE_DB_URL).trim().replace(/\/$/, '');
+    if (!targetUrl || !targetUrl.startsWith('http')) return;
+    
+    setSheetSyncStatus('pinging');
+    try {
+      const res = await fetch(`${targetUrl}/logs.json`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          const remoteList = Object.entries(data).map(([key, val]) => ({
+            ...val,
+            id: val.id || key
+          }));
+          remoteList.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+          setActivityLogs(remoteList);
+          try {
+            localStorage.setItem('bit_activity_logs', JSON.stringify(remoteList));
+          } catch (e) {}
+          setSheetSyncStatus('connected');
+        } else {
+          setSheetSyncStatus('connected');
+        }
+      } else {
+        setSheetSyncStatus('connected');
+      }
+    } catch (e) {
+      console.warn('Firebase sync error:', e);
+      setSheetSyncStatus('connected');
+    }
+  };
+
+  // Initial load from Firebase if configured
+  useEffect(() => {
+    fetchFirebaseLogs();
+  }, []);
+
+  // Log activity helper (saves locally & triggers Firebase / Google Sheets)
+  const logActivity = (student, action = 'Login') => {
+    if (!student) return;
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const browser = /Edg/i.test(ua) ? 'Edge' : /Chrome/i.test(ua) ? 'Chrome' : /Safari/i.test(ua) ? 'Safari' : /Firefox/i.test(ua) ? 'Firefox' : 'Browser';
+    const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad/i.test(ua) ? 'iOS' : /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'Mac' : 'Device';
+    const deviceStr = `${os} (${browser})`;
+
+    const newEntry = {
+      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: student.name || student.student_name || 'BIT Student',
+      roll_no: student.id || student.roll_no || 'Unknown',
+      department: student.department || student.dept || 'Computer Technology',
+      email: student.email || `${student.id || student.roll_no || 'student'}@bitsathy.ac.in`,
+      action: action,
+      device: deviceStr,
+      timestamp: new Date().toISOString()
+    };
+
+    setActivityLogs(prev => {
+      const updated = [newEntry, ...prev.slice(0, 499)];
+      try {
+        localStorage.setItem('bit_activity_logs', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // 1. Send to Firebase Realtime Database if configured
+    const fUrl = localStorage.getItem('bit_firebase_url');
+    if (fUrl && fUrl.startsWith('http')) {
+      const cleanFUrl = fUrl.trim().replace(/\/$/, '');
+      try {
+        fetch(`${cleanFUrl}/logs.json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newEntry)
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    // 2. Send to Google Sheets Webhook if configured
+    const gsheetUrl = localStorage.getItem('bit_gsheet_url');
+    if (gsheetUrl && gsheetUrl.startsWith('http')) {
+      try {
+        fetch(gsheetUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newEntry)
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  };
+
+  // Save Firebase URL & Sync
+  const handleSaveFirebaseUrl = () => {
+    const cleaned = firebaseInputUrl.trim().replace(/\/$/, '');
+    try {
+      localStorage.setItem('bit_firebase_url', cleaned);
+      localStorage.setItem('bit_cloud_provider', 'firebase');
+      setFirebaseDbUrl(cleaned);
+      if (cleaned) {
+        setSheetSyncStatus('connected');
+        fetchFirebaseLogs(cleaned);
+        alert('🔥 Firebase Realtime Database URL saved! Syncing live data...');
+      } else {
+        setSheetSyncStatus('standby');
+      }
+    } catch (e) {}
+  };
+
+  const handleTestFirebasePing = async () => {
+    const cleaned = firebaseInputUrl.trim().replace(/\/$/, '');
+    if (!cleaned) {
+      alert('Please enter your Firebase Realtime Database URL first.');
+      return;
+    }
+    setSheetSyncStatus('pinging');
+    try {
+      const testObj = {
+        id: `test-${Date.now()}`,
+        name: 'ADMIN TEST PING',
+        roll_no: '7376232CT109',
+        department: 'Computer Technology',
+        email: 'dharineesh.ct23@bitsathy.ac.in',
+        action: 'Test Ping',
+        device: 'Admin Console (Firebase)',
+        timestamp: new Date().toISOString()
+      };
+      const res = await fetch(`${cleaned}/logs.json`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testObj)
+      });
+      if (res.ok) {
+        setSheetSyncStatus('connected');
+        alert('🔥 Test Ping successfully saved to Firebase Realtime DB! Now fetching latest logs...');
+        fetchFirebaseLogs(cleaned);
+      } else {
+        setSheetSyncStatus('connected');
+        alert(`Firebase responded with status ${res.status}. Check your Realtime Database rules (.read: true, .write: true).`);
+      }
+    } catch (err) {
+      setSheetSyncStatus('connected');
+      alert(`Could not connect to Firebase: ${err.message}. Make sure the URL is correct.`);
+    }
+  };
+
+  // Google Sheets Save & Test Ping
+  const handleSaveGoogleSheetUrl = () => {
+    try {
+      localStorage.setItem('bit_gsheet_url', sheetInputUrl.trim());
+      localStorage.setItem('bit_cloud_provider', 'gsheet');
+      setGoogleSheetUrl(sheetInputUrl.trim());
+      if (sheetInputUrl.trim()) {
+        setSheetSyncStatus('connected');
+      } else {
+        setSheetSyncStatus('standby');
+      }
+    } catch (e) {}
+  };
+
+  const handleTestGoogleSheetPing = async () => {
+    if (!sheetInputUrl.trim()) {
+      alert('Please enter your Google Apps Script Webhook URL first.');
+      return;
+    }
+    setSheetSyncStatus('pinging');
+    try {
+      await fetch(sheetInputUrl.trim(), {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'ADMIN TEST PING',
+          roll_no: '7376232CT109',
+          department: 'Computer Technology',
+          email: 'dharineesh.ct23@bitsathy.ac.in',
+          action: 'Test Ping',
+          device: 'Admin Console'
+        })
+      });
+      setSheetSyncStatus('connected');
+      alert('✅ Test Ping sent successfully! Check your Google Sheet to see the new row.');
+    } catch (err) {
+      setSheetSyncStatus('connected');
+      alert('Ping dispatched to Google Sheet URL.');
+    }
+  };
+
+  // Export Logs to CSV
+  const handleExportLogsCSV = () => {
+    if (activityLogs.length === 0) {
+      alert('No activity logs to export.');
+      return;
+    }
+    const headers = ['Timestamp', 'Student Name', 'Roll Number', 'Department', 'Email', 'Action', 'Device / OS'];
+    const rows = activityLogs.map(l => [
+      `"${new Date(l.timestamp).toLocaleString()}"`,
+      `"${l.name}"`,
+      `"${l.roll_no}"`,
+      `"${l.department}"`,
+      `"${l.email}"`,
+      `"${l.action}"`,
+      `"${l.device}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `bit_rewards_users_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Clear Activity Logs
+  const handleClearLogs = () => {
+    if (window.confirm('Are you sure you want to clear the local activity logs?')) {
+      setActivityLogs([]);
+      try {
+        localStorage.removeItem('bit_activity_logs');
+      } catch (e) {}
+    }
+  };
+
+  // Computed Admin Analytics Metrics
+  const adminMetrics = useMemo(() => {
+    const totalLogs = activityLogs.length;
+    const uniqueUsersSet = new Set(activityLogs.map(l => (l.roll_no || '').toUpperCase()));
+    const totalUniqueUsers = uniqueUsersSet.size;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const activeToday = activityLogs.filter(l => l.timestamp && l.timestamp.startsWith(todayStr)).length;
+    const totalSearches = activityLogs.filter(l => l.action === 'Search').length;
+
+    let mobileCount = 0;
+    let desktopCount = 0;
+    activityLogs.forEach(l => {
+      if (l.device && (l.device.includes('Android') || l.device.includes('iOS') || l.device.includes('Mobile'))) {
+        mobileCount++;
+      } else {
+        desktopCount++;
+      }
+    });
+
+    const mobilePercent = totalLogs > 0 ? Math.round((mobileCount / totalLogs) * 100) : 0;
+    const desktopPercent = totalLogs > 0 ? (100 - mobilePercent) : 0;
+
+    // Dept breakdown
+    const deptCounts = {};
+    activityLogs.forEach(l => {
+      const d = l.department || 'Computer Technology';
+      deptCounts[d] = (deptCounts[d] || 0) + 1;
+    });
+
+    const topDepts = Object.entries(deptCounts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percent: totalLogs > 0 ? Math.round((count / totalLogs) * 100) : 0
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      totalLogs,
+      totalUniqueUsers,
+      activeToday,
+      totalSearches,
+      mobilePercent,
+      desktopPercent,
+      topDepts
+    };
+  }, [activityLogs]);
+
   const normalizeStudentYear = (yearStr, rollNo) => {
     const s = String(yearStr || '').trim().toUpperCase();
     if (s === 'IV' || s === '4' || s.includes('IV') || s.includes('4')) return 'Year IV';
@@ -903,6 +1260,7 @@ export default function App() {
       localStorage.setItem('bit_rp_is_logged_in', 'true');
       localStorage.setItem('bit_rp_user', JSON.stringify(user));
       localStorage.setItem('bit_rp_last_active', Date.now().toString());
+      logActivity(user, 'Login');
     } catch (e) {
       console.warn('Failed to save session to localStorage:', e);
     }
@@ -1391,6 +1749,26 @@ export default function App() {
             <Settings className="w-5 h-5" strokeWidth={activeNav === 'Settings' ? 2.2 : 1.8} />
             <span>Settings</span>
           </button>
+
+          {/* Admin & Developer Console (Only visible to Dharineesh) */}
+          {isAdminUser && (
+            <button
+              onClick={() => { setActiveNav('Admin Console'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer border ${
+                activeNav === 'Admin Console'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white shadow-lg shadow-purple-500/25'
+                  : isDarkMode
+                    ? 'border-purple-900/40 bg-purple-950/20 text-purple-300 hover:text-white hover:bg-purple-900/30'
+                    : 'border-purple-200 bg-purple-50/70 text-purple-800 hover:bg-purple-100/80 shadow-xs'
+              }`}
+            >
+              <ShieldCheck className="w-5 h-5 text-purple-400" strokeWidth={activeNav === 'Admin Console' ? 2.2 : 1.8} />
+              <div className="flex items-center justify-between w-full">
+                <span>Admin Console</span>
+                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 border border-purple-400/40">DEV</span>
+              </div>
+            </button>
+          )}
 
           {/* PWA Install App Button */}
           {isInstallable && (
@@ -2648,6 +3026,484 @@ export default function App() {
             </div>
           )}
 
+          {/* VIEW 5: ADMIN & DEVELOPER CONSOLE (Only accessible to Dharineesh) */}
+          {activeNav === 'Admin Console' && isAdminUser && (
+            <div className="max-w-6xl mx-auto w-full space-y-6 animate-fadeIn">
+              
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                      <ShieldCheck className="w-5 h-5" />
+                    </span>
+                    <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Admin & Developer Console
+                    </h1>
+                  </div>
+                  <p className={`text-xs sm:text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Real-time student login monitoring, roll number searches, and Google Sheets cloud analytics.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    onClick={handleExportLogsCSV}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
+                    title="Download Excel / CSV"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export CSV</span>
+                  </button>
+                  <button
+                    onClick={handleClearLogs}
+                    className={`p-2 rounded-xl border transition-all cursor-pointer text-xs ${
+                      isDarkMode ? 'border-slate-800 text-slate-400 hover:text-rose-400 hover:bg-slate-900' : 'border-slate-300 text-slate-600 hover:text-rose-600 hover:bg-slate-100'
+                    }`}
+                    title="Clear activity logs"
+                  >
+                    Clear Logs
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 KPI Top Metric Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                
+                {/* 1. Total Unique Users */}
+                <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Total Students
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl sm:text-3xl font-black text-indigo-500 dark:text-indigo-400 tracking-tight">
+                      {adminMetrics.totalUniqueUsers.toLocaleString()}
+                    </div>
+                    <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Unique student roll numbers
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Active Today */}
+                <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Active Today
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <Activity className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl sm:text-3xl font-black text-emerald-500 dark:text-emerald-400 tracking-tight">
+                      {adminMetrics.activeToday.toLocaleString()}
+                    </div>
+                    <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Live daily active sessions
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Total Searches */}
+                <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Searches Logged
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <Search className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl sm:text-3xl font-black text-amber-500 dark:text-amber-400 tracking-tight">
+                      {adminMetrics.totalSearches.toLocaleString()}
+                    </div>
+                    <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Student profile queries
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Mobile vs Desktop */}
+                <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Mobile vs Desktop
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                      <Smartphone className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-xl sm:text-2xl font-black text-cyan-500 dark:text-cyan-400 tracking-tight">
+                      {adminMetrics.mobilePercent}% <span className="text-xs font-bold text-slate-400">/ {adminMetrics.desktopPercent}%</span>
+                    </div>
+                    <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Phones vs PCs
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Cloud Database Sync Card (Firebase Realtime DB / Google Sheets) */}
+              <div className={`rounded-3xl border p-5 sm:p-6 shadow-xl space-y-4 ${
+                isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 dark:border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                      cloudProvider === 'firebase' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-500'
+                    }`}>
+                      {cloudProvider === 'firebase' ? <Database className="w-5 h-5" /> : <FileSpreadsheet className="w-5 h-5" />}
+                    </div>
+                    <div>
+                      <h3 className={`text-base font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Cloud Database Live Sync
+                      </h3>
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Permanent multi-device student login monitoring across the college.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Provider Selector Tabs & Status */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex rounded-xl p-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                      <button
+                        onClick={() => { setCloudProvider('firebase'); localStorage.setItem('bit_cloud_provider', 'firebase'); }}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                          cloudProvider === 'firebase'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        🔥 Firebase DB
+                      </button>
+                      <button
+                        onClick={() => { setCloudProvider('gsheet'); localStorage.setItem('bit_cloud_provider', 'gsheet'); }}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                          cloudProvider === 'gsheet'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        📊 Google Sheets
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => setShowScriptCode(prev => !prev)}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors cursor-pointer ${
+                        isDarkMode ? 'border-slate-700 hover:bg-slate-800 text-indigo-400' : 'border-slate-300 hover:bg-slate-100 text-indigo-600'
+                      }`}
+                    >
+                      {showScriptCode ? 'Hide Guide' : 'Setup Guide 📖'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* FIREBASE INPUT & SYNC */}
+                {cloudProvider === 'firebase' && (
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <input
+                        type="url"
+                        value={firebaseInputUrl}
+                        onChange={(e) => setFirebaseInputUrl(e.target.value)}
+                        placeholder="Paste Firebase Realtime DB URL (e.g. https://myproject-default-rtdb.firebaseio.com)"
+                        className={`flex-1 px-4 py-2.5 rounded-2xl text-xs sm:text-sm border font-mono transition-all outline-none ${
+                          isDarkMode 
+                            ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500 focus:border-amber-500' 
+                            : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-amber-500 shadow-xs'
+                        }`}
+                      />
+                      <button
+                        onClick={handleSaveFirebaseUrl}
+                        className="px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        Save & Sync Live
+                      </button>
+                      <button
+                        onClick={handleTestFirebasePing}
+                        className={`px-4 py-2.5 rounded-2xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+                          isDarkMode ? 'border-slate-700 hover:bg-slate-800 text-slate-200' : 'border-slate-300 hover:bg-slate-100 text-slate-700 shadow-xs'
+                        }`}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${sheetSyncStatus === 'pinging' ? 'animate-spin' : ''}`} />
+                        <span>Test Ping</span>
+                      </button>
+                    </div>
+
+                    {showScriptCode && (
+                      <div className={`p-4 rounded-2xl border space-y-2.5 text-xs ${
+                        isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-amber-50/50 border-amber-200 text-slate-800'
+                      }`}>
+                        <div className="font-extrabold text-amber-500 uppercase tracking-wider text-[11px]">
+                          ⚡ 30-Second Firebase Realtime Database Setup (Free Forever)
+                        </div>
+                        <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
+                          <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-amber-500 underline font-bold">console.firebase.google.com</a> $\rightarrow$ Click <strong>Add Project</strong>.</li>
+                          <li>In left sidebar, click <strong>Build $\rightarrow$ Realtime Database $\rightarrow$ Create Database</strong>.</li>
+                          <li>Go to the <strong>Rules</strong> tab and set both <code className="font-mono font-bold">".read": true, ".write": true</code> $\rightarrow$ Click <strong>Publish</strong>.</li>
+                          <li>Copy the Database URL at the top (e.g. <code className="font-mono text-amber-400">https://yourproject-default-rtdb.firebaseio.com</code>) and paste it above!</li>
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* GOOGLE SHEETS INPUT & SYNC */}
+                {cloudProvider === 'gsheet' && (
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <input
+                        type="url"
+                        value={sheetInputUrl}
+                        onChange={(e) => setSheetInputUrl(e.target.value)}
+                        placeholder="Paste Google Apps Script Webhook URL (https://script.google.com/macros/s/.../exec)"
+                        className={`flex-1 px-4 py-2.5 rounded-2xl text-xs sm:text-sm border font-mono transition-all outline-none ${
+                          isDarkMode 
+                            ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
+                            : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500 shadow-xs'
+                        }`}
+                      />
+                      <button
+                        onClick={handleSaveGoogleSheetUrl}
+                        className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        Save URL
+                      </button>
+                      <button
+                        onClick={handleTestGoogleSheetPing}
+                        className={`px-4 py-2.5 rounded-2xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+                          isDarkMode ? 'border-slate-700 hover:bg-slate-800 text-slate-200' : 'border-slate-300 hover:bg-slate-100 text-slate-700 shadow-xs'
+                        }`}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${sheetSyncStatus === 'pinging' ? 'animate-spin' : ''}`} />
+                        <span>Test Ping</span>
+                      </button>
+                    </div>
+
+                    {showScriptCode && (
+                      <div className={`p-4 rounded-2xl border space-y-3 ${
+                        isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">
+                            Google Apps Script Code (Copy & Deploy as Web App)
+                          </h4>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    new Date(),
+    data.name || '',
+    data.roll_no || '',
+    data.department || '',
+    data.email || '',
+    data.action || 'Login',
+    data.device || ''
+  ]);
+  return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+}`);
+                              setCopiedScript(true);
+                              setTimeout(() => setCopiedScript(false), 2500);
+                            }}
+                            className="px-3 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold cursor-pointer hover:bg-indigo-500"
+                          >
+                            {copiedScript ? '✅ Copied!' : 'Copy Script'}
+                          </button>
+                        </div>
+                        <pre className="p-3 rounded-xl bg-slate-900 text-emerald-400 font-mono text-[10px] overflow-x-auto border border-slate-800">
+{`function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    new Date(),
+    data.name || '',
+    data.roll_no || '',
+    data.department || '',
+    data.email || '',
+    data.action || 'Login',
+    data.device || ''
+  ]);
+  return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+}`}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 2-Column Section: Department Distribution & Live Activity Logs */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Left Column: Department Breakdown (4 cols) */}
+                <div className={`lg:col-span-4 rounded-3xl border p-5 sm:p-6 shadow-xl space-y-4 ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
+                }`}>
+                  <div className="flex items-center justify-between border-b pb-3 dark:border-slate-800">
+                    <h3 className={`text-sm font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Department Engagement
+                    </h3>
+                    <span className="text-[10px] font-bold text-indigo-400">
+                      {adminMetrics.topDepts.length} Branches Active
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                    {adminMetrics.topDepts.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-slate-400">
+                        No department activity logged yet.
+                      </div>
+                    ) : (
+                      adminMetrics.topDepts.map((d, i) => (
+                        <div key={i} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs font-semibold">
+                            <span className={`truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{d.name}</span>
+                            <span className="text-indigo-400 font-mono font-bold flex-shrink-0">{d.count} ({d.percent}%)</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
+                              style={{ width: `${Math.max(d.percent, 8)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Column: Live Activity Feed Table (8 cols) */}
+                <div className={`lg:col-span-8 rounded-3xl border overflow-hidden shadow-xl ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
+                }`}>
+                  {/* Table Header & Search Filter */}
+                  <div className={`p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    isDarkMode ? 'border-slate-800 bg-slate-950/60' : 'border-slate-100 bg-slate-50'
+                  }`}>
+                    <div>
+                      <h3 className={`text-sm font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Live Student Activity Feed
+                      </h3>
+                      <p className={`text-[11px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {activityLogs.length} total logged sessions
+                      </p>
+                    </div>
+
+                    {/* Filter Input */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Search className={`w-3.5 h-3.5 absolute left-3 top-2.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+                        <input
+                          type="text"
+                          value={logFilterQuery}
+                          onChange={(e) => setLogFilterQuery(e.target.value)}
+                          placeholder="Filter name, rollno..."
+                          className={`pl-8 pr-3 py-1.5 rounded-xl text-xs border outline-none ${
+                            isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900 shadow-xs'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className={`text-[11px] uppercase tracking-wider sticky top-0 z-10 ${
+                        isDarkMode ? 'bg-slate-800/90 text-slate-400' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <tr>
+                          <th className="py-2.5 px-3.5">Student</th>
+                          <th className="py-2.5 px-3">Department</th>
+                          <th className="py-2.5 px-3">Action</th>
+                          <th className="py-2.5 px-3">Device / OS</th>
+                          <th className="py-2.5 px-3 text-right">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`text-xs divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
+                        {activityLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan="5" className="py-12 text-center text-xs text-slate-400">
+                              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-2 text-slate-400">
+                                <Users className="w-5 h-5" />
+                              </div>
+                              <p className="font-bold text-slate-400">No student sessions recorded yet.</p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">Real-time logins and roll number searches will appear here live.</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          activityLogs
+                            .filter(l => {
+                              if (!logFilterQuery) return true;
+                              const q = logFilterQuery.toLowerCase();
+                              return (
+                                (l.name && l.name.toLowerCase().includes(q)) ||
+                                (l.roll_no && l.roll_no.toLowerCase().includes(q)) ||
+                                (l.department && l.department.toLowerCase().includes(q))
+                              );
+                            })
+                            .map((log) => (
+                              <tr key={log.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
+                                <td className="py-3 px-3.5">
+                                  <div className="font-bold truncate max-w-[140px] sm:max-w-[180px]">{log.name}</div>
+                                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                                    isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
+                                  }`}>
+                                    {log.roll_no}
+                                  </span>
+                                </td>
+                                <td className={`py-3 px-3 text-[11px] truncate max-w-[120px] ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  {log.department}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                                    log.action === 'Login'
+                                      ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                                      : 'bg-indigo-950/80 text-indigo-300 border-indigo-800'
+                                  }`}>
+                                    {log.action}
+                                  </span>
+                                </td>
+                                <td className={`py-3 px-3 text-[11px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  {log.device}
+                                </td>
+                                <td className={`py-3 px-3 text-right text-[10px] whitespace-nowrap ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                              </tr>
+                            ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
         </main>
       </div>
 
@@ -2657,51 +3513,65 @@ export default function App() {
       }`}>
         <button
           onClick={() => setActiveNav('Dashboard')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === 'Dashboard' 
               ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
               : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <LayoutGrid className="w-5 h-5" strokeWidth={activeNav === 'Dashboard' ? 2.4 : 1.8} />
+          <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Dashboard' ? 2.4 : 1.8} />
           <span className="text-[10px]">Dashboard</span>
         </button>
 
         <button
           onClick={() => setActiveNav('Leaderboard')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === 'Leaderboard' 
               ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
               : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <BarChart2 className="w-5 h-5" strokeWidth={activeNav === 'Leaderboard' ? 2.4 : 1.8} />
+          <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Leaderboard' ? 2.4 : 1.8} />
           <span className="text-[10px]">Leaderboard</span>
         </button>
 
         <button
           onClick={() => setActiveNav('Rewards History')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === 'Rewards History' 
               ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
               : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <History className="w-5 h-5" strokeWidth={activeNav === 'Rewards History' ? 2.4 : 1.8} />
+          <History className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Rewards History' ? 2.4 : 1.8} />
           <span className="text-[10px]">History</span>
         </button>
 
         <button
           onClick={() => setActiveNav('Settings')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
             activeNav === 'Settings' 
               ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
               : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Settings className="w-5 h-5" strokeWidth={activeNav === 'Settings' ? 2.4 : 1.8} />
+          <Settings className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Settings' ? 2.4 : 1.8} />
           <span className="text-[10px]">Settings</span>
         </button>
+
+        {isAdminUser && (
+          <button
+            onClick={() => setActiveNav('Admin Console')}
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+              activeNav === 'Admin Console' 
+                ? 'text-purple-600 dark:text-purple-400 font-extrabold' 
+                : isDarkMode ? 'text-purple-400/70 hover:text-purple-300' : 'text-purple-600/70 hover:text-purple-800'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Admin Console' ? 2.4 : 1.8} />
+            <span className="text-[10px]">Admin</span>
+          </button>
+        )}
       </div>
 
       {/* 4. FOOTER */}
