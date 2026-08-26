@@ -1674,30 +1674,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* User Card in Drawer */}
-        <div className={`p-3 rounded-2xl border mb-3 flex items-center gap-3 ${
-          isDarkMode ? 'bg-slate-800/60 border-slate-700/80' : 'bg-slate-50 border-slate-200'
-        }`}>
-          <div className={`w-9 h-9 rounded-xl overflow-hidden shadow-xs flex-shrink-0 border ${
-            isDarkMode ? 'border-slate-700' : 'border-slate-300'
-          }`}>
-            <AvatarImage
-              src={currentUser.picture || currentUser.photo_url}
-              alt={currentUser.name}
-              initials={currentUser.initials}
-              fallbackBg={currentUser.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className={`text-xs font-bold truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-              {currentUser.name}
-            </div>
-            <div className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              {currentUser.email || currentUser.id}
-            </div>
-          </div>
-        </div>
-
         {/* Navigation Items */}
         <nav className="space-y-1.5 flex-1 overflow-y-auto">
           <button
