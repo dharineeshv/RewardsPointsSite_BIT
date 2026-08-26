@@ -1574,8 +1574,8 @@ export default function App() {
                         }
 
                         return (
-                          <div key={index} className={`p-3.5 transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
-                            <div className="flex items-start justify-between gap-2.5 mb-2">
+                          <div key={index} className={`py-4 px-3.5 sm:px-4 transition-colors space-y-1.5 ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
+                            <div className="flex items-start justify-between gap-3">
                               <h4 className={`text-xs font-bold leading-snug flex-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                 {act.activity_name || act.course_name || 'Academic Course Activity'}
                               </h4>
@@ -1588,7 +1588,7 @@ export default function App() {
                               </span>
                             </div>
 
-                            <div className={`flex flex-wrap items-center justify-between gap-1.5 text-[11px] pt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <div className={`flex flex-wrap items-center justify-between gap-2 text-[11px] pt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeStyle}`}>
                                 {act.activity_type || 'General'}
                               </span>
@@ -2084,62 +2084,64 @@ export default function App() {
                           {/* Mobile Responsive Ranking Cards (Phones < 640px) */}
                           <div className={`block sm:hidden divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                             {filteredList.length === 0 ? (
-                              <div className={`py-8 text-center font-medium text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              <div className={`py-10 text-center font-medium text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                 No students matching the selected year and search criteria.
                               </div>
                             ) : (
                               filteredList.map((st, index) => {
                                 const rank = index + 1;
                                 let rankBadge = (
-                                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full font-extrabold text-[11px] border ${
+                                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full font-extrabold text-xs border shadow-xs ${
                                     isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
                                   }`}>
                                     {rank}
                                   </span>
                                 );
                                 if (rank === 1) {
-                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-amber-500/20 text-amber-500 dark:text-amber-300 border border-amber-500/60">🥇 1</span>;
+                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[11px] bg-amber-500/20 text-amber-500 dark:text-amber-300 border border-amber-500/60 shadow-xs">🥇 1</span>;
                                 } else if (rank === 2) {
-                                  rankBadge = <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] border ${
+                                  rankBadge = <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-black text-[11px] border shadow-xs ${
                                     isDarkMode ? 'bg-slate-700 text-slate-200 border-slate-500' : 'bg-slate-200 text-slate-700 border-slate-400'
                                   }`}>🥈 2</span>;
                                 } else if (rank === 3) {
-                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-600/40">🥉 3</span>;
+                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[11px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-600/40 shadow-xs">🥉 3</span>;
                                 }
 
                                 return (
                                   <div 
                                     key={st.roll_no}
-                                    className={`p-3.5 flex items-center justify-between gap-2.5 transition-colors ${
+                                    className={`py-4 px-3.5 flex items-center justify-between gap-3 transition-colors ${
                                       isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
-                                    } ${rank <= 3 ? (isDarkMode ? 'bg-slate-900/40' : 'bg-indigo-50/30') : ''}`}
+                                    } ${rank <= 3 ? (isDarkMode ? 'bg-slate-900/40' : 'bg-indigo-50/25') : ''}`}
                                   >
-                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
                                       <div className="flex-shrink-0">
                                         {rankBadge}
                                       </div>
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-1.5 truncate">
-                                          <h4 className={`text-xs font-bold truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{st.student_name}</h4>
-                                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono border flex-shrink-0 ${
-                                            isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
+                                      <div className="min-w-0 flex-1 space-y-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <h4 className={`text-xs font-bold leading-tight truncate max-w-[170px] ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                            {st.student_name}
+                                          </h4>
+                                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-medium border flex-shrink-0 ${
+                                            isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
                                           }`}>
                                             {st.roll_no}
                                           </span>
                                         </div>
-                                        <div className={`flex items-center gap-1.5 text-[10px] mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                          <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{st.normalizedYear}</span>
+                                        <div className={`flex items-center gap-1.5 text-[11px] truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                          <span className="font-bold text-indigo-600 dark:text-indigo-400 flex-shrink-0">{st.normalizedYear}</span>
                                           {st.mentor_name && st.mentor_name !== 'N/A' && (
                                             <>
-                                              <span>•</span>
-                                              <span className="truncate">{st.mentor_name}</span>
+                                              <span className="opacity-40">•</span>
+                                              <span className="truncate text-[10px]">{st.mentor_name}</span>
                                             </>
                                           )}
                                         </div>
                                       </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0 pl-1">
                                       <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
                                         +{st.displayBalance} RP
                                       </span>
@@ -2149,7 +2151,7 @@ export default function App() {
                                           setSelectedStudent(transformed);
                                           setIsModalOpen(true);
                                         }}
-                                        className="px-2.5 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                                        className="px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] transition-all cursor-pointer shadow-xs whitespace-nowrap active:scale-95"
                                       >
                                         Inspect
                                       </button>
@@ -2291,9 +2293,9 @@ export default function App() {
                     </div>
                   ) : (
                     rewardsData.map((item, idx) => (
-                      <div key={idx} className={`p-3.5 transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
-                        <div className="flex items-start justify-between gap-2.5 mb-2">
-                          <div className="flex items-start gap-2 flex-1">
+                      <div key={idx} className={`py-4 px-3.5 sm:px-4 transition-colors space-y-1.5 ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5 flex-1">
                             <span className={`text-[10px] font-mono mt-0.5 flex-shrink-0 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                               #{idx + 1}
                             </span>
@@ -2306,7 +2308,7 @@ export default function App() {
                           </span>
                         </div>
 
-                        <div className={`flex flex-wrap items-center justify-between gap-1.5 text-[11px] pt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <div className={`flex flex-wrap items-center justify-between gap-2 text-[11px] pt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                             isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
                           }`}>
