@@ -36,7 +36,9 @@ import {
   Building2,
   Phone,
   LogOut,
-  Medal
+  Medal,
+  Monitor,
+  Menu
 } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
@@ -187,16 +189,16 @@ function AvatarImage({ src, alt = "Avatar", initials = "ST", className = "w-full
 import { useGoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 
-// Unified Bitcentral API proxy fetcher (CORS-safe on Vercel and local dev)
+// Unified Bitcentral API proxy fetcher (Routes purely through secure serverless gateway)
 async function bitcentralFetch(pathAndQuery) {
   const cleanPath = pathAndQuery.startsWith('/') ? pathAndQuery : `/${pathAndQuery}`;
-  try {
-    const proxyRes = await fetch(`/api/bitcentral${cleanPath}`);
-    if (proxyRes.ok) return proxyRes;
-  } catch (err) {
-    console.warn(`Proxy fetch failed for ${cleanPath}, attempting direct connection:`, err);
-  }
-  return fetch(`https://bitcentral-api.onrender.com${cleanPath}`);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('bit_rp_access_token') : null;
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+
+  return fetch(`/api/bitcentral${cleanPath}`, { headers });
 }
 
 // Standalone Login Page Component
@@ -210,6 +212,9 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
       setGoogleLoading(true);
       setAuthError('');
       try {
+        if (tokenResponse.access_token) {
+          localStorage.setItem('bit_rp_access_token', tokenResponse.access_token);
+        }
         const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
@@ -310,10 +315,14 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
   };
 
   return (
-    <div className="h-screen max-h-screen overflow-y-auto sm:overflow-hidden flex flex-col justify-between bg-slate-950 text-slate-100">
+    <div className={`h-screen max-h-screen overflow-y-auto sm:overflow-hidden flex flex-col justify-between transition-colors duration-200 ${
+      isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+    }`}>
       
       {/* Top Navbar */}
-      <header className="w-full px-5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between border-b border-slate-800/60 bg-slate-900/40 flex-shrink-0">
+      <header className={`w-full px-5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between border-b flex-shrink-0 transition-colors duration-200 ${
+        isDarkMode ? 'border-slate-800/60 bg-slate-900/40 text-slate-100' : 'border-slate-200 bg-white/80 text-slate-900 shadow-xs'
+      }`}>
         <div className="flex items-center gap-3">
           <img 
             src="/bit-logo.png" 
@@ -321,25 +330,29 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
             className="h-9 sm:h-10 object-contain rounded-md bg-white p-1 shadow-xs"
           />
           <div>
-            <span className="text-sm sm:text-base font-black tracking-tight text-indigo-400">
+            <span className="text-sm sm:text-base font-black tracking-tight text-indigo-600 dark:text-indigo-400">
               Reward Points Site
             </span>
-            <span className="block text-[10px] text-slate-400 font-semibold tracking-wide">
+            <span className={`block text-[10px] font-semibold tracking-wide ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
               Bannari Amman Institute of Technology
             </span>
           </div>
         </div>
 
         {/* Top Right Developer Credit */}
-        <div className="text-right text-xs text-slate-400 hidden sm:block">
-          <div>Developed by <span className="font-bold text-indigo-400">Dharineesh V</span></div>
-          <div className="text-[10px] text-slate-400">(Dept. of Computer Technology)</div>
+        <div className={`text-right text-xs hidden sm:block ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+          <div>Developed by <span className="font-bold text-indigo-600 dark:text-indigo-400">Dharineesh V</span></div>
+          <div className={`text-[10px] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>(Dept. of Computer Technology)</div>
         </div>
       </header>
 
       {/* Main Login Card Container */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 my-auto">
-        <div className="w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/60 border border-slate-800 bg-slate-900 text-slate-100 backdrop-blur-md">
+        <div className={`w-full max-w-md rounded-3xl p-6 sm:p-8 border backdrop-blur-md transition-all duration-200 ${
+          isDarkMode 
+            ? 'shadow-2xl shadow-black/60 border-slate-800 bg-slate-900 text-slate-100' 
+            : 'shadow-2xl shadow-slate-300/60 border-slate-200 bg-white text-slate-900'
+        }`}>
           
           {/* Logo & Header Title */}
           <div className="flex flex-col items-center text-center mb-6">
@@ -351,24 +364,24 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
               />
             </div>
             
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+            <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               Reward Points Site
             </h1>
-            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-medium">
+            <p className={`text-[11px] sm:text-xs mt-0.5 font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
               Bannari Amman Institute of Technology
             </p>
-            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 text-[10px] sm:text-[11px] font-bold border border-indigo-800/60">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 text-[10px] sm:text-[11px] font-bold border border-indigo-200 dark:border-indigo-800/60">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
               <span>Student RP Portal</span>
             </div>
             
-            <p className="text-xs text-slate-400 mt-3 leading-relaxed max-w-xs">
+            <p className={`text-xs mt-3 leading-relaxed max-w-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               Sign in with your official BIT Google account to access your reward points, activities, and achievements.
             </p>
           </div>
 
           {authError && (
-            <div className="mb-4 p-3 rounded-2xl bg-amber-950/50 border border-amber-800 text-amber-200 text-xs">
+            <div className="mb-4 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
               <div className="font-semibold mb-1">Notice:</div>
               <div>{authError}</div>
             </div>
@@ -379,7 +392,11 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
             type="button"
             onClick={handleLoginClick}
             disabled={googleLoading}
-            className="w-full py-3 px-5 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 border border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700/90 hover:border-slate-600 transition-all duration-150 cursor-pointer shadow-lg shadow-black/40 active:scale-98"
+            className={`w-full py-3 px-5 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 border transition-all duration-150 cursor-pointer active:scale-98 ${
+              isDarkMode 
+                ? 'border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700/90 hover:border-slate-600 shadow-lg shadow-black/40' 
+                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400 shadow-md'
+            }`}
           >
             {googleLoading ? (
               <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -390,9 +407,9 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
           </button>
 
           {/* Security / Help hint */}
-          <div className="mt-5 pt-4 border-t border-slate-800 text-center">
-            <p className="text-[11px] text-slate-400 font-medium">
-              Use your <span className="font-semibold text-slate-200">@bitsathy.ac.in</span> institutional email
+          <div className={`mt-5 pt-4 border-t text-center ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+            <p className={`text-[11px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Use your <span className={`font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>@bitsathy.ac.in</span> institutional email
             </p>
           </div>
 
@@ -400,15 +417,16 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
       </div>
 
       {/* Login Footer */}
-      <footer className="w-full py-2.5 sm:py-3 px-6 text-center text-xs text-slate-400 border-t border-slate-800/60 bg-slate-900/40 flex-shrink-0">
-        <div className="font-semibold text-slate-300 text-[11px] sm:text-xs">
+      <footer className={`w-full py-2.5 sm:py-3 px-6 text-center text-xs border-t flex-shrink-0 transition-colors duration-200 ${
+        isDarkMode ? 'border-slate-800/60 bg-slate-900/40 text-slate-400' : 'border-slate-200 bg-white text-slate-500'
+      }`}>
+        <div className={`font-semibold text-[11px] sm:text-xs ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
           © 2026 Rewards Points Site
         </div>
-        <div className="mt-0.5 text-[10px] text-slate-400">
-          Developed by <span className="font-bold text-indigo-400">Dharineesh V</span> (Dept. of Computer Technology)
+        <div className={`mt-0.5 text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+          Developed by <span className="font-bold text-indigo-600 dark:text-indigo-400">Dharineesh V</span> (Dept. of Computer Technology)
         </div>
       </footer>
-
     </div>
   );
 }
@@ -507,8 +525,54 @@ export default function App() {
 
   const [selectedStudent, setSelectedStudent] = useState(STUDENTS_DATABASE[0]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Theme Mode: 'system' (default), 'dark', or 'light'
+  const [themeMode, setThemeMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bit_rp_theme');
+      if (saved === 'dark' || saved === 'light' || saved === 'system') return saved;
+    } catch (e) {}
+    return 'system'; // System default
+  });
+
+  const [systemIsDark, setSystemIsDark] = useState(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      setSystemIsDark(e.matches);
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } else if (mediaQuery.addListener) {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
+  }, []);
+
+  const isDarkMode = themeMode === 'system' ? systemIsDark : themeMode === 'dark';
+
+  const setTheme = (mode) => {
+    setThemeMode(mode);
+    try {
+      localStorage.setItem('bit_rp_theme', mode);
+    } catch (e) {}
+  };
+
+  const toggleTheme = () => {
+    const next = isDarkMode ? 'light' : 'dark';
+    setTheme(next);
+  };
 
   // PWA Web App Installation State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -837,6 +901,7 @@ export default function App() {
       localStorage.removeItem('bit_rp_is_logged_in');
       localStorage.removeItem('bit_rp_user');
       localStorage.removeItem('bit_rp_last_active');
+      localStorage.removeItem('bit_rp_access_token');
     } catch (e) {
       console.warn('Failed to clear session from localStorage:', e);
     }
@@ -896,24 +961,42 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-slate-950 text-slate-100">
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
+      isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
+    }`}>
       
       {/* 1. TOP HEADER & NAVBAR */}
-      <header className="sticky top-0 z-30 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md transition-colors duration-200">
+      <header className={`sticky top-0 z-30 w-full border-b backdrop-blur-md transition-colors duration-200 ${
+        isDarkMode ? 'border-slate-800 bg-slate-950/90 text-slate-100' : 'border-slate-200 bg-white/90 text-slate-900 shadow-xs'
+      }`}>
         <div className="max-w-[1600px] mx-auto px-3.5 sm:px-6 md:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* Logo Section */}
+          {/* Hamburger Menu Toggle Button & Logo Section (Hamburger hidden on mobile) */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <button
+              onClick={() => setIsSidebarOpen(prev => !prev)}
+              className={`hidden md:flex p-2 rounded-xl transition-all cursor-pointer items-center justify-center ${
+                isDarkMode 
+                  ? 'hover:bg-slate-800 text-slate-300 hover:text-white' 
+                  : 'hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-xs'
+              }`}
+              title={isSidebarOpen ? 'Close Menu' : 'Open Navigation Menu'}
+              aria-label="Toggle Navigation Menu"
+            >
+              {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+
             <img 
               src="/bit-logo.png" 
               alt="Bannari Amman Institute of Technology" 
-              className="h-8 sm:h-10 object-contain rounded-md bg-white p-0.5 shadow-xs flex-shrink-0"
+              className="h-8 sm:h-10 object-contain rounded-md bg-white p-0.5 shadow-xs flex-shrink-0 cursor-pointer"
+              onClick={() => setActiveNav('Dashboard')}
             />
-            <div>
-              <span className="text-sm sm:text-base md:text-lg font-black text-indigo-400 tracking-tight block leading-tight">
+            <div className="cursor-pointer" onClick={() => setActiveNav('Dashboard')}>
+              <span className="text-sm sm:text-base md:text-lg font-black text-indigo-600 dark:text-indigo-400 tracking-tight block leading-tight">
                 Reward Points Site
               </span>
-              <span className="text-[10px] text-slate-400 font-semibold hidden sm:block">
+              <span className={`text-[10px] font-semibold hidden sm:block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 BIT Sathy
               </span>
             </div>
@@ -925,7 +1008,7 @@ export default function App() {
               {isSearching ? (
                 <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-4"></div>
               ) : (
-                <Search className="w-4 h-4 text-slate-400 absolute left-4 pointer-events-none" />
+                <Search className={`w-4 h-4 absolute left-4 pointer-events-none ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
               )}
               
               <input
@@ -934,14 +1017,18 @@ export default function App() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
-                placeholder="CT109, CT120..."
-                className="w-full pl-11 pr-10 py-2 rounded-full text-xs sm:text-sm font-medium transition-all outline-none border bg-slate-800/90 border-slate-700 text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:bg-slate-800"
+                placeholder="Search by rollno eg. CT109, CT120..."
+                className={`w-full pl-11 pr-10 py-2 rounded-full text-xs sm:text-sm font-medium transition-all outline-none border ${
+                  isDarkMode 
+                    ? 'bg-slate-800/90 border-slate-700 text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:bg-slate-800' 
+                    : 'bg-slate-100 border-slate-300 text-slate-900 placeholder-slate-500 focus:border-indigo-500 focus:bg-white shadow-xs'
+                }`}
               />
               
               {searchQuery && (
                 <button 
                   onClick={() => { setSearchQuery(''); setShowDropdown(false); }}
-                  className="absolute right-3.5 text-slate-400 hover:text-slate-200 text-xs font-semibold p-1"
+                  className={`absolute right-3.5 text-xs font-semibold p-1 ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -952,38 +1039,46 @@ export default function App() {
             {showDropdown && searchResults.length > 0 && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-                <div className="absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/98 backdrop-blur-xl text-slate-100 divide-y divide-slate-800 max-h-80 overflow-y-auto z-50 animate-fadeIn">
-                  <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between bg-slate-950/40">
+                <div className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl border backdrop-blur-xl divide-y max-h-80 overflow-y-auto z-50 animate-fadeIn ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900/98 text-slate-100 divide-slate-800' : 'border-slate-200 bg-white/98 text-slate-900 divide-slate-100'
+                }`}>
+                  <div className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+                    isDarkMode ? 'bg-slate-950/40 text-slate-400' : 'bg-slate-50 text-slate-500'
+                  }`}>
                     <span>API Results ({searchResults.length})</span>
-                    <span className="normal-case font-normal text-slate-400">Click to select</span>
+                    <span className="normal-case font-normal">Click to select</span>
                   </div>
                   {searchResults.map((item, idx) => (
                     <div
                       key={`${item.roll_no}-${idx}`}
                       onClick={() => handleSelectStudent(item)}
-                      className="px-4 py-3 cursor-pointer flex items-center justify-between transition-colors hover:bg-slate-800/80 active:bg-slate-800"
+                      className={`px-4 py-3 cursor-pointer flex items-center justify-between transition-colors ${
+                        isDarkMode ? 'hover:bg-slate-800/80 active:bg-slate-800' : 'hover:bg-slate-50 active:bg-slate-100'
+                      }`}
                     >
                       <div className="flex items-center gap-3 min-w-0 pr-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#38c4ee] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
                           {(item.student_name || 'ST').slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-slate-200 flex flex-wrap items-center gap-1.5 truncate">
+                          <div className={`text-xs font-bold flex flex-wrap items-center gap-1.5 truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                             <span className="truncate">{item.student_name}</span>
-                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-300 border border-slate-700 flex-shrink-0">
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono flex-shrink-0 ${
+                              isDarkMode ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-300'
+                            }`}>
                               {item.roll_no}
                             </span>
                           </div>
-                          <div className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
+                          <div className={`text-[11px] font-medium mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                             {item.department} {item.year ? `• Year ${item.year}` : ''}
                           </div>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 pl-2">
-                        <span className="text-xs font-black text-emerald-400 block whitespace-nowrap">
+                        <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 block whitespace-nowrap">
                           +{item.balance_points ? parseFloat(item.balance_points.replace(/,/g, '')).toLocaleString() : '0'} RP
                         </span>
-                        <span className="text-[9px] text-slate-400">Balance</span>
+                        <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Balance</span>
                       </div>
                     </div>
                   ))}
@@ -995,18 +1090,37 @@ export default function App() {
           {/* Right Action Icons & Developer Info */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             {/* Top Right Developer Details */}
-            <div className="hidden lg:flex flex-col text-right pr-2 border-r border-slate-800 mr-1">
-              <span className="text-[11px] font-semibold text-slate-300">
-                Developed by <span className="font-bold text-indigo-400">Dharineesh V</span>
+            <div className={`hidden lg:flex flex-col text-right pr-2 border-r mr-1 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+              <span className={`text-[11px] font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                Developed by <span className="font-bold text-indigo-600 dark:text-indigo-400">Dharineesh V</span>
               </span>
-              <span className="text-[10px] text-slate-400">
+              <span className={`text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 (Dept. of Computer Technology)
               </span>
             </div>
 
+            {/* Dark / Light Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className={`p-1.5 sm:p-2 rounded-full transition-colors cursor-pointer ${
+                isDarkMode 
+                  ? 'hover:bg-slate-800 text-amber-400 hover:text-amber-300' 
+                  : 'hover:bg-slate-100 text-slate-700 hover:text-indigo-600'
+              }`}
+              title={isDarkMode ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+            >
+              {isDarkMode ? (
+                <Sun className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
+              ) : (
+                <Moon className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
+              )}
+            </button>
+
             <button
               onClick={() => setShowInfoModal(true)}
-              className="p-1.5 sm:p-2 rounded-full transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+              className={`p-1.5 sm:p-2 rounded-full transition-colors cursor-pointer ${
+                isDarkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
+              }`}
               title="Information & Help"
             >
               <Info className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={1.75} />
@@ -1017,7 +1131,9 @@ export default function App() {
                 setSelectedStudent(currentUser);
                 setIsModalOpen(true);
               }}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-indigo-400 transition-all cursor-pointer border border-slate-700 shadow-xs flex-shrink-0"
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-indigo-400 transition-all cursor-pointer border shadow-xs flex-shrink-0 ${
+                isDarkMode ? 'border-slate-700' : 'border-slate-300'
+              }`}
               title={`${currentUser.name} (${currentUser.email})`}
             >
               <AvatarImage
@@ -1030,7 +1146,9 @@ export default function App() {
 
             <button
               onClick={handleLogout}
-              className="p-1.5 sm:p-2 rounded-full transition-colors hover:bg-slate-800 text-rose-400 hover:text-rose-300"
+              className={`p-1.5 sm:p-2 rounded-full transition-colors cursor-pointer ${
+                isDarkMode ? 'hover:bg-slate-800 text-rose-400 hover:text-rose-300' : 'hover:bg-slate-100 text-rose-600 hover:text-rose-700'
+              }`}
               title="Logout to Login Screen"
             >
               <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1039,12 +1157,16 @@ export default function App() {
         </div>
 
         {/* Mobile Search Bar Sub-Strip (Immediately Downwards After Header on Phones) */}
-        <div className="block sm:hidden px-3.5 py-2 bg-slate-950/98 border-t border-slate-800/80 relative">
-          <div className="relative flex items-center">
+        <div className={`block sm:hidden px-3.5 py-2.5 border-b relative transition-colors duration-200 ${
+          isDarkMode ? 'bg-slate-950 border-slate-800/80' : 'bg-white border-slate-200/80 shadow-xs'
+        }`}>
+          <div className="relative flex items-center max-w-md mx-auto">
             {isSearching ? (
-              <div className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-3"></div>
+              <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-3.5 z-10"></div>
             ) : (
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+              <Search className={`w-4 h-4 absolute left-3.5 pointer-events-none transition-colors z-10 ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-400'
+              }`} strokeWidth={2} />
             )}
             
             <input
@@ -1053,14 +1175,21 @@ export default function App() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
-              placeholder="Search CT109, CT120..."
-              className="w-full pl-9 pr-9 py-2 rounded-xl text-xs font-medium transition-all outline-none border bg-slate-900 border-slate-700/90 text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:bg-slate-800 shadow-inner"
+              placeholder="Search by rollno eg. CT109, CT120..."
+              className={`w-full h-9 pl-10 pr-9 rounded-full text-xs font-semibold transition-all outline-none border ${
+                isDarkMode 
+                  ? 'bg-slate-900 border-slate-700/80 text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:bg-slate-900' 
+                  : 'bg-slate-100/90 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 focus:bg-white'
+              }`}
             />
             
             {searchQuery && (
               <button 
                 onClick={() => { setSearchQuery(''); setShowDropdown(false); }}
-                className="absolute right-2.5 text-slate-400 hover:text-slate-200 text-xs font-semibold p-1"
+                className={`absolute right-2.5 p-1 rounded-full transition-colors z-10 ${
+                  isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                }`}
+                title="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -1071,38 +1200,46 @@ export default function App() {
           {showDropdown && searchResults.length > 0 && (
             <>
               <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowDropdown(false)} />
-              <div className="absolute left-3.5 right-3.5 top-full mt-1.5 rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/98 backdrop-blur-xl text-slate-100 divide-y divide-slate-800 max-h-[65vh] overflow-y-auto z-50 animate-fadeIn">
-                <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between bg-slate-950/60">
+              <div className={`absolute left-3.5 right-3.5 top-full mt-1.5 rounded-2xl shadow-2xl border backdrop-blur-xl divide-y max-h-[65vh] overflow-y-auto z-50 animate-fadeIn ${
+                isDarkMode ? 'border-slate-800 bg-slate-900/98 text-slate-100 divide-slate-800' : 'border-slate-200 bg-white/98 text-slate-900 divide-slate-100'
+              }`}>
+                <div className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+                  isDarkMode ? 'bg-slate-950/60 text-slate-400' : 'bg-slate-50 text-slate-500'
+                }`}>
                   <span>API Results ({searchResults.length})</span>
-                  <span className="normal-case font-normal text-slate-400">Click to select</span>
+                  <span className="normal-case font-normal">Click to select</span>
                 </div>
                 {searchResults.map((item, idx) => (
                   <div
                     key={`${item.roll_no}-${idx}`}
                     onClick={() => handleSelectStudent(item)}
-                    className="px-3.5 py-3 cursor-pointer flex items-center justify-between transition-colors hover:bg-slate-800/80 active:bg-slate-800"
+                    className={`px-3.5 py-3 cursor-pointer flex items-center justify-between transition-colors ${
+                      isDarkMode ? 'hover:bg-slate-800/80 active:bg-slate-800' : 'hover:bg-slate-50 active:bg-slate-100'
+                    }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-2">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#38c4ee] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
                         {(item.student_name || 'ST').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-slate-200 flex flex-wrap items-center gap-1.5 truncate">
+                        <div className={`text-xs font-bold flex flex-wrap items-center gap-1.5 truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                           <span className="truncate">{item.student_name}</span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-300 border border-slate-700 flex-shrink-0">
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono flex-shrink-0 ${
+                            isDarkMode ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-300'
+                          }`}>
                             {item.roll_no}
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
+                        <div className={`text-[10px] font-medium mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {item.department} {item.year ? `• Year ${item.year}` : ''}
                         </div>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0 pl-2">
-                      <span className="text-xs font-black text-emerald-400 block whitespace-nowrap">
+                      <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 block whitespace-nowrap">
                         +{item.balance_points ? parseFloat(item.balance_points.replace(/,/g, '')).toLocaleString() : '0'} RP
                       </span>
-                      <span className="text-[9px] text-slate-400">Balance</span>
+                      <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Balance</span>
                     </div>
                   </div>
                 ))}
@@ -1112,84 +1249,158 @@ export default function App() {
         </div>
       </header>
 
-      {/* 2. BODY LAYOUT: SIDEBAR + MAIN CONTENT */}
-      <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
+      {/* 2. SLIDE-OVER HAMBURGER DRAWER SIDEBAR (Desktop & Tablet) */}
+      {isSidebarOpen && (
+        <div 
+          className="hidden md:block fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300 animate-fadeIn cursor-pointer" 
+          onClick={() => setIsSidebarOpen(false)} 
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={`hidden md:flex fixed top-0 left-0 bottom-0 z-50 w-72 max-w-[85vw] flex-col py-5 px-4 shadow-2xl transition-transform duration-300 ease-in-out ${
+        isSidebarOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
+      } ${
+        isDarkMode ? 'bg-slate-900 border-r border-slate-800 text-slate-100' : 'bg-white border-r border-slate-200 text-slate-900'
+      }`}>
         
-        {/* Left Sidebar (Desktop & Tablet) */}
-        <aside className="w-60 lg:w-64 hidden md:flex flex-col py-6 px-4 border-r border-slate-800 bg-slate-900/60 transition-colors duration-200 flex-shrink-0">
-          <nav className="space-y-1.5 flex-1">
-            <button
-              onClick={() => setActiveNav('Dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
-                activeNav === 'Dashboard'
-                  ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-              }`}
-            >
-              <LayoutGrid className="w-5 h-5" strokeWidth={activeNav === 'Dashboard' ? 2.2 : 1.8} />
-              <span>Dashboard</span>
-            </button>
+        {/* Drawer Header */}
+        <div className={`flex items-center justify-between pb-4 mb-3 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className="flex items-center gap-2.5">
+            <img 
+              src="/bit-logo.png" 
+              alt="Bannari Amman Institute of Technology" 
+              className="h-8 object-contain rounded-md bg-white p-0.5 shadow-xs"
+            />
+            <div>
+              <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 block leading-tight">
+                Reward Points
+              </span>
+              <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Navigation Menu
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+              isDarkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'
+            }`}
+            title="Close Menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-            <button
-              onClick={() => setActiveNav('Leaderboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
-                activeNav === 'Leaderboard'
-                  ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-              }`}
-            >
-              <BarChart2 className="w-5 h-5" strokeWidth={1.8} />
-              <span>Leaderboard</span>
-            </button>
+        {/* User Card in Drawer */}
+        <div className={`p-3 rounded-2xl border mb-3 flex items-center gap-3 ${
+          isDarkMode ? 'bg-slate-800/60 border-slate-700/80' : 'bg-slate-50 border-slate-200'
+        }`}>
+          <div className={`w-9 h-9 rounded-xl overflow-hidden shadow-xs flex-shrink-0 border ${
+            isDarkMode ? 'border-slate-700' : 'border-slate-300'
+          }`}>
+            <AvatarImage
+              src={currentUser.picture || currentUser.photo_url}
+              alt={currentUser.name}
+              initials={currentUser.initials}
+              fallbackBg={currentUser.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className={`text-xs font-bold truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+              {currentUser.name}
+            </div>
+            <div className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              {currentUser.email || currentUser.id}
+            </div>
+          </div>
+        </div>
 
-            <button
-              onClick={() => setActiveNav('Rewards History')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
-                activeNav === 'Rewards History'
-                  ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-              }`}
-            >
-              <History className="w-5 h-5" strokeWidth={1.8} />
-              <span>Rewards History</span>
-            </button>
+        {/* Navigation Items */}
+        <nav className="space-y-1.5 flex-1 overflow-y-auto">
+          <button
+            onClick={() => { setActiveNav('Dashboard'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Dashboard'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <LayoutGrid className="w-5 h-5" strokeWidth={activeNav === 'Dashboard' ? 2.2 : 1.8} />
+            <span>Dashboard</span>
+          </button>
 
-            <button
-              onClick={() => setActiveNav('Settings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
-                activeNav === 'Settings'
-                  ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-              }`}
-            >
-              <Settings className="w-5 h-5" strokeWidth={1.8} />
-              <span>Settings</span>
-            </button>
-          </nav>
+          <button
+            onClick={() => { setActiveNav('Leaderboard'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Leaderboard'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <BarChart2 className="w-5 h-5" strokeWidth={activeNav === 'Leaderboard' ? 2.2 : 1.8} />
+            <span>Leaderboard</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveNav('Rewards History'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Rewards History'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <History className="w-5 h-5" strokeWidth={activeNav === 'Rewards History' ? 2.2 : 1.8} />
+            <span>Rewards History</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveNav('Settings'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Settings'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Settings className="w-5 h-5" strokeWidth={activeNav === 'Settings' ? 2.2 : 1.8} />
+            <span>Settings</span>
+          </button>
 
           {/* PWA Install App Button */}
           {isInstallable && (
             <button
-              onClick={handleInstallClick}
-              className="my-3 w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+              onClick={() => { handleInstallClick(); setIsSidebarOpen(false); }}
+              className="mt-3 w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
             >
-              <span>📲 Install App</span>
+              <span>📲 Install Web App</span>
             </button>
           )}
+        </nav>
 
-          {/* Quick Info Box in Sidebar */}
-          <div className="mt-auto p-4 rounded-2xl border bg-slate-800/50 border-slate-700/60 text-slate-300">
-            <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>About Rewards Site</span>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Rewards Site is the official academic and extracurricular rewards management platform. It tracks student rewards point and leaderboards.
-            </p>
+        {/* Quick Info Box in Drawer */}
+        <div className={`mt-auto p-3 rounded-2xl border transition-colors duration-200 ${
+          isDarkMode ? 'bg-slate-800/50 border-slate-700/60 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700 shadow-xs'
+        }`}>
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>About Rewards Site</span>
           </div>
-        </aside>
+          <p className={`text-[10px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            Official academic & extracurricular rewards management platform for students.
+          </p>
+        </div>
+      </aside>
 
-        {/* Main Content Area (Mobile-friendly padding and bottom offset) */}
+      {/* 3. BODY LAYOUT: MAIN CONTENT */}
+      <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
         <main className="flex-1 p-3.5 sm:p-6 md:p-8 lg:p-10 max-w-full overflow-x-hidden pb-24 md:pb-10">
           
           {/* VIEW 1: DASHBOARD */}
@@ -1197,35 +1408,45 @@ export default function App() {
             <>
               {/* Top Title & Subtitle */}
               <div className="mb-6">
-                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
+                <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                   Rewards Points Dashboard
                 </h1>
-                <p className="text-slate-400 text-sm mt-1">
-                  Showing logged in profile for <span className="text-indigo-400 font-bold">{currentUser.name}</span> ({currentUser.email}).
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Showing logged in profile for <span className="text-indigo-600 dark:text-indigo-400 font-bold">{currentUser.name}</span> ({currentUser.email}).
                 </p>
               </div>
 
               {/* SECTION 1: SEARCH RESULTS */}
               <section className="mb-8">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">
+                  <h2 className={`text-[11px] font-bold tracking-wider uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     STUDENT PROFILE & POINTS
                   </h2>
                   {student.email === currentUser.email && (
-                    <span className="text-[11px] font-bold text-indigo-400 bg-indigo-950/80 border border-indigo-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                      isDarkMode 
+                        ? 'text-indigo-400 bg-indigo-950/80 border border-indigo-800' 
+                        : 'text-indigo-700 bg-indigo-50 border border-indigo-200'
+                    }`}>
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                       <span>Current Logged In User</span>
                     </span>
                   )}
                 </div>
 
                 {/* Student Result Card */}
-                <div className="rounded-2xl border border-slate-800 bg-slate-900 hover:border-slate-700 transition-all duration-200 p-5 md:p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className={`rounded-2xl border transition-all duration-200 p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 ${
+                  isDarkMode 
+                    ? 'border-slate-800 bg-slate-900 hover:border-slate-700 shadow-xl' 
+                    : 'border-slate-200 bg-white hover:border-slate-300 shadow-md'
+                }`}>
                   
                   {/* Left Student Info */}
                   <div className="flex items-center gap-4 sm:gap-5">
                     {/* Photo / Avatar */}
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border-2 border-slate-700">
+                    <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border-2 ${
+                      isDarkMode ? 'border-slate-700' : 'border-slate-200'
+                    }`}>
                       <AvatarImage
                         src={student.picture || student.photo_url}
                         alt={student.name}
@@ -1236,33 +1457,37 @@ export default function App() {
 
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
+                        <h3 className={`text-lg sm:text-xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                           {student.name}
                         </h3>
                         {student.batch && (
-                          <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                          <span className={`text-[10px] font-bold px-2 py-0.2 rounded-full border ${
+                            isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
+                          }`}>
                             {student.batch}
                           </span>
                         )}
                       </div>
                       
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-1.5 text-xs text-slate-400 font-medium">
+                      <div className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-1.5 text-xs font-medium ${
+                        isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                      }`}>
                         <div className="flex items-center gap-1.5">
-                          <IdCard className="w-4 h-4 text-slate-400" strokeWidth={1.8} />
-                          <span className="tracking-wide font-mono font-semibold text-slate-200">{student.id}</span>
+                          <IdCard className="w-4 h-4" strokeWidth={1.8} />
+                          <span className={`tracking-wide font-mono font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{student.id}</span>
                         </div>
                         <div className="flex items-center gap-1.5 uppercase">
-                          <GraduationCap className="w-4 h-4 text-slate-400" strokeWidth={1.8} />
+                          <GraduationCap className="w-4 h-4" strokeWidth={1.8} />
                           <span>{student.course_code ? `${student.course_code} - ` : ''}{student.department}</span>
                         </div>
                         {student.email && (
-                          <div className="flex items-center gap-1.5 text-slate-300 font-mono">
-                            <Mail className="w-3.5 h-3.5 text-slate-400" />
+                          <div className={`flex items-center gap-1.5 font-mono ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                            <Mail className="w-3.5 h-3.5" />
                             <span>{student.email}</span>
                           </div>
                         )}
                         {student.mentor_name && student.mentor_name !== 'N/A' && (
-                          <div className="flex items-center gap-1.5 text-indigo-400">
+                          <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
                             <User className="w-3.5 h-3.5" />
                             <span>Mentor: {student.mentor_name}</span>
                           </div>
@@ -1272,12 +1497,16 @@ export default function App() {
                   </div>
 
                   {/* Right Points and Action */}
-                  <div className="w-full md:w-auto flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 sm:gap-4 border-t md:border-t-0 pt-4 md:pt-0 border-slate-800 flex-shrink-0">
+                  <div className={`w-full md:w-auto flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 sm:gap-4 border-t md:border-t-0 pt-4 md:pt-0 flex-shrink-0 ${
+                    isDarkMode ? 'border-slate-800' : 'border-slate-200'
+                  }`}>
                     <div className="text-left md:text-right">
-                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                      <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider block ${
+                        isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
                         ACTIVE BALANCE POINTS
                       </span>
-                      <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight leading-tight">
+                      <div className="text-2xl sm:text-3xl font-black text-emerald-500 dark:text-emerald-400 tracking-tight leading-tight">
                         {student.currentPoints} <span className="text-base sm:text-lg font-bold">RP</span>
                       </div>
                     </div>
@@ -1300,30 +1529,32 @@ export default function App() {
               {/* SECTION 2: OVERVIEW */}
               <section className="mb-8">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xs font-black text-slate-300 tracking-wider uppercase">
+                  <h2 className={`text-xs font-black tracking-wider uppercase ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     OVERVIEW
                   </h2>
                   {rewardsTotal > 0 && (
-                    <span className="text-xs font-bold text-slate-400">
-                      Total Activities: <span className="text-indigo-400 font-extrabold">{rewardsTotal}</span>
+                    <span className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Total Activities: <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">{rewardsTotal}</span>
                     </span>
                   )}
                 </div>
 
                 {/* Overview Activity Container */}
-                <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden shadow-xs transition-all duration-200">
+                <div className={`rounded-2xl border overflow-hidden shadow-xs transition-all duration-200 ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900 shadow-xl' : 'border-slate-200 bg-white shadow-md'
+                }`}>
                   
                   {/* Mobile Responsive Activity Cards (Phones < 640px) */}
-                  <div className="block sm:hidden divide-y divide-slate-800">
+                  <div className={`block sm:hidden divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                     {loadingRewards ? (
-                      <div className="py-8 text-center text-slate-400 font-semibold">
+                      <div className={`py-8 text-center font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                         <div className="inline-flex items-center gap-2">
                           <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                           <span>Loading activities for {student.id}...</span>
                         </div>
                       </div>
                     ) : rewardsData.length === 0 ? (
-                      <div className="py-8 text-center text-slate-500 font-semibold text-xs">
+                      <div className={`py-8 text-center font-semibold text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         No reward activity records found for {student.id}.
                       </div>
                     ) : (
@@ -1331,35 +1562,37 @@ export default function App() {
                         const rawPts = act.reward_points ? parseFloat(act.reward_points.replace(/,/g, '')) : 0;
                         const isPositive = act.type !== 'negative' && rawPts >= 0;
                         const t = (act.activity_type || '').toUpperCase();
-                        let badgeStyle = 'bg-slate-800 text-slate-200 border border-slate-700';
+                        let badgeStyle = isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-slate-100 text-slate-800 border-slate-300';
                         if (t.includes('TECHNICAL') || t.includes('EVENT')) {
-                          badgeStyle = 'bg-cyan-950/80 text-cyan-300 border border-cyan-800/80';
+                          badgeStyle = isDarkMode ? 'bg-cyan-950/80 text-cyan-300 border-cyan-800/80' : 'bg-cyan-50 text-cyan-800 border-cyan-300';
                         } else if (t.includes('P SKILL') || t.includes('SKILL')) {
-                          badgeStyle = 'bg-indigo-950/80 text-indigo-300 border border-indigo-800/80';
+                          badgeStyle = isDarkMode ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800/80' : 'bg-indigo-50 text-indigo-800 border-indigo-300';
                         } else if (t.includes('INITIATIVE') || t.includes('CHALLENGE')) {
-                          badgeStyle = 'bg-amber-950/80 text-amber-300 border border-amber-800/80';
+                          badgeStyle = isDarkMode ? 'bg-amber-950/80 text-amber-300 border-amber-800/80' : 'bg-amber-50 text-amber-800 border-amber-300';
                         } else if (t.includes('ACADEMIC')) {
-                          badgeStyle = 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/80';
+                          badgeStyle = isDarkMode ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/80' : 'bg-emerald-50 text-emerald-800 border-emerald-300';
                         }
 
                         return (
-                          <div key={index} className="p-3.5 hover:bg-slate-800/40 transition-colors">
+                          <div key={index} className={`p-3.5 transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
                             <div className="flex items-start justify-between gap-2.5 mb-2">
-                              <h4 className="text-xs font-bold text-white leading-snug flex-1">
+                              <h4 className={`text-xs font-bold leading-snug flex-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                 {act.activity_name || act.course_name || 'Academic Course Activity'}
                               </h4>
                               <span className={`text-xs font-black px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${
-                                isPositive ? 'text-emerald-400 bg-emerald-950/70 border border-emerald-800/70' : 'text-rose-400 bg-rose-950/70 border border-rose-800/70'
+                                isPositive 
+                                  ? 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800/70' 
+                                  : 'text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-800/70'
                               }`}>
                                 {isPositive ? `+${rawPts.toLocaleString()}` : `-${rawPts.toLocaleString()}`} RP
                               </span>
                             </div>
 
-                            <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-slate-400 pt-0.5">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeStyle}`}>
+                            <div className={`flex flex-wrap items-center justify-between gap-1.5 text-[11px] pt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeStyle}`}>
                                 {act.activity_type || 'General'}
                               </span>
-                              <span className="font-medium text-slate-400 text-[10px]">
+                              <span className="font-medium text-[10px]">
                                 {act.date || 'Recent'}
                               </span>
                             </div>
@@ -1373,17 +1606,19 @@ export default function App() {
                   <div className="hidden sm:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-700 bg-slate-800 text-[11px] lg:text-xs font-extrabold uppercase tracking-wider text-slate-200">
+                        <tr className={`border-b text-[11px] lg:text-xs font-extrabold uppercase tracking-wider ${
+                          isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'
+                        }`}>
                           <th className="py-3.5 px-3 lg:px-4 font-extrabold">COURSE NAME</th>
                           <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">COMPLETED DATE</th>
                           <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">ACTIVITY TYPE</th>
                           <th className="py-3.5 px-3 lg:px-4 font-extrabold text-right whitespace-nowrap">REWARD POINTS</th>
                         </tr>
                       </thead>
-                      <tbody className="text-xs divide-y divide-slate-800">
+                      <tbody className={`text-xs divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                         {loadingRewards ? (
                           <tr>
-                            <td colSpan="4" className="py-8 text-center text-slate-400 font-semibold">
+                            <td colSpan="4" className={`py-8 text-center font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                               <div className="inline-flex items-center gap-2">
                                 <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                                 <span>Loading activities for {student.id}...</span>
@@ -1392,7 +1627,7 @@ export default function App() {
                           </tr>
                         ) : rewardsData.length === 0 ? (
                           <tr>
-                            <td colSpan="4" className="py-8 text-center text-slate-500 font-semibold">
+                            <td colSpan="4" className={`py-8 text-center font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                               No reward activity records found for {student.id}.
                             </td>
                           </tr>
@@ -1403,32 +1638,32 @@ export default function App() {
                             
                             // Badge color styles
                             const t = (act.activity_type || '').toUpperCase();
-                            let badgeStyle = 'bg-slate-800 text-slate-200 border border-slate-700';
+                            let badgeStyle = isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-slate-100 text-slate-800 border-slate-300';
                             if (t.includes('TECHNICAL') || t.includes('EVENT')) {
-                              badgeStyle = 'bg-cyan-950 text-cyan-200 border border-cyan-800';
+                              badgeStyle = isDarkMode ? 'bg-cyan-950 text-cyan-200 border-cyan-800' : 'bg-cyan-50 text-cyan-800 border-cyan-300';
                             } else if (t.includes('P SKILL') || t.includes('SKILL')) {
-                              badgeStyle = 'bg-indigo-950 text-indigo-200 border border-indigo-800';
+                              badgeStyle = isDarkMode ? 'bg-indigo-950 text-indigo-200 border-indigo-800' : 'bg-indigo-50 text-indigo-800 border-indigo-300';
                             } else if (t.includes('INITIATIVE') || t.includes('CHALLENGE')) {
-                              badgeStyle = 'bg-amber-950 text-amber-200 border border-amber-800';
+                              badgeStyle = isDarkMode ? 'bg-amber-950 text-amber-200 border-amber-800' : 'bg-amber-50 text-amber-800 border-amber-300';
                             } else if (t.includes('ACADEMIC')) {
-                              badgeStyle = 'bg-emerald-950 text-emerald-200 border border-emerald-800';
+                              badgeStyle = isDarkMode ? 'bg-emerald-950 text-emerald-200 border-emerald-800' : 'bg-emerald-50 text-emerald-800 border-emerald-300';
                             }
 
                             return (
-                              <tr key={index} className="transition-colors text-slate-200 hover:bg-slate-800/50">
-                                <td className="py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm text-white">
+                              <tr key={index} className={`transition-colors ${isDarkMode ? 'text-slate-200 hover:bg-slate-800/50' : 'text-slate-800 hover:bg-slate-50'}`}>
+                                <td className={`py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                   {act.activity_name || act.course_name || 'Academic Course Activity'}
                                 </td>
-                                <td className="py-3.5 px-3 lg:px-4 font-semibold text-slate-300 whitespace-nowrap text-xs">
+                                <td className={`py-3.5 px-3 lg:px-4 font-semibold whitespace-nowrap text-xs ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                                   {act.date || 'Recent'}
                                 </td>
                                 <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold whitespace-nowrap shadow-xs ${badgeStyle}`}>
+                                  <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold whitespace-nowrap border shadow-xs ${badgeStyle}`}>
                                     {act.activity_type || 'General'}
                                   </span>
                                 </td>
                                 <td className={`py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm whitespace-nowrap ${
-                                  isPositive ? 'text-emerald-400' : 'text-rose-400'
+                                  isPositive ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
                                 }`}>
                                   {isPositive ? `+${rawPts.toLocaleString()}` : `-${rawPts.toLocaleString()}`} RP
                                 </td>
@@ -1444,7 +1679,7 @@ export default function App() {
 
               {/* SECTION 3: AVERAGE REWARD POINTS BY YEAR */}
               <section>
-                <h2 className="text-xs font-black text-slate-300 tracking-wider uppercase mb-3">
+                <h2 className={`text-xs font-black tracking-wider uppercase mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                   AVERAGE REWARD POINTS BY YEAR
                 </h2>
 
@@ -1484,16 +1719,18 @@ export default function App() {
                     return (
                       <div 
                         key={card.key}
-                        className="rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6 shadow-xs overflow-hidden flex flex-col justify-between transition-all duration-200 text-slate-100"
+                        className={`rounded-2xl border p-5 sm:p-6 shadow-xs overflow-hidden flex flex-col justify-between transition-all duration-200 ${
+                          isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900 shadow-sm'
+                        }`}
                       >
                         <div className="mb-2">
-                          <span className="text-xs font-bold text-slate-300">{card.label}</span>
+                          <span className={`text-xs font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{card.label}</span>
                         </div>
                         <div className="flex items-baseline gap-1.5 mt-1">
-                          <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                          <span className={`text-2xl sm:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                             {loadingAverages ? '...' : Number(card.value).toLocaleString()}
                           </span>
-                          <span className="text-xs sm:text-sm font-bold text-slate-400">RP</span>
+                          <span className={`text-xs sm:text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>RP</span>
                         </div>
                       </div>
                     );
@@ -1513,24 +1750,26 @@ export default function App() {
                     <div>
                       <div className="flex items-center gap-2">
                         <Trophy className="w-7 h-7 text-amber-400" />
-                        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
+                        <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                           Department Leaderboards
                         </h1>
                       </div>
-                      <p className="text-slate-400 text-sm mt-1">
+                      <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                         Select any department to view live student rankings in descending order of Reward Points.
                       </p>
                     </div>
 
                     {/* Filter Department Search */}
                     <div className="relative max-w-xs w-full">
-                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                      <Search className={`w-4 h-4 absolute left-3.5 top-3 pointer-events-none ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                       <input
                         type="text"
                         value={deptFilterQuery}
                         onChange={(e) => setDeptFilterQuery(e.target.value)}
                         placeholder="Filter department..."
-                        className="w-full pl-10 pr-4 py-2 rounded-xl text-sm border bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        className={`w-full pl-10 pr-4 py-2 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 ${
+                          isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 shadow-xs'
+                        }`}
                       />
                     </div>
                   </div>
@@ -1546,7 +1785,11 @@ export default function App() {
                       .map((dept) => (
                         <div
                           key={dept.id}
-                          className="rounded-3xl border border-slate-800 bg-slate-900 hover:border-slate-700 shadow-lg shadow-black/30 p-6 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 group"
+                          className={`rounded-3xl border p-6 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 group ${
+                            isDarkMode 
+                              ? 'border-slate-800 bg-slate-900 hover:border-slate-700 shadow-lg shadow-black/30' 
+                              : 'border-slate-200 bg-white hover:border-slate-300 shadow-md'
+                          }`}
                         >
                           <div>
                             {/* Card Top Header */}
@@ -1556,18 +1799,22 @@ export default function App() {
                                 <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${dept.badgeColor}`}>
                                   {dept.id}
                                 </span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                                }`}>
                                   {dept.degree}
                                 </span>
                               </div>
                             </div>
 
                             {/* Department Name */}
-                            <h3 className="text-base font-extrabold text-white group-hover:text-indigo-400 transition-colors leading-snug">
+                            <h3 className={`text-base font-extrabold transition-colors leading-snug ${
+                              isDarkMode ? 'text-white group-hover:text-indigo-400' : 'text-slate-900 group-hover:text-indigo-600'
+                            }`}>
                               {dept.name}
                             </h3>
 
-                            <p className="text-xs text-slate-400 mt-2 font-medium">
+                            <p className={`text-xs mt-2 font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                               Bannari Amman Institute of Technology
                             </p>
                           </div>
@@ -1588,11 +1835,17 @@ export default function App() {
                 /* SELECTED DEPARTMENT DETAILED LEADERBOARD VIEW */
                 <div>
                   {/* Back Button & Header */}
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-6 border-b border-slate-800">
+                  <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-6 border-b ${
+                    isDarkMode ? 'border-slate-800' : 'border-slate-200'
+                  }`}>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                       <button
                         onClick={() => setSelectedDeptLeaderboard(null)}
-                        className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer w-fit"
+                        className={`p-2 sm:p-2.5 rounded-xl border transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer w-fit ${
+                          isDarkMode 
+                            ? 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800' 
+                            : 'bg-white border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-50 shadow-xs'
+                        }`}
                       >
                         <ChevronLeft className="w-4 h-4" />
                         <span>All Departments</span>
@@ -1601,28 +1854,30 @@ export default function App() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xl sm:text-2xl">{selectedDeptLeaderboard.icon}</span>
-                          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white">
+                          <h1 className={`text-xl sm:text-2xl md:text-3xl font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                             {selectedDeptLeaderboard.name}
                           </h1>
                           <span className={`text-[10px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full border ${selectedDeptLeaderboard.badgeColor}`}>
                             {selectedDeptLeaderboard.id}
                           </span>
                         </div>
-                        <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
-                          Ranked in <span className="text-emerald-400 font-bold">descending order</span> of Reward Points • {selectedDeptLeaderboard.degree}
+                        <p className={`text-[11px] sm:text-xs mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Ranked in <span className="text-emerald-500 dark:text-emerald-400 font-bold">descending order</span> of Reward Points • {selectedDeptLeaderboard.degree}
                         </p>
                       </div>
                     </div>
 
                     {/* Filter Within Department */}
                     <div className="relative max-w-full md:max-w-xs w-full">
-                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                      <Search className={`w-4 h-4 absolute left-3.5 top-3 pointer-events-none ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                       <input
                         type="text"
                         value={deptStudentSearch}
                         onChange={(e) => setDeptStudentSearch(e.target.value)}
                         placeholder="CT109, CT120, name..."
-                        className="w-full pl-10 pr-4 py-2 rounded-xl text-xs sm:text-sm border bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                        className={`w-full pl-10 pr-4 py-2 rounded-xl text-xs sm:text-sm border focus:outline-none focus:border-indigo-500 ${
+                          isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 shadow-xs'
+                        }`}
                       />
                     </div>
                   </div>
@@ -1631,13 +1886,15 @@ export default function App() {
                   {loadingDeptLeaderboard ? (
                     <div className="py-20 text-center">
                       <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                      <p className="text-sm font-semibold text-slate-400">
+                      <p className={`text-sm font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                         Fetching {selectedDeptLeaderboard.name} student records & calculating year-wise ranks...
                       </p>
                     </div>
                   ) : deptLeaderboardList.length === 0 ? (
-                    <div className="py-16 text-center rounded-3xl border border-slate-800 bg-slate-900 p-8">
-                      <p className="text-slate-400 text-sm">
+                    <div className={`py-16 text-center rounded-3xl border p-8 ${
+                      isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-white text-slate-600 shadow-md'
+                    }`}>
+                      <p className="text-sm">
                         No student reward records found for this department.
                       </p>
                       <button
@@ -1670,13 +1927,17 @@ export default function App() {
                       <div>
                         {/* YEAR-WISE TABS BAR */}
                         {availableYears.length > 1 && (
-                          <div className="flex flex-wrap items-center gap-2 mb-6 p-1.5 rounded-2xl bg-slate-900 border border-slate-800 w-fit shadow-md shadow-black/20">
+                          <div className={`flex flex-wrap items-center gap-2 mb-6 p-1.5 rounded-2xl border w-fit shadow-md ${
+                            isDarkMode ? 'bg-slate-900 border-slate-800 shadow-black/20' : 'bg-slate-100 border-slate-200 shadow-slate-200'
+                          }`}>
                             <button
                               onClick={() => setSelectedLeaderboardYear('ALL')}
                               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                 selectedLeaderboardYear === 'ALL'
                                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                                  : isDarkMode 
+                                    ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60' 
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                               }`}
                             >
                               All Years ({deptLeaderboardList.length})
@@ -1690,12 +1951,16 @@ export default function App() {
                                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                                     selectedLeaderboardYear === yr
                                       ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                                      : isDarkMode 
+                                        ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60' 
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                                   }`}
                                 >
                                   <span>{yr}</span>
                                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                                    selectedLeaderboardYear === yr ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+                                    selectedLeaderboardYear === yr 
+                                      ? 'bg-white/20 text-white' 
+                                      : isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-700'
                                   }`}>
                                     {count}
                                   </span>
@@ -1709,117 +1974,145 @@ export default function App() {
                         {filteredList.length >= 3 && !deptStudentSearch && (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             {/* Rank 2 (Silver) */}
-                            <div className="rounded-3xl border border-slate-700 bg-slate-900/90 p-5 shadow-lg relative flex flex-col justify-between order-2 md:order-1">
+                            <div className={`rounded-3xl border p-5 shadow-lg relative flex flex-col justify-between order-2 md:order-1 ${
+                              isDarkMode ? 'border-slate-700 bg-slate-900/90 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
+                            }`}>
                               <div className="flex items-center justify-between mb-3">
-                                <div className="w-9 h-9 rounded-2xl bg-slate-800 text-slate-300 flex items-center justify-center font-black text-sm border border-slate-600">
+                                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-sm border ${
+                                  isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-600' : 'bg-slate-100 text-slate-700 border-slate-300'
+                                }`}>
                                   🥈 #2
                                 </div>
-                                <span className="text-[11px] font-mono text-slate-400">{filteredList[1].roll_no}</span>
+                                <span className={`text-[11px] font-mono ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[1].roll_no}</span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 inline-block mb-1">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block mb-1 ${
+                                  isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
+                                }`}>
                                   {filteredList[1].normalizedYear}
                                 </span>
-                                <h4 className="font-extrabold text-white text-base truncate">{filteredList[1].student_name}</h4>
-                                <p className="text-xs text-slate-400 mt-0.5">{filteredList[1].mentor_name || 'BIT Faculty'}</p>
+                                <h4 className={`font-extrabold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[1].student_name}</h4>
+                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[1].mentor_name || 'BIT Faculty'}</p>
                               </div>
-                              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-                                <span className="text-xs text-slate-400 font-medium">Points</span>
-                                <span className="text-lg font-black text-emerald-400">+{filteredList[1].displayBalance} RP</span>
+                              <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                                <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Points</span>
+                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[1].displayBalance} RP</span>
                               </div>
                             </div>
 
                             {/* Rank 1 (Gold - Elevated) */}
-                            <div className="rounded-3xl border-2 border-amber-500/70 bg-gradient-to-b from-amber-950/20 via-slate-900 to-slate-900 p-6 shadow-xl relative flex flex-col justify-between order-1 md:order-2 md:-translate-y-2">
+                            <div className={`rounded-3xl border-2 p-6 shadow-xl relative flex flex-col justify-between order-1 md:order-2 md:-translate-y-2 ${
+                              isDarkMode 
+                                ? 'border-amber-500/70 bg-gradient-to-b from-amber-950/20 via-slate-900 to-slate-900' 
+                                : 'border-amber-400 bg-gradient-to-b from-amber-50 via-white to-white'
+                            }`}>
                               <div className="flex items-center justify-between mb-3">
-                                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-black text-base border border-amber-500/60 shadow-md shadow-amber-500/20">
+                                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 dark:text-amber-300 flex items-center justify-center font-black text-base border border-amber-500/60 shadow-md shadow-amber-500/20">
                                   🥇 #1
                                 </div>
-                                <span className="text-xs font-mono font-bold text-amber-300">{filteredList[0].roll_no}</span>
+                                <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-300">{filteredList[0].roll_no}</span>
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400">
+                                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                                     {selectedLeaderboardYear === 'ALL' ? 'Department Rank 1' : `${selectedLeaderboardYear} Rank 1`}
                                   </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                  <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40">
                                     {filteredList[0].normalizedYear}
                                   </span>
                                 </div>
-                                <h4 className="font-black text-white text-lg truncate">{filteredList[0].student_name}</h4>
-                                <p className="text-xs text-slate-300 mt-0.5">{filteredList[0].mentor_name || 'BIT Faculty'}</p>
+                                <h4 className={`font-black text-lg truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[0].student_name}</h4>
+                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{filteredList[0].mentor_name || 'BIT Faculty'}</p>
                               </div>
-                              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-                                <span className="text-xs text-amber-300/80 font-bold uppercase tracking-wider">Top Score</span>
-                                <span className="text-xl font-black text-emerald-400">+{filteredList[0].displayBalance} RP</span>
+                              <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                                <span className="text-xs text-amber-600 dark:text-amber-300 font-bold uppercase tracking-wider">Top Score</span>
+                                <span className="text-xl font-black text-emerald-500 dark:text-emerald-400">+{filteredList[0].displayBalance} RP</span>
                               </div>
                             </div>
 
                             {/* Rank 3 (Bronze) */}
-                            <div className="rounded-3xl border border-amber-900/60 bg-slate-900/90 p-5 shadow-lg relative flex flex-col justify-between order-3">
+                            <div className={`rounded-3xl border p-5 shadow-lg relative flex flex-col justify-between order-3 ${
+                              isDarkMode ? 'border-amber-900/60 bg-slate-900/90 text-slate-100' : 'border-amber-200 bg-white text-slate-900'
+                            }`}>
                               <div className="flex items-center justify-between mb-3">
-                                <div className="w-9 h-9 rounded-2xl bg-amber-950/40 text-amber-400 flex items-center justify-center font-black text-sm border border-amber-800">
+                                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-sm border ${
+                                  isDarkMode ? 'bg-amber-950/40 text-amber-400 border-amber-800' : 'bg-amber-50 text-amber-800 border-amber-300'
+                                }`}>
                                   🥉 #3
                                 </div>
-                                <span className="text-[11px] font-mono text-slate-400">{filteredList[2].roll_no}</span>
+                                <span className={`text-[11px] font-mono ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[2].roll_no}</span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 inline-block mb-1">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block mb-1 ${
+                                  isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
+                                }`}>
                                   {filteredList[2].normalizedYear}
                                 </span>
-                                <h4 className="font-extrabold text-white text-base truncate">{filteredList[2].student_name}</h4>
-                                <p className="text-xs text-slate-400 mt-0.5">{filteredList[2].mentor_name || 'BIT Faculty'}</p>
+                                <h4 className={`font-extrabold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[2].student_name}</h4>
+                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[2].mentor_name || 'BIT Faculty'}</p>
                               </div>
-                              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-                                <span className="text-xs text-slate-400 font-medium">Points</span>
-                                <span className="text-lg font-black text-emerald-400">+{filteredList[2].displayBalance} RP</span>
+                              <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                                <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Points</span>
+                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[2].displayBalance} RP</span>
                               </div>
                             </div>
                           </div>
                         )}
 
                         {/* Full Rankings Container */}
-                        <div className="rounded-3xl border border-slate-800 bg-slate-900 overflow-hidden shadow-xl">
-                          <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className={`rounded-3xl border overflow-hidden shadow-xl ${
+                          isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white shadow-md'
+                        }`}>
+                          <div className={`px-4 sm:px-6 py-3.5 sm:py-4 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
+                            isDarkMode ? 'border-slate-800' : 'border-slate-200 bg-slate-50'
+                          }`}>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300">
+                              <span className={`text-xs font-extrabold uppercase tracking-wider ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                 {selectedLeaderboardYear === 'ALL' ? 'All Years Leaderboard' : `${selectedLeaderboardYear} Leaderboard`}
                               </span>
-                              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60">
+                              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                                isDarkMode ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              }`}>
                                 {filteredList.length} Students
                               </span>
                             </div>
-                            <span className="text-xs text-slate-400 font-semibold">
+                            <span className={`text-xs font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                               Sorted: Highest to Lowest RP
                             </span>
                           </div>
 
                           {/* Mobile Responsive Ranking Cards (Phones < 640px) */}
-                          <div className="block sm:hidden divide-y divide-slate-800">
+                          <div className={`block sm:hidden divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                             {filteredList.length === 0 ? (
-                              <div className="py-8 text-center text-slate-500 font-medium text-xs">
+                              <div className={`py-8 text-center font-medium text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                 No students matching the selected year and search criteria.
                               </div>
                             ) : (
                               filteredList.map((st, index) => {
                                 const rank = index + 1;
                                 let rankBadge = (
-                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full font-extrabold text-[11px] bg-slate-800 text-slate-300 border border-slate-700">
+                                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full font-extrabold text-[11px] border ${
+                                    isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                                  }`}>
                                     {rank}
                                   </span>
                                 );
                                 if (rank === 1) {
-                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/60">🥇 1</span>;
+                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-amber-500/20 text-amber-500 dark:text-amber-300 border border-amber-500/60">🥇 1</span>;
                                 } else if (rank === 2) {
-                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-slate-700 text-slate-200 border border-slate-500">🥈 2</span>;
+                                  rankBadge = <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] border ${
+                                    isDarkMode ? 'bg-slate-700 text-slate-200 border-slate-500' : 'bg-slate-200 text-slate-700 border-slate-400'
+                                  }`}>🥈 2</span>;
                                 } else if (rank === 3) {
-                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-amber-950/60 text-amber-400 border border-amber-800">🥉 3</span>;
+                                  rankBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full font-black text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-600/40">🥉 3</span>;
                                 }
 
                                 return (
                                   <div 
                                     key={st.roll_no}
-                                    className={`p-3.5 flex items-center justify-between gap-2.5 hover:bg-slate-800/40 transition-colors ${rank <= 3 ? 'bg-slate-900/40' : ''}`}
+                                    className={`p-3.5 flex items-center justify-between gap-2.5 transition-colors ${
+                                      isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                                    } ${rank <= 3 ? (isDarkMode ? 'bg-slate-900/40' : 'bg-indigo-50/30') : ''}`}
                                   >
                                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                       <div className="flex-shrink-0">
@@ -1827,13 +2120,15 @@ export default function App() {
                                       </div>
                                       <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-1.5 truncate">
-                                          <h4 className="text-xs font-bold text-white truncate">{st.student_name}</h4>
-                                          <span className="text-[9px] px-1.5 py-0.2 rounded font-mono bg-slate-800 text-slate-400 border border-slate-700 flex-shrink-0">
+                                          <h4 className={`text-xs font-bold truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{st.student_name}</h4>
+                                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono border flex-shrink-0 ${
+                                            isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
+                                          }`}>
                                             {st.roll_no}
                                           </span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5 truncate">
-                                          <span className="text-indigo-400 font-semibold">{st.normalizedYear}</span>
+                                        <div className={`flex items-center gap-1.5 text-[10px] mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                          <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{st.normalizedYear}</span>
                                           {st.mentor_name && st.mentor_name !== 'N/A' && (
                                             <>
                                               <span>•</span>
@@ -1845,7 +2140,7 @@ export default function App() {
                                     </div>
 
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                      <span className="text-xs font-black text-emerald-400 whitespace-nowrap">
+                                      <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
                                         +{st.displayBalance} RP
                                       </span>
                                       <button
@@ -1869,7 +2164,9 @@ export default function App() {
                           <div className="hidden sm:block overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                               <thead>
-                                <tr className="border-b border-slate-700 bg-slate-800/80 text-[11px] lg:text-xs font-extrabold uppercase tracking-wider text-slate-200">
+                                <tr className={`border-b text-[11px] lg:text-xs font-extrabold uppercase tracking-wider ${
+                                  isDarkMode ? 'border-slate-700 bg-slate-800/80 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'
+                                }`}>
                                   <th className="py-3.5 px-3 text-center w-12">RANK</th>
                                   <th className="py-3.5 px-3 lg:px-4">STUDENT NAME</th>
                                   <th className="py-3.5 px-3">ROLL NO</th>
@@ -1879,10 +2176,10 @@ export default function App() {
                                   <th className="py-3.5 px-3 text-center">ACTION</th>
                                 </tr>
                               </thead>
-                              <tbody className="text-xs divide-y divide-slate-800">
+                              <tbody className={`text-xs divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                                 {filteredList.length === 0 ? (
                                   <tr>
-                                    <td colSpan="7" className="py-10 text-center text-slate-500 font-medium">
+                                    <td colSpan="7" className={`py-10 text-center font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                       No students matching the selected year and search criteria.
                                     </td>
                                   </tr>
@@ -1890,45 +2187,55 @@ export default function App() {
                                   filteredList.map((st, index) => {
                                     const rank = index + 1;
                                     let rankBadge = (
-                                      <span className="inline-block w-7 h-7 leading-7 text-center rounded-full font-extrabold text-xs bg-slate-800 text-slate-300 border border-slate-700">
+                                      <span className={`inline-block w-7 h-7 leading-7 text-center rounded-full font-extrabold text-xs border ${
+                                        isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                                      }`}>
                                         {rank}
                                       </span>
                                     );
                                     if (rank === 1) {
-                                      rankBadge = <span className="inline-block px-2.5 py-0.5 rounded-full font-black text-xs bg-amber-500/20 text-amber-300 border border-amber-500/60">🥇 1</span>;
+                                      rankBadge = <span className="inline-block px-2.5 py-0.5 rounded-full font-black text-xs bg-amber-500/20 text-amber-500 dark:text-amber-300 border border-amber-500/60">🥇 1</span>;
                                     } else if (rank === 2) {
-                                      rankBadge = <span className="inline-block px-2.5 py-0.5 rounded-full font-black text-xs bg-slate-700 text-slate-200 border border-slate-500">🥈 2</span>;
+                                      rankBadge = <span className={`inline-block px-2.5 py-0.5 rounded-full font-black text-xs border ${
+                                        isDarkMode ? 'bg-slate-700 text-slate-200 border-slate-500' : 'bg-slate-200 text-slate-700 border-slate-400'
+                                      }`}>🥈 2</span>;
                                     } else if (rank === 3) {
-                                      rankBadge = <span className="inline-block px-2.5 py-0.5 rounded-full font-black text-xs bg-amber-950/60 text-amber-400 border border-amber-800">🥉 3</span>;
+                                      rankBadge = <span className="inline-block px-2.5 py-0.5 rounded-full font-black text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-600/40">🥉 3</span>;
                                     }
 
                                     return (
                                       <tr 
                                         key={st.roll_no}
-                                        className={`transition-colors hover:bg-slate-800/60 ${rank <= 3 ? 'bg-slate-900/40' : ''}`}
+                                        className={`transition-colors ${
+                                          isDarkMode ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'
+                                        } ${rank <= 3 ? (isDarkMode ? 'bg-slate-900/40' : 'bg-indigo-50/20') : ''}`}
                                       >
                                         <td className="py-3.5 px-3 text-center font-bold">
                                           {rankBadge}
                                         </td>
-                                        <td className="py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm text-white">
+                                        <td className={`py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                           <div className="truncate max-w-[180px] lg:max-w-[240px] xl:max-w-none">
                                             {st.student_name}
                                           </div>
                                         </td>
-                                        <td className="py-3.5 px-3 font-mono font-medium text-slate-300 whitespace-nowrap text-[11px] lg:text-xs">
+                                        <td className={`py-3.5 px-3 font-mono font-medium whitespace-nowrap text-[11px] lg:text-xs ${
+                                          isDarkMode ? 'text-slate-300' : 'text-slate-700'
+                                        }`}>
                                           {st.roll_no}
                                         </td>
                                         <td className="py-3.5 px-2.5 text-center whitespace-nowrap">
-                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                                            isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                                          }`}>
                                             {st.normalizedYear}
                                           </span>
                                         </td>
-                                        <td className="py-3.5 px-3 lg:px-4 font-medium text-slate-400 text-xs">
+                                        <td className={`py-3.5 px-3 lg:px-4 font-medium text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                           <div className="truncate max-w-[140px] lg:max-w-[180px] xl:max-w-none">
                                             {st.mentor_name || 'N/A'}
                                           </div>
                                         </td>
-                                        <td className="py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm text-emerald-400 whitespace-nowrap">
+                                        <td className="py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
                                           +{st.displayBalance} RP
                                         </td>
                                         <td className="py-3.5 px-3 text-center whitespace-nowrap">
@@ -1963,45 +2270,49 @@ export default function App() {
           {activeNav === 'Rewards History' && (
             <div>
               <div className="mb-6">
-                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
+                <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                   Student Rewards History
                 </h1>
-                <p className="text-slate-400 text-sm mt-1">
-                  Complete chronological rewards activity logs for <span className="text-indigo-400 font-bold">{student.name} ({student.id})</span>.
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Complete chronological rewards activity logs for <span className="text-indigo-600 dark:text-indigo-400 font-bold">{student.name} ({student.id})</span>.
                 </p>
               </div>
 
               {/* History Container */}
-              <div className="rounded-3xl border border-slate-800 bg-slate-900 overflow-hidden shadow-xl">
+              <div className={`rounded-3xl border overflow-hidden shadow-xl ${
+                isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white shadow-md'
+              }`}>
                 
                 {/* Mobile Responsive History Cards (Phones < 640px) */}
-                <div className="block sm:hidden divide-y divide-slate-800">
+                <div className={`block sm:hidden divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                   {rewardsData.length === 0 ? (
-                    <div className="py-10 text-center text-slate-500 text-xs">
+                    <div className={`py-10 text-center text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                       No activities logged yet.
                     </div>
                   ) : (
                     rewardsData.map((item, idx) => (
-                      <div key={idx} className="p-3.5 hover:bg-slate-800/40 transition-colors">
+                      <div key={idx} className={`p-3.5 transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
                         <div className="flex items-start justify-between gap-2.5 mb-2">
                           <div className="flex items-start gap-2 flex-1">
-                            <span className="text-[10px] font-mono text-slate-500 mt-0.5 flex-shrink-0">
+                            <span className={`text-[10px] font-mono mt-0.5 flex-shrink-0 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                               #{idx + 1}
                             </span>
-                            <h4 className="text-xs font-bold text-white leading-snug">
+                            <h4 className={`text-xs font-bold leading-snug ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                               {item.activity_name || item.course_name}
                             </h4>
                           </div>
-                          <span className="text-xs font-black px-2.5 py-0.5 rounded-full text-emerald-400 bg-emerald-950/70 border border-emerald-800/70 whitespace-nowrap flex-shrink-0">
+                          <span className="text-xs font-black px-2.5 py-0.5 rounded-full text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800/70 whitespace-nowrap flex-shrink-0">
                             +{item.reward_points} RP
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-slate-400 pt-0.5">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        <div className={`flex flex-wrap items-center justify-between gap-1.5 text-[11px] pt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                          }`}>
                             {item.activity_type}
                           </span>
-                          <span className="font-medium text-slate-400 text-[10px]">
+                          <span className="font-medium text-[10px]">
                             {item.date}
                           </span>
                         </div>
@@ -2014,7 +2325,9 @@ export default function App() {
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-700 bg-slate-800 text-[11px] lg:text-xs font-extrabold uppercase tracking-wider text-slate-200">
+                      <tr className={`border-b text-[11px] lg:text-xs font-extrabold uppercase tracking-wider ${
+                        isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'
+                      }`}>
                         <th className="py-3.5 px-3 w-10 text-center">#</th>
                         <th className="py-3.5 px-3 lg:px-4 font-extrabold">COURSE / ACTIVITY NAME</th>
                         <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">COMPLETED DATE</th>
@@ -2022,29 +2335,31 @@ export default function App() {
                         <th className="py-3.5 px-3 lg:px-4 font-extrabold text-right whitespace-nowrap">POINTS</th>
                       </tr>
                     </thead>
-                    <tbody className="text-xs divide-y divide-slate-800">
+                    <tbody className={`text-xs divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                       {rewardsData.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="py-10 text-center text-slate-500">
+                          <td colSpan="5" className={`py-10 text-center ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                             No activities logged yet.
                           </td>
                         </tr>
                       ) : (
                         rewardsData.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
-                            <td className="py-3.5 px-3 text-center font-mono text-slate-500 text-xs">{idx + 1}</td>
-                            <td className="py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm text-white">
+                          <tr key={idx} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
+                            <td className={`py-3.5 px-3 text-center font-mono text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
+                            <td className={`py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                               {item.activity_name || item.course_name}
                             </td>
-                            <td className="py-3.5 px-3 lg:px-4 text-slate-400 font-medium whitespace-nowrap text-xs">
+                            <td className={`py-3.5 px-3 lg:px-4 font-medium whitespace-nowrap text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                               {item.date}
                             </td>
                             <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-slate-800 text-slate-300 border border-slate-700">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${
+                                isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                              }`}>
                                 {item.activity_type}
                               </span>
                             </td>
-                            <td className="py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm text-emerald-400 whitespace-nowrap">
+                            <td className="py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
                               +{item.reward_points} RP
                             </td>
                           </tr>
@@ -2059,57 +2374,221 @@ export default function App() {
 
           {/* VIEW 4: SETTINGS */}
           {activeNav === 'Settings' && (
-            <div className="max-w-2xl">
-              <div className="mb-6">
-                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
-                  User Settings
-                </h1>
-                <p className="text-slate-400 text-sm mt-1">
-                  Manage your portal preferences and account details.
-                </p>
+            <div className="max-w-5xl mx-auto w-full space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                    User Settings & Preferences
+                  </h1>
+                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Manage your account details, portal appearance, and session security.
+                  </p>
+                </div>
+                <div className={`text-xs font-semibold px-3 py-1.5 rounded-full border self-start sm:self-auto ${
+                  isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                }`}>
+                  Portal ID: <span className="font-mono font-bold text-indigo-500 dark:text-indigo-400">{currentUser.id || '7376232CT109'}</span>
+                </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 sm:p-8 space-y-6 shadow-xl">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    Signed In As
-                  </label>
-                  <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/80 flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm flex-shrink-0 border border-slate-700">
-                      <AvatarImage
-                        src={currentUser.picture || currentUser.photo_url}
-                        alt={currentUser.name}
-                        initials={currentUser.initials}
-                        fallbackBg={currentUser.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
-                      />
+              {/* 2-Column Responsive Card Grid on Desktop / Tablet */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Left Card: Account & Department Profile (5 cols) */}
+                <div className={`lg:col-span-5 rounded-3xl border p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white shadow-md'
+                }`}>
+                  <div>
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <User className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                      <span>Account Information</span>
+                    </h3>
+
+                    <div className={`p-4 rounded-2xl border flex items-center gap-4 mb-4 ${
+                      isDarkMode ? 'bg-slate-800/60 border-slate-700/80' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className={`w-14 h-14 rounded-2xl overflow-hidden shadow-sm flex-shrink-0 border-2 ${
+                        isDarkMode ? 'border-slate-700' : 'border-slate-300'
+                      }`}>
+                        <AvatarImage
+                          src={currentUser.picture || currentUser.photo_url}
+                          alt={currentUser.name}
+                          initials={currentUser.initials}
+                          fallbackBg={currentUser.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className={`font-bold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{currentUser.name}</h4>
+                        <p className={`text-xs font-mono truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{currentUser.email || currentUser.id}</p>
+                        <span className={`inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          isDarkMode ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}>
+                          Verified Student
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-white text-sm">{currentUser.name}</h4>
-                      <p className="text-xs text-slate-400 font-mono">{currentUser.email || currentUser.id}</p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Department
+                        </label>
+                        <input
+                          type="text"
+                          disabled
+                          value={currentUser.department || 'COMPUTER TECHNOLOGY'}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-semibold cursor-not-allowed ${
+                            isDarkMode ? 'bg-slate-800/70 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-700'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block text-[11px] font-bold uppercase tracking-wider mb-1.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Session Security
+                        </label>
+                        <div className={`p-3 rounded-xl border flex items-center justify-between text-xs ${
+                          isDarkMode ? 'bg-slate-800/40 border-slate-700/60 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }`}>
+                          <span className="flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Auto-logout Timeout</span>
+                          </span>
+                          <span className="font-bold text-emerald-500 dark:text-emerald-400">10 mins</span>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+
+                  <div className={`pt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full py-2.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Logout Account</span>
+                    </button>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    Default Department
-                  </label>
-                  <input
-                    type="text"
-                    disabled
-                    value={currentUser.department || 'COMPUTER TECHNOLOGY'}
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-slate-300 text-sm font-semibold cursor-not-allowed"
-                  />
+                {/* Right Card: Appearance & Theme Selector (7 cols) */}
+                <div className={`lg:col-span-7 rounded-3xl border p-6 sm:p-7 space-y-6 shadow-xl flex flex-col justify-between ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white shadow-md'
+                }`}>
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className={`text-xs font-bold uppercase tracking-wider mb-1.5 flex items-center gap-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <Sparkles className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                        <span>Display Theme & Appearance</span>
+                      </h3>
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Choose how Rewards Points site looks on your device.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setTheme('system')}
+                        className={`p-3.5 rounded-2xl border flex flex-col items-center justify-center gap-2 text-center font-bold text-xs transition-all cursor-pointer ${
+                          themeMode === 'system'
+                            ? isDarkMode
+                              ? 'bg-indigo-950/80 border-indigo-500 text-indigo-200 shadow-md shadow-indigo-500/20 ring-2 ring-indigo-400/40'
+                              : 'bg-indigo-50 border-indigo-600 text-indigo-900 shadow-md shadow-indigo-500/10 ring-2 ring-indigo-500/40'
+                            : isDarkMode
+                              ? 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                              : 'bg-slate-100 border-slate-300 text-slate-700 hover:border-slate-400'
+                        }`}
+                      >
+                        <Monitor className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                        <div>
+                          <div className="font-extrabold">System Default</div>
+                          <div className="text-[10px] font-normal opacity-75 mt-0.5">
+                            {systemIsDark ? 'Currently Dark' : 'Currently Light'}
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTheme('dark')}
+                        className={`p-3.5 rounded-2xl border flex flex-col items-center justify-center gap-2 text-center font-bold text-xs transition-all cursor-pointer ${
+                          themeMode === 'dark'
+                            ? 'bg-indigo-950/80 border-indigo-500 text-indigo-200 shadow-md shadow-indigo-500/20 ring-2 ring-indigo-400/40'
+                            : isDarkMode
+                              ? 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                              : 'bg-slate-100 border-slate-300 text-slate-700 hover:border-slate-400'
+                        }`}
+                      >
+                        <Moon className="w-5 h-5 text-indigo-400" />
+                        <div>
+                          <div className="font-extrabold">Dark Theme</div>
+                          <div className="text-[10px] font-normal opacity-75 mt-0.5">Midnight Slate</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTheme('light')}
+                        className={`p-3.5 rounded-2xl border flex flex-col items-center justify-center gap-2 text-center font-bold text-xs transition-all cursor-pointer ${
+                          themeMode === 'light'
+                            ? 'bg-indigo-50 border-indigo-600 text-indigo-900 shadow-md shadow-indigo-500/10 ring-2 ring-indigo-500/40'
+                            : isDarkMode
+                              ? 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                              : 'bg-slate-100 border-slate-300 text-slate-700 hover:border-slate-400'
+                        }`}
+                      >
+                        <Sun className="w-5 h-5 text-amber-500" />
+                        <div>
+                          <div className="font-extrabold">Light Theme</div>
+                          <div className="text-[10px] font-normal opacity-75 mt-0.5">White Screen</div>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Quick Shortcuts & App Install */}
+                    <div className={`p-4 rounded-2xl border space-y-3 ${
+                      isDarkMode ? 'bg-slate-800/50 border-slate-700/70' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Quick Shortcuts
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setActiveNav('Leaderboard')}
+                          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-500 transition-all cursor-pointer"
+                        >
+                          View Leaderboards →
+                        </button>
+                        <button
+                          onClick={() => setActiveNav('Rewards History')}
+                          className={`px-3.5 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                            isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          My RP History
+                        </button>
+                        {isInstallable && (
+                          <button
+                            onClick={handleInstallClick}
+                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 text-white font-bold text-xs hover:opacity-90 transition-all cursor-pointer"
+                          >
+                            📲 Install App
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`pt-3 border-t flex flex-wrap items-center justify-between gap-2 text-[11px] ${
+                    isDarkMode ? 'border-slate-800 text-slate-500' : 'border-slate-200 text-slate-400'
+                  }`}>
+                    <span>Bannari Amman Institute of Technology</span>
+                    <span>Version 2.4.0 (2026)</span>
+                  </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 flex justify-end">
-                  <button
-                    onClick={handleLogout}
-                    className="px-6 py-2.5 rounded-full bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/30"
-                  >
-                    Logout Account
-                  </button>
-                </div>
               </div>
             </div>
           )}
@@ -2118,11 +2597,15 @@ export default function App() {
       </div>
 
       {/* 3. MOBILE BOTTOM NAVIGATION BAR (Phones & Small Screens) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-2 py-1.5 flex items-center justify-around shadow-2xl">
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl border-t px-2 py-1.5 flex items-center justify-around shadow-2xl transition-colors duration-200 ${
+        isDarkMode ? 'bg-slate-950/95 border-slate-800/80' : 'bg-white/95 border-slate-200 shadow-lg'
+      }`}>
         <button
           onClick={() => setActiveNav('Dashboard')}
           className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Dashboard' ? 'text-indigo-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+            activeNav === 'Dashboard' 
+              ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
+              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           <LayoutGrid className="w-5 h-5" strokeWidth={activeNav === 'Dashboard' ? 2.4 : 1.8} />
@@ -2132,7 +2615,9 @@ export default function App() {
         <button
           onClick={() => setActiveNav('Leaderboard')}
           className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Leaderboard' ? 'text-indigo-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+            activeNav === 'Leaderboard' 
+              ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
+              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           <BarChart2 className="w-5 h-5" strokeWidth={activeNav === 'Leaderboard' ? 2.4 : 1.8} />
@@ -2142,7 +2627,9 @@ export default function App() {
         <button
           onClick={() => setActiveNav('Rewards History')}
           className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Rewards History' ? 'text-indigo-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+            activeNav === 'Rewards History' 
+              ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
+              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           <History className="w-5 h-5" strokeWidth={activeNav === 'Rewards History' ? 2.4 : 1.8} />
@@ -2152,7 +2639,9 @@ export default function App() {
         <button
           onClick={() => setActiveNav('Settings')}
           className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Settings' ? 'text-indigo-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+            activeNav === 'Settings' 
+              ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
+              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           <Settings className="w-5 h-5" strokeWidth={activeNav === 'Settings' ? 2.4 : 1.8} />
@@ -2161,30 +2650,40 @@ export default function App() {
       </div>
 
       {/* 4. FOOTER */}
-      <footer className="w-full border-t border-slate-800 bg-slate-900 py-3.5 px-4 sm:px-6 md:px-10 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-400 mb-14 md:mb-0">
+      <footer className={`w-full border-t py-3.5 px-4 sm:px-6 md:px-10 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs mb-14 md:mb-0 transition-colors duration-200 ${
+        isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-white text-slate-600 shadow-xs'
+      }`}>
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 sm:gap-2 text-center sm:text-left">
           <span>© 2026 Rewards Points Site</span>
-          <span className="hidden sm:inline text-slate-700">•</span>
-          <span className="text-slate-400">Developed by <span className="font-semibold text-indigo-400">Dharineesh V</span> (Dept. of Computer Technology)</span>
+          <span className={`hidden sm:inline ${isDarkMode ? 'text-slate-700' : 'text-slate-300'}`}>•</span>
+          <span>Developed by <span className="font-semibold text-indigo-600 dark:text-indigo-400">Dharineesh V</span> (Dept. of Computer Technology)</span>
         </div>
       </footer>
 
-      {/* 4. "VIEW DETAILS" INTERACTIVE MODAL */}
+      {/* 5. "VIEW DETAILS" INTERACTIVE MODAL */}
       {isModalOpen && selectedStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-2xl rounded-3xl p-4 sm:p-6 md:p-8 shadow-2xl border border-slate-800 bg-slate-900 text-slate-100 max-h-[90vh] overflow-y-auto overflow-x-hidden">
+          <div className={`relative w-full max-w-2xl rounded-3xl p-4 sm:p-6 md:p-8 shadow-2xl border max-h-[90vh] overflow-y-auto overflow-x-hidden ${
+            isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
+          }`}>
             
             {/* Close Button */}
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 sm:top-6 right-4 sm:right-6 p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+              className={`absolute top-4 sm:top-6 right-4 sm:right-6 p-2 rounded-full transition-colors cursor-pointer ${
+                isDarkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+              }`}
             >
               <X className="w-5 h-5" />
             </button>
 
             {/* Modal Header */}
-            <div className="flex items-center gap-3 sm:gap-4 pb-4 sm:pb-6 border-b border-slate-800 pr-8">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border-2 border-slate-700">
+            <div className={`flex items-center gap-3 sm:gap-4 pb-4 sm:pb-6 border-b pr-8 ${
+              isDarkMode ? 'border-slate-800' : 'border-slate-200'
+            }`}>
+              <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border-2 ${
+                isDarkMode ? 'border-slate-700' : 'border-slate-200'
+              }`}>
                 <AvatarImage
                   src={selectedStudent.picture || selectedStudent.photo_url}
                   alt={selectedStudent.name}
@@ -2194,12 +2693,14 @@ export default function App() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <h3 className="text-base sm:text-2xl font-black tracking-tight text-white truncate">{selectedStudent.name}</h3>
-                  <span className="text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 flex-shrink-0">
+                  <h3 className={`text-base sm:text-2xl font-black tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{selectedStudent.name}</h3>
+                  <span className={`text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full border flex-shrink-0 ${
+                    isDarkMode ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  }`}>
                     {selectedStudent.year}
                   </span>
                 </div>
-                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-medium truncate">
+                <p className={`text-[11px] sm:text-xs mt-0.5 font-medium truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   {selectedStudent.id} • {selectedStudent.department}
                 </p>
               </div>
@@ -2207,23 +2708,29 @@ export default function App() {
 
             {/* Modal Points Summary */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 my-4 sm:my-6">
-              <div className="p-3 sm:p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
-                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Cumulative RP</span>
-                <div className="text-lg sm:text-2xl font-black text-cyan-400 mt-0.5 truncate">{selectedStudent.cumulativePoints || selectedStudent.currentPoints} RP</div>
+              <div className={`p-3 sm:p-4 rounded-2xl border ${
+                isDarkMode ? 'bg-slate-800/60 border-slate-700/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cumulative RP</span>
+                <div className="text-lg sm:text-2xl font-black text-cyan-500 dark:text-cyan-400 mt-0.5 truncate">{selectedStudent.cumulativePoints || selectedStudent.currentPoints} RP</div>
               </div>
-              <div className="p-3 sm:p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
-                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Redeemed RP</span>
-                <div className="text-lg sm:text-2xl font-black text-amber-400 mt-0.5 truncate">{selectedStudent.redeemedPoints || '0'} RP</div>
+              <div className={`p-3 sm:p-4 rounded-2xl border ${
+                isDarkMode ? 'bg-slate-800/60 border-slate-700/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Redeemed RP</span>
+                <div className="text-lg sm:text-2xl font-black text-amber-500 dark:text-amber-400 mt-0.5 truncate">{selectedStudent.redeemedPoints || '0'} RP</div>
               </div>
-              <div className="col-span-2 sm:col-span-1 p-3 sm:p-4 rounded-2xl border bg-slate-800/60 border-slate-700/80">
-                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Active Balance</span>
-                <div className="text-lg sm:text-2xl font-black text-emerald-400 mt-0.5 truncate">{selectedStudent.currentPoints} RP</div>
+              <div className={`col-span-2 sm:col-span-1 p-3 sm:p-4 rounded-2xl border ${
+                isDarkMode ? 'bg-slate-800/60 border-slate-700/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Active Balance</span>
+                <div className="text-lg sm:text-2xl font-black text-emerald-500 dark:text-emerald-400 mt-0.5 truncate">{selectedStudent.currentPoints} RP</div>
               </div>
             </div>
 
             {/* Recent RP Activities */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Recent Activity History</h4>
+              <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Recent Activity History</h4>
               <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
                 {rewardsData.length > 0 ? (
                   rewardsData.slice(0, 8).map((act, index) => {
@@ -2232,19 +2739,27 @@ export default function App() {
                     return (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-800 bg-slate-800/40 hover:border-slate-700 transition-all gap-2"
+                        className={`flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all gap-2 ${
+                          isDarkMode 
+                            ? 'border-slate-800 bg-slate-800/40 hover:border-slate-700' 
+                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                        }`}
                       >
                         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center bg-indigo-950/70 text-indigo-400 border border-indigo-800/40 flex-shrink-0">
+                          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center border flex-shrink-0 ${
+                            isDarkMode ? 'bg-indigo-950/70 text-indigo-400 border-indigo-800/40' : 'bg-indigo-100 text-indigo-600 border-indigo-200'
+                          }`}>
                             <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-bold text-slate-200 truncate">{act.activity_name || act.course_name}</div>
-                            <div className="text-[10px] sm:text-[11px] text-slate-400 truncate">{act.date} • {act.activity_type}</div>
+                            <div className={`text-xs font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{act.activity_name || act.course_name}</div>
+                            <div className={`text-[10px] sm:text-[11px] truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{act.date} • {act.activity_type}</div>
                           </div>
                         </div>
                         <span className={`text-[10px] sm:text-xs font-black px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full whitespace-nowrap flex-shrink-0 ${
-                          isPositive ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-800/60' : 'text-rose-400 bg-rose-950/60 border border-rose-800/60'
+                          isPositive 
+                            ? 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/60' 
+                            : 'text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800/60'
                         }`}>
                           {isPositive ? `+${rawPts.toLocaleString()}` : `-${rawPts.toLocaleString()}`} RP
                         </span>
@@ -2252,7 +2767,7 @@ export default function App() {
                     );
                   })
                 ) : (
-                  <div className="p-4 text-center text-xs text-slate-500">
+                  <div className={`p-4 text-center text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                     No activity logs available for this student.
                   </div>
                 )}
@@ -2263,7 +2778,7 @@ export default function App() {
             <div className="mt-6 sm:mt-8 flex justify-end">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="w-full sm:w-auto bg-[#4f46e5] text-white text-xs font-semibold px-6 py-2.5 rounded-full hover:bg-[#4338ca] transition-all shadow-md shadow-indigo-500/30"
+                className="w-full sm:w-auto bg-[#4f46e5] text-white text-xs font-semibold px-6 py-2.5 rounded-full hover:bg-[#4338ca] transition-all shadow-md shadow-indigo-500/30 cursor-pointer"
               >
                 Close Details
               </button>
@@ -2273,56 +2788,63 @@ export default function App() {
         </div>
       )}
 
-      {/* 5. INFORMATION MODAL */}
+      {/* 6. INFORMATION MODAL */}
       {showInfoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-800 bg-slate-900 text-slate-100">
+          <div className={`w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-2xl border ${
+            isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
+          }`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-indigo-400" />
-                <h3 className="font-bold text-lg text-white">About Rewards Site</h3>
+                <Shield className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                <h3 className={`font-bold text-lg ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>About Rewards Site</h3>
               </div>
-              <button onClick={() => setShowInfoModal(false)} className="text-slate-400 hover:text-slate-200">
+              <button 
+                onClick={() => setShowInfoModal(false)} 
+                className={`cursor-pointer ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <p className="text-sm text-slate-400 leading-relaxed mb-5">
+            <p className={`text-sm leading-relaxed mb-5 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               Rewards Site is the official academic and extracurricular rewards management platform. It tracks student rewards point and leaderboards.
             </p>
 
             {/* Developer Details Box */}
-            <div className="p-4 rounded-2xl border border-slate-700 bg-slate-800/60 mb-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 mb-2 flex items-center gap-1.5">
+            <div className={`p-4 rounded-2xl border mb-4 ${
+              isDarkMode ? 'border-slate-700 bg-slate-800/60' : 'border-slate-200 bg-slate-50'
+            }`}>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-1.5">
                 <Code className="w-3.5 h-3.5" />
                 <span>Developer Information</span>
               </div>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-medium">Developed by:</span>
-                  <span className="font-bold text-slate-200">Dharineesh V</span>
+                  <span className={`font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Developed by:</span>
+                  <span className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Dharineesh V</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-medium">Department:</span>
-                  <span className="font-semibold text-slate-300">Computer Technology</span>
+                  <span className={`font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Department:</span>
+                  <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Computer Technology</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-medium">Contact No:</span>
-                  <a href="tel:9715020320" className="font-bold text-indigo-400 hover:underline">
+                  <span className={`font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Contact No:</span>
+                  <a href="tel:9715020320" className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
                     9715020320
                   </a>
                 </div>
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-400 space-y-0.5 pt-1">
+            <div className={`text-[11px] space-y-0.5 pt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
               <div>Version 2.4.0 (2026 Edition)</div>
               <div>© 2026 Rewards Points Site</div>
             </div>
 
             <button
               onClick={() => setShowInfoModal(false)}
-              className="mt-5 w-full py-2.5 rounded-full bg-[#4f46e5] text-white font-semibold text-xs hover:bg-[#4338ca] transition-colors shadow-md shadow-indigo-500/30"
+              className="mt-5 w-full py-2.5 rounded-full bg-[#4f46e5] text-white font-semibold text-xs hover:bg-[#4338ca] transition-colors shadow-md shadow-indigo-500/30 cursor-pointer"
             >
               Got it
             </button>

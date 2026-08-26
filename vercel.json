@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/bitcentral/:path*",
-      "destination": "https://bitcentral-api.onrender.com/:path*"
+      "source": "/api/bitcentral/(.*)",
+      "destination": "/api/bitcentral?path=$1"
     },
     {
       "source": "/(.*)",
