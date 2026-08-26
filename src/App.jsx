@@ -757,10 +757,14 @@ export default function App() {
     }
   };
 
-  // Initial load from Firebase if configured
+  // Auto-fetch from Firebase on interval and when Admin Console is active
   useEffect(() => {
     fetchFirebaseLogs();
-  }, []);
+    const interval = setInterval(() => {
+      fetchFirebaseLogs();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activeNav]);
 
   // Log activity helper (saves locally & triggers Firebase / Google Sheets)
   const logActivity = (student, action = 'Login') => {
@@ -789,8 +793,8 @@ export default function App() {
       return updated;
     });
 
-    // 1. Send to Firebase Realtime Database if configured
-    const fUrl = localStorage.getItem('bit_firebase_url');
+    // 1. Send to Firebase Realtime Database (default or configured URL)
+    const fUrl = localStorage.getItem('bit_firebase_url') || DEFAULT_FIREBASE_DB_URL;
     if (fUrl && fUrl.startsWith('http')) {
       const cleanFUrl = fUrl.trim().replace(/\/$/, '');
       try {
@@ -798,7 +802,7 @@ export default function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newEntry)
-        }).catch(() => {});
+        }).catch((err) => console.warn('Firebase log failed:', err));
       } catch (e) {}
     }
 
@@ -1227,6 +1231,7 @@ export default function App() {
     setDisplayedStudent(transformed);
     setShowDropdown(false);
     setSearchQuery(apiItem.roll_no || apiItem.student_name);
+    logActivity(transformed, 'Search');
   };
 
   const handleSearchKeyDown = (e) => {
@@ -1267,6 +1272,7 @@ export default function App() {
   };
 
   const handleLogout = (isTimeout = false) => {
+    logActivity(currentUser, isTimeout ? 'Session Expired' : 'Logout');
     setIsLoggedIn(false);
     if (isTimeout) {
       setSessionTimeoutNotice('Session timed out after 10 minutes of inactivity. Please sign in again.');
@@ -3047,6 +3053,16 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    onClick={() => fetchFirebaseLogs()}
+                    className={`px-3.5 py-2 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isDarkMode ? 'border-amber-700/80 bg-amber-950/40 text-amber-300 hover:bg-amber-900/60' : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 shadow-xs'
+                    }`}
+                    title="Refresh live cloud records from Firebase"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${sheetSyncStatus === 'pinging' ? 'animate-spin' : ''}`} />
+                    <span>Sync Cloud</span>
+                  </button>
                   <button
                     onClick={handleExportLogsCSV}
                     className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
