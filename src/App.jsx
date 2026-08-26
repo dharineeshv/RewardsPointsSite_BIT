@@ -59,8 +59,8 @@ const ALL_DEPARTMENTS = [
   { id: 'BIOMEDICAL', name: 'Biomedical Engineering', fullTitle: 'BIOMEDICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376231BM'], icon: '🩺', color: 'from-rose-600 to-pink-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' },
   { id: 'FD', name: 'Food Technology', fullTitle: 'FOOD TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232FD'], icon: '🍲', color: 'from-orange-600 to-yellow-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
   { id: 'FT', name: 'Fashion Technology', fullTitle: 'FASHION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232FT', '7376242FT'], icon: '👗', color: 'from-pink-600 to-rose-600', badgeColor: 'bg-pink-950/80 text-pink-300 border-pink-800' },
-  { id: 'ISE', name: 'Information Science & Engineering', fullTitle: 'INFORMATION SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376231IS', '7376241IS'], icon: '📚', color: 'from-blue-600 to-cyan-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
-  { id: 'MTRS', name: 'Mechatronics Engineering', fullTitle: 'MECHATRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376231MT', '7376231MC'], icon: '🦾', color: 'from-rose-600 to-red-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' }
+  { id: 'ISE', name: 'Information Science & Engineering', fullTitle: 'INFORMATION SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376231SE', '7376241SE', '7376251SE', '7376231IS', '7376241IS'], icon: '📚', color: 'from-blue-600 to-cyan-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
+  { id: 'MTRS', name: 'Mechatronics Engineering', fullTitle: 'MECHATRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376231MZ', '7376241MZ', '7376251MZ', '7376231MT', '7376231MC'], icon: '🦾', color: 'from-rose-600 to-red-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' }
 ];
 
 const STUDENTS_DATABASE = [
