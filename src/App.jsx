@@ -190,6 +190,11 @@ function GoogleIcon({ className = "w-5 h-5" }) {
 // Resilient Avatar Image Component
 function AvatarImage({ src, alt = "Avatar", initials = "ST", className = "w-full h-full", fallbackBg = "from-[#38c4ee] to-[#0ea5e9]" }) {
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
   const cleanInitials = (initials || (alt ? alt.split(/\s+/).map(n => n[0]).join('') : 'ST')).slice(0, 2).toUpperCase();
 
   if (src && !hasError) {
@@ -1130,62 +1135,68 @@ export default function App() {
   // Initial load: fetch profile from v2/profile (uses logged-in user email or default)
   useEffect(() => {
     async function fetchInitialStudent() {
-      let targetEmail = 'dharineesh.ct23@bitsathy.ac.in';
+      let savedUser = null;
       try {
         const saved = localStorage.getItem('bit_rp_user');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed?.email) targetEmail = parsed.email;
-        }
+        if (saved) savedUser = JSON.parse(saved);
       } catch (e) {}
+
+      const targetEmail = savedUser?.email || 'dharineesh.ct23@bitsathy.ac.in';
+      const targetRoll = savedUser?.id || savedUser?.roll_no || targetEmail.split('@')[0].toUpperCase();
 
       try {
         let profileApi = null;
-        const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(targetEmail)}`);
-        if (v2Res.ok) {
-          const v2Json = await v2Res.json();
-          if (v2Json && v2Json.data) profileApi = v2Json.data;
-        }
-
-        const roll = profileApi?.roll_no || profileApi?.register_no || targetEmail.split('@')[0].toUpperCase();
-        let searchApi = null;
-        const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(roll)}`);
-        if (sRes.ok) {
-          const sJson = await sRes.json();
-          if (sJson && sJson.data && sJson.data.length > 0) {
-            searchApi = sJson.data[0];
+        try {
+          const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(targetEmail)}`);
+          if (v2Res.ok) {
+            const v2Json = await v2Res.json();
+            if (v2Json && v2Json.data) profileApi = v2Json.data;
           }
-        }
+        } catch (e) {}
 
-        const name = (profileApi?.name || searchApi?.student_name || 'DHARINEESH V').trim().toUpperCase();
-        const initials = name.split(' ').map(n => n[0]).filter(Boolean).join('').slice(0, 2) || 'DV';
-        const balanceRaw = searchApi?.balance_points ? searchApi.balance_points.replace(/,/g, '') : '1146';
-        const balancePts = parseFloat(balanceRaw).toLocaleString();
-        const cumulativeRaw = searchApi?.cumulative_reward_points ? searchApi.cumulative_reward_points.replace(/,/g, '') : balanceRaw;
-        const cumulativePts = parseFloat(cumulativeRaw).toLocaleString();
-        const redeemedRaw = searchApi?.redeemed_points ? searchApi.redeemed_points.replace(/,/g, '') : '0';
-        const redeemedPts = parseFloat(redeemedRaw).toLocaleString();
-        const photoUrl = profileApi?.photo_url || 'https://lh3.googleusercontent.com/a/ACg8ocJIU9hq3_RNCT28a9DKkIG8eCEG46j2vNeG6pC9A30RXNOfQg=s96-c';
+        const roll = profileApi?.roll_no || profileApi?.register_no || targetRoll;
+        let searchApi = null;
+        try {
+          const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(roll)}`);
+          if (sRes.ok) {
+            const sJson = await sRes.json();
+            if (sJson && sJson.data && sJson.data.length > 0) {
+              searchApi = sJson.data[0];
+            }
+          }
+        } catch (e) {}
+
+        const name = (savedUser?.name || profileApi?.name || searchApi?.student_name || roll).trim().toUpperCase();
+        const initials = savedUser?.initials || name.split(/\s+/).map(n => n[0]).filter(Boolean).join('').slice(0, 2) || roll.slice(0, 2);
+        const photoUrl = savedUser?.picture || savedUser?.photo_url || profileApi?.photo_url || null;
+
+        const balanceRaw = searchApi?.balance_points ? searchApi.balance_points.replace(/,/g, '') : (savedUser?.currentPoints ? savedUser.currentPoints.toString().replace(/,/g, '') : '0');
+        const balancePts = parseFloat(balanceRaw || '0').toLocaleString();
+        const cumulativeRaw = searchApi?.cumulative_reward_points ? searchApi.cumulative_reward_points.replace(/,/g, '') : (savedUser?.cumulativePoints ? savedUser.cumulativePoints.toString().replace(/,/g, '') : balanceRaw);
+        const cumulativePts = parseFloat(cumulativeRaw || '0').toLocaleString();
+        const redeemedRaw = searchApi?.redeemed_points ? searchApi.redeemed_points.replace(/,/g, '') : (savedUser?.redeemedPoints ? savedUser.redeemedPoints.toString().replace(/,/g, '') : '0');
+        const redeemedPts = parseFloat(redeemedRaw || '0').toLocaleString();
 
         const userObj = {
+          ...(savedUser || {}),
           id: roll,
           name: name,
           initials: initials,
-          department: profileApi?.department || searchApi?.department || "Computer Technology",
-          course_code: searchApi?.course_code || "B. Tech.",
-          batch: profileApi?.batch || "2023 - 2027",
-          year: searchApi?.year ? `Year ${searchApi.year}` : "Year IV",
-          mentor_name: searchApi?.mentor_name || "Dr. ANANDAKUMAR K ISE",
+          department: profileApi?.department || searchApi?.department || savedUser?.department || "Computer Technology",
+          course_code: searchApi?.course_code || savedUser?.course_code || "B. Tech.",
+          batch: profileApi?.batch || savedUser?.batch || "2023 - 2027",
+          year: searchApi?.year ? `Year ${searchApi.year}` : (savedUser?.year || "Year IV"),
+          mentor_name: searchApi?.mentor_name || savedUser?.mentor_name || "Dr. ANANDAKUMAR K ISE",
           picture: photoUrl,
           photo_url: photoUrl,
-          avatarBg: "from-[#38c4ee] to-[#0ea5e9]",
+          avatarBg: savedUser?.avatarBg || "from-[#38c4ee] to-[#0ea5e9]",
           badge: "Verified BIT Student",
           email: targetEmail,
           currentPoints: balancePts,
           cumulativePoints: cumulativePts,
           redeemedPoints: redeemedPts,
-          history: [],
-          breakdown: []
+          history: savedUser?.history || [],
+          breakdown: savedUser?.breakdown || []
         };
 
         setDisplayedStudent(userObj);
@@ -1197,7 +1208,7 @@ export default function App() {
           }
         } catch (e) {}
       } catch (err) {
-        console.error('Error fetching initial student from v2/profile:', err);
+        console.error('Error refreshing initial student profile:', err);
       }
     }
     fetchInitialStudent();
