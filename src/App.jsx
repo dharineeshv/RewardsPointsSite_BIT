@@ -38,29 +38,47 @@ import {
   LogOut,
   Medal,
   Monitor,
-  Menu
+  Menu,
+  Terminal,
+  Cpu,
+  Database,
+  Brain,
+  Globe,
+  Radio,
+  Zap,
+  Cog,
+  Gauge,
+  LineChart,
+  Sprout,
+  Dna,
+  Palette,
+  HeartPulse,
+  Utensils,
+  Scissors,
+  Library,
+  Bot
 } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
-  { id: 'CT', name: 'Computer Technology', fullTitle: 'COMPUTER TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232CT', '7376242CT'], icon: '💻', color: 'from-blue-600 to-indigo-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
-  { id: 'CSE', name: 'Computer Science and Engineering', fullTitle: 'COMPUTER SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376231CS', '7376241CS', '7376251CS'], icon: '🖥️', color: 'from-indigo-600 to-violet-600', badgeColor: 'bg-indigo-950/80 text-indigo-300 border-indigo-800' },
-  { id: 'AI&DS', name: 'Artificial Intelligence & Data Science', fullTitle: 'ARTIFICIAL INTELLIGENCE AND DATA SCIENCE', degree: 'B.Tech.', prefixes: ['7376232AD', '7376242AD', '7376252AD'], icon: '🤖', color: 'from-cyan-600 to-blue-600', badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-800' },
-  { id: 'AIML', name: 'AI & Machine Learning', fullTitle: 'ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING', degree: 'B.Tech.', prefixes: ['7376232AL', '7376242AL', '7376252AL'], icon: '🧠', color: 'from-purple-600 to-pink-600', badgeColor: 'bg-purple-950/80 text-purple-300 border-purple-800' },
-  { id: 'IT', name: 'Information Technology', fullTitle: 'INFORMATION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232IT', '7376242IT', '7376252IT'], icon: '🌐', color: 'from-sky-600 to-blue-600', badgeColor: 'bg-sky-950/80 text-sky-300 border-sky-800' },
-  { id: 'ECE', name: 'Electronics & Communication Engineering', fullTitle: 'ELECTRONICS AND COMMUNICATION ENGINEERING', degree: 'B.E.', prefixes: ['7376231EC', '7376241EC', '7376251EC'], icon: '📡', color: 'from-teal-600 to-emerald-600', badgeColor: 'bg-teal-950/80 text-teal-300 border-teal-800' },
-  { id: 'EEE', name: 'Electrical & Electronics Engineering', fullTitle: 'ELECTRICAL AND ELECTRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376231EE', '7376241EE', '7376251EE'], icon: '⚡', color: 'from-amber-600 to-orange-600', badgeColor: 'bg-amber-950/80 text-amber-300 border-amber-800' },
-  { id: 'MECH', name: 'Mechanical Engineering', fullTitle: 'MECHANICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376231ME', '7376241ME', '7376251ME'], icon: '⚙️', color: 'from-slate-600 to-zinc-600', badgeColor: 'bg-slate-800 text-slate-300 border-slate-700' },
-  { id: 'EIE', name: 'Electronics & Instrumentation Engineering', fullTitle: 'ELECTRONICS AND INSTRUMENTATION ENGINEERING', degree: 'B.E.', prefixes: ['7376231EI', '7376241EI', '7376251EI'], icon: '🎛️', color: 'from-orange-600 to-amber-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
-  { id: 'CSBS', name: 'Computer Science & Business Systems', fullTitle: 'COMPUTER SCIENCE AND BUSINESS SYSTEMS', degree: 'B.Tech.', prefixes: ['7376232CB', '7376242CB', '7376252CB'], icon: '📊', color: 'from-emerald-600 to-green-600', badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-800' },
-  { id: 'AGRI', name: 'Agricultural Engineering', fullTitle: 'AGRICULTURAL ENGINEERING', degree: 'B.E.', prefixes: ['7376232AG', '7376242AG', '7376252AG'], icon: '🌾', color: 'from-lime-600 to-emerald-600', badgeColor: 'bg-lime-950/80 text-lime-300 border-lime-800' },
-  { id: 'BT', name: 'Biotechnology', fullTitle: 'BIOTECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232BT', '7376242BT', '7376252BT'], icon: '🧬', color: 'from-fuchsia-600 to-pink-600', badgeColor: 'bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-800' },
-  { id: 'CSD', name: 'Computer Science & Design', fullTitle: 'COMPUTER SCIENCE AND DESIGN', degree: 'B.E.', prefixes: ['7376231CD', '7376241CD'], icon: '🎨', color: 'from-violet-600 to-purple-600', badgeColor: 'bg-violet-950/80 text-violet-300 border-violet-800' },
-  { id: 'CIVIL', name: 'Civil Engineering', fullTitle: 'CIVIL ENGINEERING', degree: 'B.E.', prefixes: ['7376231CE', '7376241CE'], icon: '🏗️', color: 'from-yellow-600 to-amber-600', badgeColor: 'bg-yellow-950/80 text-yellow-300 border-yellow-800' },
-  { id: 'BIOMEDICAL', name: 'Biomedical Engineering', fullTitle: 'BIOMEDICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376231BM'], icon: '🩺', color: 'from-rose-600 to-pink-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' },
-  { id: 'FD', name: 'Food Technology', fullTitle: 'FOOD TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232FD'], icon: '🍲', color: 'from-orange-600 to-yellow-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
-  { id: 'FT', name: 'Fashion Technology', fullTitle: 'FASHION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232FT', '7376242FT'], icon: '👗', color: 'from-pink-600 to-rose-600', badgeColor: 'bg-pink-950/80 text-pink-300 border-pink-800' },
-  { id: 'ISE', name: 'Information Science & Engineering', fullTitle: 'INFORMATION SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376231SE', '7376241SE', '7376251SE', '7376231IS', '7376241IS'], icon: '📚', color: 'from-blue-600 to-cyan-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
-  { id: 'MTRS', name: 'Mechatronics Engineering', fullTitle: 'MECHATRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376231MZ', '7376241MZ', '7376251MZ', '7376231MT', '7376231MC'], icon: '🦾', color: 'from-rose-600 to-red-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' }
+  { id: 'CT', name: 'Computer Technology', fullTitle: 'COMPUTER TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232CT', '7376242CT'], Icon: Terminal, color: 'from-blue-600 to-indigo-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
+  { id: 'CSE', name: 'Computer Science and Engineering', fullTitle: 'COMPUTER SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376231CS', '7376241CS', '7376251CS'], Icon: Cpu, color: 'from-indigo-600 to-violet-600', badgeColor: 'bg-indigo-950/80 text-indigo-300 border-indigo-800' },
+  { id: 'AI&DS', name: 'Artificial Intelligence & Data Science', fullTitle: 'ARTIFICIAL INTELLIGENCE AND DATA SCIENCE', degree: 'B.Tech.', prefixes: ['7376232AD', '7376242AD', '7376252AD'], Icon: Database, color: 'from-cyan-600 to-blue-600', badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-800' },
+  { id: 'AIML', name: 'AI & Machine Learning', fullTitle: 'ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING', degree: 'B.Tech.', prefixes: ['7376232AL', '7376242AL', '7376252AL'], Icon: Brain, color: 'from-purple-600 to-pink-600', badgeColor: 'bg-purple-950/80 text-purple-300 border-purple-800' },
+  { id: 'IT', name: 'Information Technology', fullTitle: 'INFORMATION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232IT', '7376242IT', '7376252IT'], Icon: Globe, color: 'from-sky-600 to-blue-600', badgeColor: 'bg-sky-950/80 text-sky-300 border-sky-800' },
+  { id: 'ECE', name: 'Electronics & Communication Engineering', fullTitle: 'ELECTRONICS AND COMMUNICATION ENGINEERING', degree: 'B.E.', prefixes: ['7376231EC', '7376241EC', '7376251EC'], Icon: Radio, color: 'from-teal-600 to-emerald-600', badgeColor: 'bg-teal-950/80 text-teal-300 border-teal-800' },
+  { id: 'EEE', name: 'Electrical & Electronics Engineering', fullTitle: 'ELECTRICAL AND ELECTRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376231EE', '7376241EE', '7376251EE'], Icon: Zap, color: 'from-amber-600 to-orange-600', badgeColor: 'bg-amber-950/80 text-amber-300 border-amber-800' },
+  { id: 'MECH', name: 'Mechanical Engineering', fullTitle: 'MECHANICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376231ME', '7376241ME', '7376251ME'], Icon: Cog, color: 'from-slate-600 to-zinc-600', badgeColor: 'bg-slate-800 text-slate-300 border-slate-700' },
+  { id: 'EIE', name: 'Electronics & Instrumentation Engineering', fullTitle: 'ELECTRONICS AND INSTRUMENTATION ENGINEERING', degree: 'B.E.', prefixes: ['7376231EI', '7376241EI', '7376251EI'], Icon: Gauge, color: 'from-orange-600 to-amber-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
+  { id: 'CSBS', name: 'Computer Science & Business Systems', fullTitle: 'COMPUTER SCIENCE AND BUSINESS SYSTEMS', degree: 'B.Tech.', prefixes: ['7376232CB', '7376242CB', '7376252CB'], Icon: LineChart, color: 'from-emerald-600 to-green-600', badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-800' },
+  { id: 'AGRI', name: 'Agricultural Engineering', fullTitle: 'AGRICULTURAL ENGINEERING', degree: 'B.E.', prefixes: ['7376232AG', '7376242AG', '7376252AG'], Icon: Sprout, color: 'from-lime-600 to-emerald-600', badgeColor: 'bg-lime-950/80 text-lime-300 border-lime-800' },
+  { id: 'BT', name: 'Biotechnology', fullTitle: 'BIOTECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232BT', '7376242BT', '7376252BT'], Icon: Dna, color: 'from-fuchsia-600 to-pink-600', badgeColor: 'bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-800' },
+  { id: 'CSD', name: 'Computer Science & Design', fullTitle: 'COMPUTER SCIENCE AND DESIGN', degree: 'B.E.', prefixes: ['7376231CD', '7376241CD'], Icon: Palette, color: 'from-violet-600 to-purple-600', badgeColor: 'bg-violet-950/80 text-violet-300 border-violet-800' },
+  { id: 'CIVIL', name: 'Civil Engineering', fullTitle: 'CIVIL ENGINEERING', degree: 'B.E.', prefixes: ['7376231CE', '7376241CE'], Icon: Building2, color: 'from-yellow-600 to-amber-600', badgeColor: 'bg-yellow-950/80 text-yellow-300 border-yellow-800' },
+  { id: 'BIOMEDICAL', name: 'Biomedical Engineering', fullTitle: 'BIOMEDICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376231BM'], Icon: HeartPulse, color: 'from-rose-600 to-pink-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' },
+  { id: 'FD', name: 'Food Technology', fullTitle: 'FOOD TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232FD'], Icon: Utensils, color: 'from-orange-600 to-yellow-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
+  { id: 'FT', name: 'Fashion Technology', fullTitle: 'FASHION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232FT', '7376242FT'], Icon: Scissors, color: 'from-pink-600 to-rose-600', badgeColor: 'bg-pink-950/80 text-pink-300 border-pink-800' },
+  { id: 'ISE', name: 'Information Science & Engineering', fullTitle: 'INFORMATION SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376231SE', '7376241SE', '7376251SE', '7376231IS', '7376241IS'], Icon: Library, color: 'from-blue-600 to-cyan-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
+  { id: 'MTRS', name: 'Mechatronics Engineering', fullTitle: 'MECHATRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376231MZ', '7376241MZ', '7376251MZ', '7376231MT', '7376231MC'], Icon: Bot, color: 'from-rose-600 to-red-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' }
 ];
 
 const STUDENTS_DATABASE = [
@@ -1785,18 +1803,29 @@ export default function App() {
                       .map((dept) => (
                         <div
                           key={dept.id}
-                          className={`rounded-3xl border p-6 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 group ${
+                          onClick={() => handleViewDepartmentLeaderboard(dept)}
+                          className={`rounded-3xl border p-5 sm:p-6 flex flex-col justify-between cursor-pointer transition-all duration-300 group hover:-translate-y-1.5 ${
                             isDarkMode 
-                              ? 'border-slate-800 bg-slate-900 hover:border-slate-700 shadow-lg shadow-black/30' 
-                              : 'border-slate-200 bg-white hover:border-slate-300 shadow-md'
+                              ? 'border-slate-800 bg-slate-900/90 hover:border-indigo-500/50 hover:bg-slate-900 shadow-xl shadow-black/40 hover:shadow-indigo-950/30' 
+                              : 'border-slate-200/90 bg-white hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-100/60 shadow-sm'
                           }`}
                         >
                           <div>
-                            {/* Card Top Header */}
+                            {/* Card Top Header: 3D Glowing Vector Capsule & Badges */}
                             <div className="flex items-center justify-between mb-4">
-                              <span className="text-3xl">{dept.icon}</span>
+                              <div className="relative">
+                                {/* Ambient 3D Glow */}
+                                <div className={`absolute -inset-1 rounded-2xl bg-gradient-to-br ${dept.color} opacity-40 blur-sm group-hover:opacity-75 group-hover:blur-md transition-all duration-300`} />
+                                
+                                {/* 3D Glass Capsule */}
+                                <div className={`relative w-12 h-12 rounded-2xl bg-gradient-to-br ${dept.color} p-[1.5px] shadow-lg shadow-black/25 group-hover:scale-105 group-hover:-rotate-2 transition-all duration-300 flex items-center justify-center`}>
+                                  <div className="w-full h-full rounded-[14px] bg-white/15 backdrop-blur-xs flex items-center justify-center border-t border-l border-white/40 border-b border-r border-black/20">
+                                    <dept.Icon className="w-6 h-6 text-white drop-shadow-md" strokeWidth={2.2} />
+                                  </div>
+                                </div>
+                              </div>
                               <div className="flex items-center gap-1.5">
-                                <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${dept.badgeColor}`}>
+                                <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border shadow-2xs ${dept.badgeColor}`}>
                                   {dept.id}
                                 </span>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -1807,26 +1836,39 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Department Name */}
+                            {/* Department Title */}
                             <h3 className={`text-base font-extrabold transition-colors leading-snug ${
                               isDarkMode ? 'text-white group-hover:text-indigo-400' : 'text-slate-900 group-hover:text-indigo-600'
                             }`}>
                               {dept.name}
                             </h3>
 
-                            <p className={`text-xs mt-2 font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Bannari Amman Institute of Technology
-                            </p>
+                            {/* Live Rankings Metadata */}
+                            <div className={`flex items-center gap-1.5 mt-2.5 text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
+                              <span className="text-[11px] font-semibold">Live Rankings</span>
+                              <span className="opacity-40">•</span>
+                              <span className="text-[11px]">Year I – IV</span>
+                            </div>
                           </div>
 
-                          {/* Card Action Button */}
-                          <button
-                            onClick={() => handleViewDepartmentLeaderboard(dept)}
-                            className="mt-6 w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
-                          >
-                            <span>View Leaderboard</span>
-                            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                          </button>
+                          {/* Card Interactive Footer */}
+                          <div className={`mt-5 pt-3.5 border-t flex items-center justify-between transition-colors ${
+                            isDarkMode ? 'border-slate-800/80 group-hover:border-slate-700' : 'border-slate-100 group-hover:border-slate-200'
+                          }`}>
+                            <span className={`text-xs font-bold transition-colors ${
+                              isDarkMode ? 'text-slate-300 group-hover:text-indigo-400' : 'text-slate-700 group-hover:text-indigo-600'
+                            }`}>
+                              View Leaderboard
+                            </span>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              isDarkMode 
+                                ? 'bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-indigo-500/30' 
+                                : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-indigo-500/30'
+                            }`}>
+                              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                            </div>
+                          </div>
                         </div>
                       ))}
                   </div>
@@ -1851,19 +1893,30 @@ export default function App() {
                         <span>All Departments</span>
                       </button>
 
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xl sm:text-2xl">{selectedDeptLeaderboard.icon}</span>
-                          <h1 className={`text-xl sm:text-2xl md:text-3xl font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                            {selectedDeptLeaderboard.name}
-                          </h1>
-                          <span className={`text-[10px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full border ${selectedDeptLeaderboard.badgeColor}`}>
-                            {selectedDeptLeaderboard.id}
-                          </span>
+                      <div className="flex items-center gap-3">
+                        {selectedDeptLeaderboard.Icon && (
+                          <div className="relative flex-shrink-0">
+                            <div className={`absolute -inset-0.5 rounded-xl bg-gradient-to-br ${selectedDeptLeaderboard.color} opacity-50 blur-xs`} />
+                            <div className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${selectedDeptLeaderboard.color} p-[1.5px] flex items-center justify-center shadow-md`}>
+                              <div className="w-full h-full rounded-[10px] bg-white/15 backdrop-blur-xs flex items-center justify-center border-t border-l border-white/40">
+                                <selectedDeptLeaderboard.Icon className="w-5 h-5 text-white drop-shadow-sm" strokeWidth={2.2} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h1 className={`text-xl sm:text-2xl md:text-3xl font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {selectedDeptLeaderboard.name}
+                            </h1>
+                            <span className={`text-[10px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full border ${selectedDeptLeaderboard.badgeColor}`}>
+                              {selectedDeptLeaderboard.id}
+                            </span>
+                          </div>
+                          <p className={`text-[11px] sm:text-xs mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Ranked in <span className="text-emerald-500 dark:text-emerald-400 font-bold">descending order</span> of Reward Points • {selectedDeptLeaderboard.degree}
+                          </p>
                         </div>
-                        <p className={`text-[11px] sm:text-xs mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Ranked in <span className="text-emerald-500 dark:text-emerald-400 font-bold">descending order</span> of Reward Points • {selectedDeptLeaderboard.degree}
-                        </p>
                       </div>
                     </div>
 
