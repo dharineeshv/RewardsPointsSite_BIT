@@ -200,9 +200,9 @@ async function bitcentralFetch(pathAndQuery) {
 }
 
 // Standalone Login Page Component
-function LoginPage({ onLogin, isDarkMode }) {
+function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
+  const [authError, setAuthError] = useState(initialNotice);
 
   const triggerGoogleLogin = useGoogleLogin({
     hosted_domain: 'bitsathy.ac.in',
@@ -451,10 +451,32 @@ function transformApiStudent(apiItem) {
   };
 }
 
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
 export default function App() {
+  const [sessionTimeoutNotice, setSessionTimeoutNotice] = useState(() => {
+    try {
+      const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
+      const lastActive = parseInt(localStorage.getItem('bit_rp_last_active') || '0', 10);
+      if (isLogged && lastActive && Date.now() - lastActive > INACTIVITY_TIMEOUT_MS) {
+        return 'Session expired due to 10 minutes of inactivity. Please sign in again.';
+      }
+    } catch (e) {}
+    return '';
+  });
+
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try {
-      return localStorage.getItem('bit_rp_is_logged_in') === 'true';
+      const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
+      if (!isLogged) return false;
+      const lastActive = parseInt(localStorage.getItem('bit_rp_last_active') || '0', 10);
+      if (lastActive && Date.now() - lastActive > INACTIVITY_TIMEOUT_MS) {
+        localStorage.removeItem('bit_rp_is_logged_in');
+        localStorage.removeItem('bit_rp_user');
+        localStorage.removeItem('bit_rp_last_active');
+        return false;
+      }
+      return true;
     } catch (e) {
       return false;
     }
@@ -487,6 +509,31 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+
+  // PWA Web App Installation State
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+    }
+    setDeferredPrompt(null);
+  };
   
   // Dynamic API state for yearly averages
   const [yearlyAverages, setYearlyAverages] = useState({
@@ -769,23 +816,73 @@ export default function App() {
     setCurrentUser(user);
     setDisplayedStudent(user);
     setIsLoggedIn(true);
+    setSessionTimeoutNotice('');
     try {
       localStorage.setItem('bit_rp_is_logged_in', 'true');
       localStorage.setItem('bit_rp_user', JSON.stringify(user));
+      localStorage.setItem('bit_rp_last_active', Date.now().toString());
     } catch (e) {
       console.warn('Failed to save session to localStorage:', e);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = (isTimeout = false) => {
     setIsLoggedIn(false);
+    if (isTimeout) {
+      setSessionTimeoutNotice('Session timed out after 10 minutes of inactivity. Please sign in again.');
+    } else {
+      setSessionTimeoutNotice('');
+    }
     try {
       localStorage.removeItem('bit_rp_is_logged_in');
       localStorage.removeItem('bit_rp_user');
+      localStorage.removeItem('bit_rp_last_active');
     } catch (e) {
       console.warn('Failed to clear session from localStorage:', e);
     }
   };
+
+  // 10-Minute Idle Inactivity Auto-Logout Tracker
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    // Record initial active timestamp
+    try {
+      if (!localStorage.getItem('bit_rp_last_active')) {
+        localStorage.setItem('bit_rp_last_active', Date.now().toString());
+      }
+    } catch (e) {}
+
+    // Throttle user activity events to update localStorage every 5 seconds max
+    let lastRecorded = Date.now();
+    const updateActivity = () => {
+      const now = Date.now();
+      if (now - lastRecorded > 5000) {
+        lastRecorded = now;
+        try {
+          localStorage.setItem('bit_rp_last_active', now.toString());
+        } catch (e) {}
+      }
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(evt => window.addEventListener(evt, updateActivity, { passive: true }));
+
+    // Periodic check every 5 seconds
+    const interval = setInterval(() => {
+      try {
+        const lastActive = parseInt(localStorage.getItem('bit_rp_last_active') || '0', 10);
+        if (lastActive && Date.now() - lastActive >= INACTIVITY_TIMEOUT_MS) {
+          handleLogout(true);
+        }
+      } catch (e) {}
+    }, 5000);
+
+    return () => {
+      activityEvents.forEach(evt => window.removeEventListener(evt, updateActivity));
+      clearInterval(interval);
+    };
+  }, [isLoggedIn]);
 
   // If user is not logged in, render the dedicated Login Page
   if (!isLoggedIn) {
@@ -793,6 +890,7 @@ export default function App() {
       <LoginPage 
         onLogin={handleLogin}
         isDarkMode={isDarkMode}
+        initialNotice={sessionTimeoutNotice}
       />
     );
   }
@@ -1068,6 +1166,16 @@ export default function App() {
               <span>Settings</span>
             </button>
           </nav>
+
+          {/* PWA Install App Button */}
+          {isInstallable && (
+            <button
+              onClick={handleInstallClick}
+              className="my-3 w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+            >
+              <span>📲 Install App</span>
+            </button>
+          )}
 
           {/* Quick Info Box in Sidebar */}
           <div className="mt-auto p-4 rounded-2xl border bg-slate-800/50 border-slate-700/60 text-slate-300">
