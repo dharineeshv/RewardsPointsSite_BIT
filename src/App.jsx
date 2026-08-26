@@ -1045,7 +1045,7 @@ export default function App() {
                   <div className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
                     isDarkMode ? 'bg-slate-950/40 text-slate-400' : 'bg-slate-50 text-slate-500'
                   }`}>
-                    <span>API Results ({searchResults.length})</span>
+                    <span>Results ({searchResults.length})</span>
                     <span className="normal-case font-normal">Click to select</span>
                   </div>
                   {searchResults.map((item, idx) => (
@@ -1206,7 +1206,7 @@ export default function App() {
                 <div className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
                   isDarkMode ? 'bg-slate-950/60 text-slate-400' : 'bg-slate-50 text-slate-500'
                 }`}>
-                  <span>API Results ({searchResults.length})</span>
+                  <span>Results ({searchResults.length})</span>
                   <span className="normal-case font-normal">Click to select</span>
                 </div>
                 {searchResults.map((item, idx) => (
@@ -2390,7 +2390,7 @@ export default function App() {
                 <div className={`text-xs font-semibold px-3 py-1.5 rounded-full border self-start sm:self-auto ${
                   isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
                 }`}>
-                  Portal ID: <span className="font-mono font-bold text-indigo-500 dark:text-indigo-400">{currentUser.id || '7376232CT109'}</span>
+                  Student ID: <span className="font-mono font-bold text-indigo-500 dark:text-indigo-400">{currentUser.id || '7376232CT109'}</span>
                 </div>
               </div>
 
