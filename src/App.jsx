@@ -640,6 +640,10 @@ export default function App() {
   const [rewardsTotal, setRewardsTotal] = useState(0);
   const [rewardsPage, setRewardsPage] = useState(1);
 
+  // Dynamic API state for Student Detail Modal
+  const [modalRewardsData, setModalRewardsData] = useState([]);
+  const [loadingModalRewards, setLoadingModalRewards] = useState(false);
+
   // Leaderboard State
   const [selectedDeptLeaderboard, setSelectedDeptLeaderboard] = useState(null);
   const [deptLeaderboardList, setDeptLeaderboardList] = useState([]);
@@ -1073,6 +1077,9 @@ export default function App() {
           if (json && Array.isArray(json.data)) {
             setRewardsData(json.data);
             setRewardsTotal(json.total || json.data.length);
+          } else if (Array.isArray(json)) {
+            setRewardsData(json);
+            setRewardsTotal(json.length);
           } else {
             setRewardsData([]);
             setRewardsTotal(0);
@@ -1086,6 +1093,39 @@ export default function App() {
     }
     fetchRewards();
   }, [displayedStudent.id]);
+
+  // Fetch live rewards specifically for selectedStudent in the Detail Modal
+  useEffect(() => {
+    if (!isModalOpen || !selectedStudent?.id) return;
+    let isMounted = true;
+    async function fetchModalRewards() {
+      setLoadingModalRewards(true);
+      try {
+        const res = await bitcentralFetch(`/rewards?roll_no=${encodeURIComponent(selectedStudent.id)}&page=1&limit=50`);
+        if (res.ok) {
+          const json = await res.json();
+          if (isMounted) {
+            if (json && Array.isArray(json.data)) {
+              setModalRewardsData(json.data);
+            } else if (Array.isArray(json)) {
+              setModalRewardsData(json);
+            } else {
+              setModalRewardsData([]);
+            }
+          }
+        } else {
+          if (isMounted) setModalRewardsData([]);
+        }
+      } catch (err) {
+        console.error('Error fetching modal rewards:', err);
+        if (isMounted) setModalRewardsData([]);
+      } finally {
+        if (isMounted) setLoadingModalRewards(false);
+      }
+    }
+    fetchModalRewards();
+    return () => { isMounted = false; };
+  }, [isModalOpen, selectedStudent?.id]);
 
   // Initial load: fetch profile from v2/profile (uses logged-in user email or default)
   useEffect(() => {
@@ -3647,10 +3687,22 @@ export default function App() {
 
             {/* Recent RP Activities */}
             <div>
-              <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Recent Activity History</h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Recent Activity History</h4>
+                {loadingModalRewards && (
+                  <span className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1 animate-pulse">
+                    <RefreshCw className="w-3 h-3 animate-spin" /> Fetching live RP logs...
+                  </span>
+                )}
+              </div>
               <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
-                {rewardsData.length > 0 ? (
-                  rewardsData.slice(0, 8).map((act, index) => {
+                {loadingModalRewards ? (
+                  <div className={`p-6 text-center text-xs flex flex-col items-center justify-center gap-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Loading student's authentic reward logs...</span>
+                  </div>
+                ) : modalRewardsData.length > 0 ? (
+                  modalRewardsData.slice(0, 8).map((act, index) => {
                     const rawPts = act.reward_points ? parseFloat(act.reward_points.replace(/,/g, '')) : 0;
                     const isPositive = act.type !== 'negative' && rawPts >= 0;
                     return (
@@ -3685,7 +3737,7 @@ export default function App() {
                   })
                 ) : (
                   <div className={`p-4 text-center text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    No activity logs available for this student.
+                    No activity logs recorded yet for this student.
                   </div>
                 )}
               </div>
