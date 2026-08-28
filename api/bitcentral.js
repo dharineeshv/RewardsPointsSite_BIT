@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   }
 
   // 3. Target backend (server-side only, invisible to client browser)
-  const BACKEND_URL = process.env.BITCENTRAL_BACKEND_URL || 'https://bitcentral-api.onrender.com';
+  const BACKEND_URL = process.env.BITCENTRAL_BACKEND_URL || 'https://bitcentral-v2.onrender.com';
 
   const { path = '', ...queryParams } = req.query;
   const subpath = Array.isArray(path) ? path.join('/') : path;

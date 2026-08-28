@@ -91,29 +91,29 @@ const ALL_DEPARTMENTS = [
 
 const STUDENTS_DATABASE = [
   {
-    id: "737623CT108",
-    name: "DHARANI M",
-    initials: "DM",
+    id: "7376232CT109",
+    name: "DHARINEESH V",
+    initials: "DV",
     department: "COMPUTER TECHNOLOGY",
     year: "IV Yr",
-    currentPoints: "1,450",
-    rawPoints: 1450,
+    currentPoints: "4.00",
+    rawPoints: 4.0,
+    cumulativePoints: "4.00",
+    redeemedPoints: "0.00",
     avatarBg: "from-[#38c4ee] to-[#0ea5e9]",
-    badge: "Top 5% Performer",
-    email: "dharani.ct23@bitsathy.ac.in",
+    badge: "Verified BIT Student",
+    email: "dharineesh.ct23@bitsathy.ac.in",
     cgpa: "8.92",
     history: [
-      { id: 1, title: "Smart India Hackathon - 1st Place", date: "Oct 24, 2024", points: "+500 RP", category: "Hackathon", icon: Trophy, color: "text-amber-500 bg-amber-50" },
-      { id: 2, title: "Dean's Academic Excellence Award", date: "Sep 15, 2024", points: "+400 RP", category: "Academics", icon: Award, color: "text-indigo-500 bg-indigo-50" },
-      { id: 3, title: "Open Source AI Project Contribution", date: "Aug 10, 2024", points: "+300 RP", category: "Innovation", icon: Code, color: "text-emerald-500 bg-emerald-50" },
-      { id: 4, title: "Tech Symposium Lead Coordinator", date: "Jul 28, 2024", points: "+150 RP", category: "Leadership", icon: Users, color: "text-blue-500 bg-blue-50" },
-      { id: 5, title: "Cloud Architecture Workshop Certification", date: "Jun 12, 2024", points: "+100 RP", category: "Workshop", icon: BookOpen, color: "text-purple-500 bg-purple-50" },
+      { id: 1, title: "External Technical Events", date: "Apr 18, 2026", points: "+300 RP", category: "External", icon: Trophy, color: "text-amber-500 bg-amber-50" },
+      { id: 2, title: "Database Programming Level 4", date: "Apr 13, 2026", points: "+400 RP", category: "P Skill", icon: Code, color: "text-emerald-500 bg-emerald-50" },
+      { id: 3, title: "III & I Year March GP Challenge - BPI", date: "Apr 16, 2026", points: "+300 RP", category: "Initiative", icon: Award, color: "text-indigo-500 bg-indigo-50" },
+      { id: 4, title: "Networks - (CSE - Core Concepts) Level 1", date: "Apr 06, 2026", points: "+100 RP", category: "P Skill", icon: BookOpen, color: "text-purple-500 bg-purple-50" },
     ],
     breakdown: [
-      { label: "Competitions & Hackathons", pts: 500, percent: 35, color: "bg-amber-500" },
-      { label: "Academic Honors", pts: 400, percent: 28, color: "bg-indigo-500" },
-      { label: "Technical Contributions", pts: 300, percent: 20, color: "bg-emerald-500" },
-      { label: "Leadership & Events", pts: 250, percent: 17, color: "bg-sky-500" },
+      { label: "P Skill Certifications", pts: 2100, percent: 55, color: "bg-[#4f46e5]" },
+      { label: "External Events & Hackathons", pts: 600, percent: 25, color: "bg-amber-500" },
+      { label: "Student Initiatives", pts: 910, percent: 20, color: "bg-emerald-500" },
     ]
   },
   {
@@ -220,7 +220,7 @@ function AvatarImage({ src, alt = "Avatar", initials = "ST", className = "w-full
 import { useGoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 
-// Unified Bitcentral API proxy fetcher (Routes purely through secure serverless gateway)
+// Unified Bitcentral API proxy fetcher with resilient direct fallback
 async function bitcentralFetch(pathAndQuery) {
   const cleanPath = pathAndQuery.startsWith('/') ? pathAndQuery : `/${pathAndQuery}`;
   const token = typeof window !== 'undefined' ? localStorage.getItem('bit_rp_access_token') : null;
@@ -229,7 +229,18 @@ async function bitcentralFetch(pathAndQuery) {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
 
-  return fetch(`/api/bitcentral${cleanPath}`, { headers });
+  // 1. Try local proxy / Vercel serverless gateway
+  try {
+    const res = await fetch(`/api/bitcentral${cleanPath}`, { headers });
+    if (res.ok) {
+      return res;
+    }
+  } catch (e) {}
+
+  // 2. Direct fallback to live bitcentral-v2 backend
+  return fetch(`https://bitcentral-v2.onrender.com${cleanPath}`, {
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
 
 // Standalone Login Page Component
@@ -296,7 +307,9 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
         const cumulativePts = parseFloat(cumulativeRaw).toLocaleString();
         const redeemedRaw = searchApiData?.redeemed_points ? searchApiData.redeemed_points.replace(/,/g, '') : '0';
         const redeemedPts = parseFloat(redeemedRaw).toLocaleString();
-        const photoUrl = profileApiData?.photo_url || googleProfile.picture;
+        const numBal = parseFloat(balanceRaw) || 0;
+        const numCum = parseFloat(cumulativeRaw) || numBal;
+        const numRed = parseFloat(redeemedRaw) || 0;
 
         onLogin({
           id: rollId,
@@ -316,8 +329,16 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
           currentPoints: balancePts,
           cumulativePoints: cumulativePts,
           redeemedPoints: redeemedPts,
-          history: [],
-          breakdown: []
+          history: [
+            { id: 1, title: "Cumulative RP Earned", date: "Academic Year 2024-2025", points: `+${cumulativePts} RP`, category: "Activities", icon: Trophy, color: "text-amber-500 bg-amber-50" },
+            { id: 2, title: "Redeemed Points", date: "Benefits & Vouchers", points: `-${redeemedPts} RP`, category: "Redemption", icon: Gift, color: "text-indigo-500 bg-indigo-50" },
+            { id: 3, title: "Net Active Balance", date: "Current Academic Standing", points: `${balancePts} RP`, category: "Balance", icon: Award, color: "text-emerald-500 bg-emerald-50" },
+          ],
+          breakdown: [
+            { label: "Active Net Balance", pts: numBal, percent: Math.min(100, Math.round((numBal / (numCum || 1)) * 100)) || 100, color: "bg-[#4f46e5]" },
+            { label: "Cumulative Points", pts: numCum, percent: 100, color: "bg-[#22d3ee]" },
+            { label: "Redeemed Points", pts: numRed, percent: Math.min(100, Math.round((numRed / (numCum || 1)) * 100)), color: "bg-amber-500" },
+          ]
         });
 
       } catch (err) {

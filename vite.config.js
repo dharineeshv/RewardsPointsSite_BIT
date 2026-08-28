@@ -11,7 +11,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api/bitcentral': {
-        target: 'https://bitcentral-api.onrender.com',
+        target: 'https://bitcentral-v2.onrender.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/bitcentral/, ''),
         configure: (proxy) => {
