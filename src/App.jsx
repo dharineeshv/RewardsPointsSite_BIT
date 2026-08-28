@@ -249,18 +249,35 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
   const [authError, setAuthError] = useState(initialNotice);
 
   const triggerGoogleLogin = useGoogleLogin({
-    hosted_domain: 'bitsathy.ac.in',
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       setAuthError('');
       try {
-        if (tokenResponse.access_token) {
-          localStorage.setItem('bit_rp_access_token', tokenResponse.access_token);
+        const accessToken = tokenResponse?.access_token;
+        if (!accessToken) {
+          throw new Error('Google did not provide a valid access token. Please try again.');
         }
-        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const googleProfile = await res.json();
+
+        localStorage.setItem('bit_rp_access_token', accessToken);
+
+        // Fetch Google User Profile info
+        let googleProfile = null;
+        try {
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (res.ok) {
+            googleProfile = await res.json();
+          } else {
+            console.warn('Google userinfo HTTP status:', res.status);
+          }
+        } catch (fetchErr) {
+          console.warn('Failed to reach Google userinfo endpoint:', fetchErr);
+        }
+
+        if (!googleProfile || !googleProfile.email) {
+          throw new Error('Could not retrieve email from Google. Please check your network connection and try again.');
+        }
         
         const email = (googleProfile.email || '').toLowerCase().trim();
         const googleName = (googleProfile.name || 'BIT Student').toUpperCase();
@@ -272,44 +289,47 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
           return;
         }
 
-        // Fetch v2/profile endpoint
+        // 1. Fetch v2/profile endpoint (safely isolated)
         let profileApiData = null;
         try {
           const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(email)}`);
-          if (v2Res.ok) {
+          if (v2Res && v2Res.ok) {
             const v2Json = await v2Res.json();
             if (v2Json && v2Json.data) profileApiData = v2Json.data;
           }
         } catch (e) {
-          console.warn('v2/profile fetch error:', e);
+          console.warn('v2/profile fetch fallback:', e);
         }
 
-        // Fetch student points from search endpoint
+        // 2. Resolve Student Roll ID
         const rollId = profileApiData?.roll_no || profileApiData?.register_no || email.split('@')[0].toUpperCase();
+
+        // 3. Fetch student points from search endpoint (safely isolated)
         let searchApiData = null;
         try {
           const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(rollId)}`);
-          if (sRes.ok) {
+          if (sRes && sRes.ok) {
             const sJson = await sRes.json();
-            if (sJson && sJson.data && sJson.data.length > 0) {
+            if (sJson && sJson.data && Array.isArray(sJson.data) && sJson.data.length > 0) {
               searchApiData = sJson.data[0];
             }
           }
         } catch (e) {
-          console.warn('search API fetch error:', e);
+          console.warn('search API fetch fallback:', e);
         }
 
         const name = (profileApiData?.name || searchApiData?.student_name || googleName).trim().toUpperCase();
-        const initials = name.split(' ').map(n => n[0]).filter(Boolean).join('').slice(0, 2) || 'ST';
-        const balanceRaw = searchApiData?.balance_points ? searchApiData.balance_points.replace(/,/g, '') : '0';
-        const balancePts = parseFloat(balanceRaw).toLocaleString();
+        const initials = name.split(/\s+/).map(n => n[0]).filter(Boolean).join('').slice(0, 2) || rollId.slice(0, 2) || 'ST';
+        const balanceRaw = searchApiData?.balance_points ? searchApiData.balance_points.replace(/,/g, '') : '0.00';
+        const balancePts = parseFloat(balanceRaw || '0').toLocaleString();
         const cumulativeRaw = searchApiData?.cumulative_reward_points ? searchApiData.cumulative_reward_points.replace(/,/g, '') : balanceRaw;
-        const cumulativePts = parseFloat(cumulativeRaw).toLocaleString();
-        const redeemedRaw = searchApiData?.redeemed_points ? searchApiData.redeemed_points.replace(/,/g, '') : '0';
-        const redeemedPts = parseFloat(redeemedRaw).toLocaleString();
+        const cumulativePts = parseFloat(cumulativeRaw || '0').toLocaleString();
+        const redeemedRaw = searchApiData?.redeemed_points ? searchApiData.redeemed_points.replace(/,/g, '') : '0.00';
+        const redeemedPts = parseFloat(redeemedRaw || '0').toLocaleString();
         const numBal = parseFloat(balanceRaw) || 0;
         const numCum = parseFloat(cumulativeRaw) || numBal;
         const numRed = parseFloat(redeemedRaw) || 0;
+        const photoUrl = profileApiData?.photo_url || googleProfile.picture || null;
 
         onLogin({
           id: rollId,
@@ -342,8 +362,8 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
         });
 
       } catch (err) {
-        console.error('Error fetching Google profile:', err);
-        setAuthError('Failed to fetch profile from Google. Please try again.');
+        console.error('Error in Google profile handling:', err);
+        setAuthError(err.message || 'Failed to complete sign in. Please try again.');
       } finally {
         setGoogleLoading(false);
       }
@@ -351,7 +371,8 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
     onError: (errorResponse) => {
       console.warn('Google Login returned error:', errorResponse);
       setGoogleLoading(false);
-      setAuthError('Google sign in was cancelled or requires http://localhost:5173 in Authorized JavaScript origins.');
+      const detail = errorResponse?.error_description || errorResponse?.error || '';
+      setAuthError(detail ? `Google sign in error: ${detail}` : 'Google sign in was cancelled or requires http://localhost:5173 in Authorized JavaScript origins.');
     }
   });
 
