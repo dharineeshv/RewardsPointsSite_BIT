@@ -3034,7 +3034,7 @@ export default function App() {
                   isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
                 }`}>
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>Student ID: <strong className="font-mono text-indigo-500">{student.id}</strong></span>
+                  <span>Logged in: <strong className="font-mono text-indigo-500">{currentUser?.id || student.id}</strong></span>
                 </div>
               </div>
 
