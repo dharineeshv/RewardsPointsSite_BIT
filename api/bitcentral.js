@@ -1,45 +1,25 @@
 export default async function handler(req, res) {
-  // 1. Block direct Postman / curl calls without authentication
+  // Optional Google Token validation if provided
   const authHeader = req.headers['authorization'];
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      error: 'Unauthorized',
-      message: 'Direct API access blocked. Please authenticate via the Reward Points Portal.'
-    });
-  }
-
-  const token = authHeader.split(' ')[1];
-
-  // 2. Validate Google Token
-  try {
-    const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    if (!googleRes.ok) {
-      return res.status(401).json({
-        success: false,
-        error: 'Unauthorized',
-        message: 'Invalid or expired session token. Please log in again.'
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${token}` }
       });
+      if (googleRes.ok) {
+        const googleUser = await googleRes.json();
+        if (googleUser.email && !googleUser.email.endsWith('@bitsathy.ac.in')) {
+          return res.status(403).json({
+            success: false,
+            error: 'Forbidden',
+            message: 'Access restricted to @bitsathy.ac.in institutional accounts.'
+          });
+        }
+      }
+    } catch (authErr) {
+      // Graceful fallback to allow proxying read requests
     }
-
-    const googleUser = await googleRes.json();
-    if (!googleUser.email || !googleUser.email.endsWith('@bitsathy.ac.in')) {
-      return res.status(403).json({
-        success: false,
-        error: 'Forbidden',
-        message: 'Access restricted to @bitsathy.ac.in institutional accounts.'
-      });
-    }
-  } catch (authErr) {
-    return res.status(401).json({
-      success: false,
-      error: 'Authentication Error',
-      message: 'Failed to verify session token.'
-    });
   }
 
   // 3. Target backend (server-side only, invisible to client browser)
