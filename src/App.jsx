@@ -280,6 +280,100 @@ async function psFetch(pathAndQuery, options = {}, tokenOverride = null) {
   });
 }
 
+// Robust student roll & profile resolver from email or query
+async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
+  const cleanInput = (emailOrRoll || '').toLowerCase().trim();
+  const isEmail = cleanInput.includes('@');
+  const emailPrefix = isEmail ? cleanInput.split('@')[0] : cleanInput;
+
+  // 1. Try v2/profile if email
+  let profileApiData = null;
+  if (isEmail) {
+    try {
+      const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(cleanInput)}`);
+      if (v2Res && v2Res.ok) {
+        const v2Json = await v2Res.json();
+        if (v2Json && v2Json.data) profileApiData = v2Json.data;
+      }
+    } catch (e) {}
+  }
+
+  let rollId = profileApiData?.roll_no || profileApiData?.register_no;
+
+  // 2. If already a standard roll number format (e.g. 7376232CT109, 7376231EE150)
+  if (!rollId && /^7376\d{2,3}[A-Z]{2,3}\d{2,3}$/i.test(emailPrefix)) {
+    rollId = emailPrefix.toUpperCase();
+  }
+
+  // 3. If rollId is still not resolved, query /search with name or prefix parts
+  let searchApiData = null;
+  if (!rollId) {
+    const dotParts = emailPrefix.split('.');
+    const namePart = dotParts[0] || '';
+    const deptYrPart = dotParts[1] || '';
+    const deptMatch = deptYrPart.match(/^([a-z]+)(\d{2})$/i);
+    const deptCode = deptMatch ? deptMatch[1].toUpperCase() : '';
+    const batchYr = deptMatch ? deptMatch[2] : '';
+
+    let candidates = [];
+    if (googleName) {
+      try {
+        const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(googleName)}`);
+        if (sRes && sRes.ok) {
+          const sJson = await sRes.json();
+          if (sJson && Array.isArray(sJson.data)) candidates = sJson.data;
+        }
+      } catch (e) {}
+    }
+
+    if (candidates.length === 0 && namePart) {
+      try {
+        const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(namePart)}`);
+        if (sRes && sRes.ok) {
+          const sJson = await sRes.json();
+          if (sJson && Array.isArray(sJson.data)) candidates = sJson.data;
+        }
+      } catch (e) {}
+    }
+
+    if (candidates.length > 0) {
+      if (deptCode) {
+        const exactMatch = candidates.find(st => 
+          (st.roll_no || '').includes(deptCode) && 
+          (!batchYr || (st.roll_no || '').includes(batchYr))
+        );
+        if (exactMatch) {
+          rollId = exactMatch.roll_no;
+          searchApiData = exactMatch;
+        }
+      }
+      if (!rollId) {
+        rollId = candidates[0].roll_no;
+        searchApiData = candidates[0];
+      }
+    }
+  }
+
+  if (!rollId) {
+    rollId = emailPrefix.toUpperCase();
+  }
+
+  // 4. Fetch searchApiData with resolved rollId if not already present
+  if (!searchApiData) {
+    try {
+      const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(rollId)}`);
+      if (sRes && sRes.ok) {
+        const sJson = await sRes.json();
+        if (sJson && Array.isArray(sJson.data) && sJson.data.length > 0) {
+          searchApiData = sJson.data[0];
+        }
+      }
+    } catch (e) {}
+  }
+
+  return { rollId, profileApiData, searchApiData };
+}
+
 // Standalone Login Page Component
 function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -326,34 +420,8 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
           return;
         }
 
-        // 1. Fetch v2/profile endpoint (safely isolated)
-        let profileApiData = null;
-        try {
-          const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(email)}`);
-          if (v2Res && v2Res.ok) {
-            const v2Json = await v2Res.json();
-            if (v2Json && v2Json.data) profileApiData = v2Json.data;
-          }
-        } catch (e) {
-          console.warn('v2/profile fetch fallback:', e);
-        }
-
-        // 2. Resolve Student Roll ID
-        const rollId = profileApiData?.roll_no || profileApiData?.register_no || email.split('@')[0].toUpperCase();
-
-        // 3. Fetch student points from search endpoint (safely isolated)
-        let searchApiData = null;
-        try {
-          const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(rollId)}`);
-          if (sRes && sRes.ok) {
-            const sJson = await sRes.json();
-            if (sJson && sJson.data && Array.isArray(sJson.data) && sJson.data.length > 0) {
-              searchApiData = sJson.data[0];
-            }
-          }
-        } catch (e) {
-          console.warn('search API fetch fallback:', e);
-        }
+        // Robust student roll & profile resolution
+        const { rollId, profileApiData, searchApiData } = await resolveStudentRollAndProfile(email, googleName);
 
         const name = (profileApiData?.name || searchApiData?.student_name || googleName).trim().toUpperCase();
         const initials = name.split(/\s+/).map(n => n[0]).filter(Boolean).join('').slice(0, 2) || rollId.slice(0, 2) || 'ST';
@@ -1286,22 +1354,25 @@ export default function App() {
     async function fetchRewards() {
       setLoadingRewards(true);
       try {
-        const res = await bitcentralFetch(`/rewards?roll_no=${encodeURIComponent(displayedStudent.id)}&page=1&limit=100`);
+        let roll = displayedStudent.id;
+        if (roll.includes('.') || roll.includes('@')) {
+          const { rollId } = await resolveStudentRollAndProfile(roll, displayedStudent.name || '');
+          if (rollId) roll = rollId;
+        }
+        const res = await bitcentralFetch(`/rewards?roll_no=${encodeURIComponent(roll)}&page=1&limit=100`);
         if (res.ok) {
           const json = await res.json();
-          if (json && Array.isArray(json.data)) {
-            setRewardsData(json.data);
-            setRewardsTotal(json.total || json.data.length);
-          } else if (Array.isArray(json)) {
-            setRewardsData(json);
-            setRewardsTotal(json.length);
-          } else {
-            setRewardsData([]);
-            setRewardsTotal(0);
-          }
+          const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+          setRewardsData(list);
+          setRewardsTotal(json?.total || list.length);
+        } else {
+          setRewardsData([]);
+          setRewardsTotal(0);
         }
       } catch (err) {
         console.error('Error fetching rewards overview:', err);
+        setRewardsData([]);
+        setRewardsTotal(0);
       } finally {
         setLoadingRewards(false);
       }
@@ -1352,29 +1423,10 @@ export default function App() {
       } catch (e) {}
 
       const targetEmail = savedUser?.email || 'dharineesh.ct23@bitsathy.ac.in';
-      const targetRoll = savedUser?.id || savedUser?.roll_no || targetEmail.split('@')[0].toUpperCase();
 
       try {
-        let profileApi = null;
-        try {
-          const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(targetEmail)}`);
-          if (v2Res.ok) {
-            const v2Json = await v2Res.json();
-            if (v2Json && v2Json.data) profileApi = v2Json.data;
-          }
-        } catch (e) {}
-
-        const roll = profileApi?.roll_no || profileApi?.register_no || targetRoll;
-        let searchApi = null;
-        try {
-          const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(roll)}`);
-          if (sRes.ok) {
-            const sJson = await sRes.json();
-            if (sJson && sJson.data && sJson.data.length > 0) {
-              searchApi = sJson.data[0];
-            }
-          }
-        } catch (e) {}
+        const { rollId, profileApiData: profileApi, searchApiData: searchApi } = await resolveStudentRollAndProfile(targetEmail, savedUser?.name || '');
+        const roll = rollId;
 
         const name = (savedUser?.name || profileApi?.name || searchApi?.student_name || roll).trim().toUpperCase();
         const initials = savedUser?.initials || name.split(/\s+/).map(n => n[0]).filter(Boolean).join('').slice(0, 2) || roll.slice(0, 2);
