@@ -1,25 +1,42 @@
 export default async function handler(req, res) {
-  const { path = '', ...queryParams } = req.query;
+  // CORS Headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-ps-token, Cookie');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  const { path = '', ps_token = '', ...queryParams } = req.query;
   const subpath = Array.isArray(path) ? path.join('/') : path;
   const queryString = new URLSearchParams(queryParams).toString();
   const targetUrl = `https://ps.bitsathy.ac.in/${subpath}${queryString ? `?${queryString}` : ''}`;
 
+  // Extract Token from Authorization header, x-ps-token, Cookie, or query
+  let token = '';
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.headers['x-ps-token']) {
+    token = req.headers['x-ps-token'];
+  } else if (ps_token) {
+    token = ps_token;
+  } else if (req.headers['cookie'] && req.headers['cookie'].includes('PS=')) {
+    const m = req.headers['cookie'].match(/PS=([^;]+)/);
+    if (m) token = m[1];
+  }
+
   const forwardHeaders = {
     'Accept': 'application/json, text/plain, */*',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Referer': 'https://ps.bitsathy.ac.in/',
     'Origin': 'https://ps.bitsathy.ac.in',
   };
 
-  if (req.headers['authorization']) {
-    forwardHeaders['Authorization'] = req.headers['authorization'];
-    if (req.headers['authorization'].startsWith('Bearer ')) {
-      const token = req.headers['authorization'].split(' ')[1];
-      forwardHeaders['Cookie'] = `PS=${token}; ${req.headers['cookie'] || ''}`;
-    }
-  }
-  if (req.headers['cookie'] && !forwardHeaders['Cookie']) {
-    forwardHeaders['Cookie'] = req.headers['cookie'];
+  if (token) {
+    forwardHeaders['Authorization'] = `Bearer ${token}`;
+    forwardHeaders['Cookie'] = `PS=${token}`;
   }
   if (req.headers['content-type']) {
     forwardHeaders['Content-Type'] = req.headers['content-type'];
@@ -36,13 +53,13 @@ export default async function handler(req, res) {
     }
 
     const upstreamRes = await fetch(targetUrl, fetchOptions);
-    const data = await upstreamRes.text();
+    const textData = await upstreamRes.text();
 
     res.status(upstreamRes.status);
     try {
-      return res.json(JSON.parse(data));
+      return res.json(JSON.parse(textData));
     } catch {
-      return res.send(data);
+      return res.send(textData);
     }
   } catch (error) {
     console.error('PS Gateway Error:', error);

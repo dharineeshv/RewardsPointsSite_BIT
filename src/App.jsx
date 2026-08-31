@@ -257,6 +257,7 @@ async function psFetch(pathAndQuery, options = {}, tokenOverride = null) {
     'Content-Type': 'application/json',
     ...(token ? { 
       'Authorization': `Bearer ${token}`,
+      'x-ps-token': token,
       'Cookie': `PS=${token}`
     } : {}),
     ...(options.headers || {})
