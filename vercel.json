@@ -5,10 +5,6 @@
       "destination": "/api/bitcentral?path=$1"
     },
     {
-      "source": "/api/ps/(.*)",
-      "destination": "/api/ps?path=$1"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
