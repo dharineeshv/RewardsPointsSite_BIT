@@ -23,12 +23,31 @@ export default defineConfig({
               res.writeHead(401, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ 
                 error: 'Unauthorized', 
-                message: 'Direct API access blocked. Please authenticate via the portal.' 
+                message: 'Unauthorized access.Please Provide a valid token or access through the app.' 
               }));
               return;
             }
           });
         }
+      },
+      '/api/ps': {
+        target: 'https://ps.bitsathy.ac.in',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ps/, ''),
+        headers: {
+          referer: 'https://ps.bitsathy.ac.in/',
+          origin: 'https://ps.bitsathy.ac.in',
+        },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            const authHeader = req.headers['authorization'];
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+              const token = authHeader.split(' ')[1];
+              const existingCookie = req.headers['cookie'] || '';
+              proxyReq.setHeader('Cookie', `PS=${token}; ${existingCookie}`);
+            }
+          });
+        },
       },
     },
   },

@@ -30,7 +30,6 @@ A modern, responsive student portal for tracking, exploring, and inspecting stud
   - `GET /search?q=...`
   - `GET /rewards?roll_no=...`
   - `GET /averages`
-
 ---
 
 ## 📦 Getting Started
@@ -60,5 +59,4 @@ npm run build
 
 ## 👨‍💻 Developed by
 **Dharineesh V**  
-Department of Computer Technology  
 Bannari Amman Institute of Technology
