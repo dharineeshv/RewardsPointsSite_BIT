@@ -812,13 +812,9 @@ export default function App() {
   // Live Campus Attendance State (PS Portal)
   const [psToken, setPsToken] = useState(() => {
     try {
-      const saved = localStorage.getItem('bit_ps_token');
-      if (saved) return saved;
-      const defaultToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IkRIQVJJTkVFU0ggIFYiLCJlbWFpbCI6ImRoYXJpbmVlc2guY3QyM0BiaXRzYXRoeS5hYy5pbiIsInVzZXJfaWQiOiI3Mzc2MjMyQ1QxMDkiLCJ1c2VyX29mZl9pZCI6IjczNzYyMzJDVDEwOSIsInJvbGVfaWQiOjIsImRlcHQiOiIxMyIsInllYXIiOiJJViIsInllYXJfZ3JvdXAiOiJJViIsImV4cCI6MTc4ODE4NTIzMH0.F9perNjlAU3fiwL-y2P5OWlaOrx6zPEhSX8C7HhTrko';
-      localStorage.setItem('bit_ps_token', defaultToken);
-      return defaultToken;
+      return localStorage.getItem('bit_ps_token') || '';
     } catch (e) {
-      return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IkRIQVJJTkVFU0ggIFYiLCJlbWFpbCI6ImRoYXJpbmVlc2guY3QyM0BiaXRzYXRoeS5hYy5pbiIsInVzZXJfaWQiOiI3Mzc2MjMyQ1QxMDkiLCJ1c2VyX29mZl9pZCI6IjczNzYyMzJDVDEwOSIsInJvbGVfaWQiOjIsImRlcHQiOiIxMyIsInllYXIiOiJJViIsInllYXJfZ3JvdXAiOiJJViIsImV4cCI6MTc4ODE4NTIzMH0.F9perNjlAU3fiwL-y2P5OWlaOrx6zPEhSX8C7HhTrko';
+      return '';
     }
   });
   const [attendanceData, setAttendanceData] = useState(null);
