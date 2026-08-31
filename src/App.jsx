@@ -62,6 +62,10 @@ import {
   Palette,
   HeartPulse,
   Utensils,
+  UtensilsCrossed,
+  Calendar,
+  Clock,
+  Coffee,
   Scissors,
   Library,
   Bot
@@ -691,6 +695,19 @@ export default function App() {
   const [modalRewardsData, setModalRewardsData] = useState([]);
   const [loadingModalRewards, setLoadingModalRewards] = useState(false);
 
+  // Campus Mess & Dining Menu State
+  const [messHostel, setMessHostel] = useState('boys');
+  const [selectedMessDate, setSelectedMessDate] = useState(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [messData, setMessData] = useState(null);
+  const [loadingMess, setLoadingMess] = useState(false);
+  const [messError, setMessError] = useState('');
+
   // Leaderboard State
   const [selectedDeptLeaderboard, setSelectedDeptLeaderboard] = useState(null);
   const [deptLeaderboardList, setDeptLeaderboardList] = useState([]);
@@ -1111,6 +1128,53 @@ export default function App() {
       setLoadingDeptLeaderboard(false);
     }
   };
+
+  // Fetch live campus hostel mess menu with date support
+  const fetchMessMenu = async (hostel = messHostel, date = selectedMessDate) => {
+    setLoadingMess(true);
+    setMessError('');
+    try {
+      const url = date 
+        ? `/mess?hostel=${encodeURIComponent(hostel)}&date=${encodeURIComponent(date)}`
+        : `/mess?hostel=${encodeURIComponent(hostel)}`;
+      const res = await bitcentralFetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setMessData(data);
+      } else {
+        setMessError('Unable to load mess menu for the selected date & hostel.');
+      }
+    } catch (e) {
+      console.warn('Mess menu fetch error:', e);
+      setMessError('Network error while fetching campus mess menu.');
+    } finally {
+      setLoadingMess(false);
+    }
+  };
+
+  const changeMessDateBy = (days) => {
+    const parts = (selectedMessDate || '').split('-');
+    const curr = parts.length === 3 ? new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)) : new Date();
+    curr.setDate(curr.getDate() + days);
+    const year = curr.getFullYear();
+    const month = String(curr.getMonth() + 1).padStart(2, '0');
+    const day = String(curr.getDate()).padStart(2, '0');
+    setSelectedMessDate(`${year}-${month}-${day}`);
+  };
+
+  const setMessDateToday = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setSelectedMessDate(`${year}-${month}-${day}`);
+  };
+
+  useEffect(() => {
+    if (activeNav === 'Menu Details') {
+      fetchMessMenu(messHostel, selectedMessDate);
+    }
+  }, [activeNav, messHostel, selectedMessDate]);
 
   // Fetch live rewards history from endpoint whenever displayed student changes
   useEffect(() => {
@@ -1733,7 +1797,16 @@ export default function App() {
         />
       )}
 
-      <aside className={`hidden md:flex fixed top-0 left-0 bottom-0 z-50 w-72 max-w-[85vw] flex-col py-5 px-4 shadow-2xl transition-transform duration-300 ease-in-out ${
+      {/* 2. SLIDE-OVER HAMBURGER DRAWER SIDEBAR (Mobile, Tablet & Desktop) */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300 animate-fadeIn cursor-pointer" 
+          onClick={() => setIsSidebarOpen(false)} 
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={`fixed top-0 left-0 bottom-0 z-50 w-72 sm:w-80 max-w-[85vw] flex flex-col py-5 px-4 shadow-2xl transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
       } ${
         isDarkMode ? 'bg-slate-900 border-r border-slate-800 text-slate-100' : 'bg-white border-r border-slate-200 text-slate-900'
@@ -1745,11 +1818,11 @@ export default function App() {
             <img 
               src="/bit-logo.png" 
               alt="Bannari Amman Institute of Technology" 
-              className="h-8 object-contain rounded-md bg-white p-0.5 shadow-xs"
+              className="h-8 sm:h-9 object-contain rounded-md bg-white p-0.5 shadow-xs"
             />
             <div>
-              <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 block leading-tight">
-                Reward Points
+              <span className="text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-400 block leading-tight">
+                BIT Rewards
               </span>
               <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 Navigation Menu
@@ -1767,8 +1840,46 @@ export default function App() {
           </button>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="space-y-1.5 flex-1 overflow-y-auto">
+        {/* Student Profile Quick Details Card in Drawer */}
+        <div className={`mb-4 p-3 rounded-2xl border transition-all ${
+          isDarkMode ? 'bg-slate-800/60 border-slate-700/80 text-white' : 'bg-slate-50 border-slate-200 text-slate-900 shadow-xs'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full overflow-hidden shadow-xs border border-indigo-400/40 flex-shrink-0">
+              <AvatarImage
+                src={currentUser.picture || currentUser.photo_url}
+                alt={currentUser.name}
+                initials={currentUser.initials}
+                fallbackBg={currentUser.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-xs font-bold truncate leading-tight">{currentUser.name}</h4>
+              <p className={`text-[10px] font-mono mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                {currentUser.id} • {currentUser.department}
+              </p>
+            </div>
+          </div>
+          <div className={`mt-2.5 pt-2 border-t flex items-center justify-between text-[11px] ${
+            isDarkMode ? 'border-slate-700/60' : 'border-slate-200'
+          }`}>
+            <span className={`text-[10px] uppercase font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Active Balance:
+            </span>
+            <span className="font-black text-emerald-500 dark:text-emerald-400">
+              {currentUser.currentPoints} RP
+            </span>
+          </div>
+        </div>
+
+        {/* Navigation Items Group */}
+        <div className={`text-[10px] font-bold uppercase tracking-wider px-2 mb-1.5 ${
+          isDarkMode ? 'text-slate-400' : 'text-slate-500'
+        }`}>
+          Navigation
+        </div>
+
+        <nav className="space-y-1.5 flex-1 overflow-y-auto pr-0.5">
           <button
             onClick={() => { setActiveNav('Dashboard'); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
@@ -1798,17 +1909,17 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => { setActiveNav('Rewards History'); setIsSidebarOpen(false); }}
+            onClick={() => { setActiveNav('Menu Details'); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Rewards History'
+              activeNav === 'Menu Details'
                 ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
                 : isDarkMode
                   ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <History className="w-5 h-5" strokeWidth={activeNav === 'Rewards History' ? 2.2 : 1.8} />
-            <span>Rewards History</span>
+            <UtensilsCrossed className="w-5 h-5" strokeWidth={activeNav === 'Menu Details' ? 2.2 : 1.8} />
+            <span>Menu Details</span>
           </button>
 
           <button
@@ -1856,16 +1967,27 @@ export default function App() {
           )}
         </nav>
 
-        {/* Quick Info Box in Drawer */}
+        {/* Quick Info & Theme Box in Drawer */}
         <div className={`mt-auto p-3 rounded-2xl border transition-colors duration-200 ${
           isDarkMode ? 'bg-slate-800/50 border-slate-700/60 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700 shadow-xs'
         }`}>
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>About Rewards Site</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>BIT Rewards Site</span>
+            </div>
+            <button
+              onClick={toggleTheme}
+              className={`p-1 rounded-lg transition-colors cursor-pointer text-xs ${
+                isDarkMode ? 'bg-slate-700 text-amber-400 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+              }`}
+              title="Toggle Theme"
+            >
+              {isDarkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
           </div>
           <p className={`text-[10px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            Official academic & extracurricular rewards management platform for students.
+            Official academic & extracurricular rewards management platform.
           </p>
         </div>
       </aside>
@@ -2774,109 +2896,248 @@ export default function App() {
             </div>
           )}
 
-          {/* VIEW 3: REWARDS HISTORY */}
-          {activeNav === 'Rewards History' && (
-            <div>
-              <div className="mb-6">
-                <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Student Rewards History
-                </h1>
-                <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Complete chronological rewards activity logs for <span className="text-indigo-600 dark:text-indigo-400 font-bold">{student.name} ({student.id})</span>.
-                </p>
+          {/* VIEW 3: MENU DETAILS (CAMPUS MESS & DINING) */}
+          {activeNav === 'Menu Details' && (
+            <div className="max-w-6xl mx-auto w-full space-y-6">
+              {/* Header & Hostel Switcher */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Campus Dining & Mess Menu
+                  </h1>
+                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Live daily meal schedule, hostel dining items, and current meal details.
+                  </p>
+                </div>
+
+                {/* Hostel Switcher Pills */}
+                <div className={`p-1 rounded-2xl border flex items-center gap-1 self-start sm:self-auto ${
+                  isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200 shadow-xs'
+                }`}>
+                  <button
+                    onClick={() => setMessHostel('boys')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      messHostel === 'boys'
+                        ? 'bg-[#4f46e5] text-white shadow-md shadow-indigo-600/30'
+                        : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>👨 Boys Hostel</span>
+                  </button>
+                  <button
+                    onClick={() => setMessHostel('girls')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      messHostel === 'girls'
+                        ? 'bg-[#4f46e5] text-white shadow-md shadow-indigo-600/30'
+                        : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>👩 Girls Hostel</span>
+                  </button>
+                </div>
               </div>
 
-              {/* History Container */}
-              <div className={`rounded-3xl border overflow-hidden shadow-xl ${
-                isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white shadow-md'
+              {/* Date Navigation & Controls Bar */}
+              <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 ${
+                isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
               }`}>
-                
-                {/* Mobile Responsive History Cards (Phones < 640px) */}
-                <div className={`block sm:hidden divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
-                  {rewardsData.length === 0 ? (
-                    <div className={`py-10 text-center text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                      No activities logged yet.
-                    </div>
-                  ) : (
-                    rewardsData.map((item, idx) => (
-                      <div key={idx} className={`py-4 px-3.5 sm:px-4 transition-colors space-y-1.5 ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-2.5 flex-1">
-                            <span className={`text-[10px] font-mono mt-0.5 flex-shrink-0 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                              #{idx + 1}
-                            </span>
-                            <h4 className={`text-xs font-bold leading-snug ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                              {item.activity_name || item.course_name}
-                            </h4>
-                          </div>
-                          <span className="text-xs font-black px-2.5 py-0.5 rounded-full text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800/70 whitespace-nowrap flex-shrink-0">
-                            +{item.reward_points} RP
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => changeMessDateBy(-1)}
+                    className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                      isDarkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                    }`}
+                    title="Previous Day"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60">
+                    <Calendar className="w-4 h-4 text-indigo-500" />
+                    <span className={`text-xs sm:text-sm font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                      {messData?.day ? `${messData.day}, ` : ''}{selectedMessDate}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => changeMessDateBy(1)}
+                    className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                      isDarkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                    }`}
+                    title="Next Day"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={setMessDateToday}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                      isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    onClick={() => fetchMessMenu(messHostel, selectedMessDate)}
+                    className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                      isDarkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                    }`}
+                    title="Refresh Menu"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingMess ? 'animate-spin text-indigo-500' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Data Rendering */}
+              {loadingMess ? (
+                <div className={`p-12 text-center rounded-3xl border ${
+                  isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
+                }`}>
+                  <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                  <p className="font-semibold text-sm">Fetching campus mess schedule...</p>
+                </div>
+              ) : messError ? (
+                <div className="p-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-between gap-4">
+                  <span className="text-sm font-medium">{messError}</span>
+                  <button
+                    onClick={() => fetchMessMenu(messHostel, selectedMessDate)}
+                    className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 transition-all cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : messData ? (
+                <div className="space-y-6">
+                  {/* Current Meal Active Banner */}
+                  {messData.current_meal && (
+                    <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-xl shadow-indigo-600/20 relative overflow-hidden">
+                      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1 rounded-full bg-white/20 text-xs font-black uppercase tracking-wider backdrop-blur-xs">
+                            🔥 CURRENT MEAL: {messData.current_meal.meal_type}
+                          </span>
+                          <span className="text-xs text-indigo-100 flex items-center gap-1 font-semibold">
+                            <Clock className="w-3.5 h-3.5" />
+                            {messData.current_meal.start_time} - {messData.current_meal.end_time}
                           </span>
                         </div>
+                        <span className="text-xs text-indigo-100 font-mono">
+                          {messData.hostel === 'boys' ? 'Boys Mess' : 'Girls Mess'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {Array.isArray(messData.current_meal.items) && messData.current_meal.items.map((item, idx) => (
+                          <span
+                            key={idx}
+                            className="px-3.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md text-xs sm:text-sm font-bold border border-white/20 shadow-xs"
+                          >
+                            🍽️ {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                        <div className={`flex flex-wrap items-center justify-between gap-2 text-[11px] pt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                            isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
-                          }`}>
-                            {item.activity_type}
-                          </span>
-                          <span className="font-medium text-[10px]">
-                            {item.date}
-                          </span>
+                  {/* 3 Meal Cards: Breakfast, Lunch, Dinner */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* Breakfast Card */}
+                    <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 shadow-xl' : 'bg-white border-slate-200 shadow-md'
+                    }`}>
+                      <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+                            <Coffee className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className={`text-base font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                              Breakfast
+                            </h3>
+                            <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              07:30 AM - 09:00 AM
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                      <ul className="space-y-2">
+                        {messData.full_menu?.breakfast?.map((item, idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-xs font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                            <span className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>{item}</span>
+                          </li>
+                        )) || (
+                          <li className="text-xs text-slate-400 italic">No breakfast items listed</li>
+                        )}
+                      </ul>
+                    </div>
 
-                {/* Desktop & Tablet Table (>= 640px) */}
-                <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className={`border-b text-[11px] lg:text-xs font-extrabold uppercase tracking-wider ${
-                        isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'
-                      }`}>
-                        <th className="py-3.5 px-3 w-10 text-center">#</th>
-                        <th className="py-3.5 px-3 lg:px-4 font-extrabold">COURSE / ACTIVITY NAME</th>
-                        <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">COMPLETED DATE</th>
-                        <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">CATEGORY TYPE</th>
-                        <th className="py-3.5 px-3 lg:px-4 font-extrabold text-right whitespace-nowrap">POINTS</th>
-                      </tr>
-                    </thead>
-                    <tbody className={`text-xs divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
-                      {rewardsData.length === 0 ? (
-                        <tr>
-                          <td colSpan="5" className={`py-10 text-center ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                            No activities logged yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        rewardsData.map((item, idx) => (
-                          <tr key={idx} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
-                            <td className={`py-3.5 px-3 text-center font-mono text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
-                            <td className={`py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                              {item.activity_name || item.course_name}
-                            </td>
-                            <td className={`py-3.5 px-3 lg:px-4 font-medium whitespace-nowrap text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              {item.date}
-                            </td>
-                            <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${
-                                isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
-                              }`}>
-                                {item.activity_type}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
-                              +{item.reward_points} RP
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                    {/* Lunch Card */}
+                    <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 shadow-xl' : 'bg-white border-slate-200 shadow-md'
+                    }`}>
+                      <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+                            <Utensils className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className={`text-base font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                              Lunch
+                            </h3>
+                            <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              12:00 PM - 02:00 PM
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <ul className="space-y-2">
+                        {messData.full_menu?.lunch?.map((item, idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-xs font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                            <span className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>{item}</span>
+                          </li>
+                        )) || (
+                          <li className="text-xs text-slate-400 italic">No lunch items listed</li>
+                        )}
+                      </ul>
+                    </div>
+
+                    {/* Dinner Card */}
+                    <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 shadow-xl' : 'bg-white border-slate-200 shadow-md'
+                    }`}>
+                      <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
+                            <UtensilsCrossed className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className={`text-base font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                              Dinner
+                            </h3>
+                            <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              07:00 PM - 08:30 PM
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <ul className="space-y-2">
+                        {messData.full_menu?.dinner?.map((item, idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-xs font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
+                            <span className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>{item}</span>
+                          </li>
+                        )) || (
+                          <li className="text-xs text-slate-400 italic">No dinner items listed</li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           )}
 
@@ -3070,12 +3331,12 @@ export default function App() {
                           View Leaderboards →
                         </button>
                         <button
-                          onClick={() => setActiveNav('Rewards History')}
+                          onClick={() => setActiveNav('Dashboard')}
                           className={`px-3.5 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
                             isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-100'
                           }`}
                         >
-                          My RP History
+                          Dashboard Overview
                         </button>
                         {isInstallable && (
                           <button
@@ -3593,18 +3854,18 @@ export default function App() {
       </div>
 
       {/* 3. MOBILE BOTTOM NAVIGATION BAR (Phones & Small Screens) */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl border-t px-2 py-1.5 flex items-center justify-around shadow-2xl transition-colors duration-200 ${
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl border-t px-4 py-2 flex items-center justify-around shadow-2xl transition-colors duration-200 ${
         isDarkMode ? 'bg-slate-950/95 border-slate-800/80' : 'bg-white/95 border-slate-200 shadow-lg'
       }`}>
         <button
           onClick={() => setActiveNav('Dashboard')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
             activeNav === 'Dashboard' 
               ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
               : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Dashboard' ? 2.4 : 1.8} />
+          <LayoutGrid className="w-5 h-5" strokeWidth={activeNav === 'Dashboard' ? 2.4 : 1.8} />
           <span className="text-[10px]">Dashboard</span>
         </button>
 
@@ -3616,20 +3877,20 @@ export default function App() {
               : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <BarChart2 className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Leaderboard' ? 2.4 : 1.8} />
+          <BarChart2 className="w-5 h-5" strokeWidth={activeNav === 'Leaderboard' ? 2.4 : 1.8} />
           <span className="text-[10px]">Leaderboard</span>
         </button>
 
         <button
-          onClick={() => setActiveNav('Rewards History')}
+          onClick={() => setActiveNav('Menu Details')}
           className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Rewards History' 
+            activeNav === 'Menu Details' 
               ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
               : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <History className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Rewards History' ? 2.4 : 1.8} />
-          <span className="text-[10px]">History</span>
+          <UtensilsCrossed className="w-5 h-5" strokeWidth={activeNav === 'Menu Details' ? 2.4 : 1.8} />
+          <span className="text-[10px]">Menu</span>
         </button>
 
         <button
@@ -3640,20 +3901,20 @@ export default function App() {
               : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Settings className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Settings' ? 2.4 : 1.8} />
+          <Settings className="w-5 h-5" strokeWidth={activeNav === 'Settings' ? 2.4 : 1.8} />
           <span className="text-[10px]">Settings</span>
         </button>
 
         {isAdminUser && (
           <button
             onClick={() => setActiveNav('Admin Console')}
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
               activeNav === 'Admin Console' 
                 ? 'text-purple-600 dark:text-purple-400 font-extrabold' 
                 : isDarkMode ? 'text-purple-400/70 hover:text-purple-300' : 'text-purple-600/70 hover:text-purple-800'
             }`}
           >
-            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={activeNav === 'Admin Console' ? 2.4 : 1.8} />
+            <ShieldCheck className="w-5 h-5" strokeWidth={activeNav === 'Admin Console' ? 2.4 : 1.8} />
             <span className="text-[10px]">Admin</span>
           </button>
         )}
