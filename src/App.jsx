@@ -861,33 +861,60 @@ export default function App() {
     return [];
   });
 
-  // Fetch real-time logs from Firebase Database
+  // Fetch real-time logs from Firebase Database with student overriding/deduplication
   const fetchFirebaseLogs = async (urlOverride) => {
     const targetUrl = (urlOverride || firebaseDbUrl || localStorage.getItem('bit_firebase_url') || DEFAULT_FIREBASE_DB_URL).trim().replace(/\/$/, '');
     if (!targetUrl || !targetUrl.startsWith('http')) return;
     
     setSheetSyncStatus('pinging');
     try {
-      const res = await fetch(`${targetUrl}/logs.json`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && typeof data === 'object') {
-          const remoteList = Object.entries(data).map(([key, val]) => ({
-            ...val,
-            id: val.id || key
-          }));
-          remoteList.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-          setActivityLogs(remoteList);
-          try {
-            localStorage.setItem('bit_activity_logs', JSON.stringify(remoteList));
-          } catch (e) {}
-          setSheetSyncStatus('connected');
-        } else {
-          setSheetSyncStatus('connected');
+      // 1. First attempt to fetch from /active_users.json (unique per student)
+      let remoteList = [];
+      try {
+        const activeRes = await fetch(`${targetUrl}/active_users.json`);
+        if (activeRes.ok) {
+          const activeData = await activeRes.json();
+          if (activeData && typeof activeData === 'object') {
+            remoteList = Object.entries(activeData).map(([key, val]) => ({
+              ...val,
+              id: val.id || key
+            }));
+          }
         }
-      } else {
-        setSheetSyncStatus('connected');
+      } catch (e) {}
+
+      // 2. If active_users is empty, fallback to /logs.json with deduplication by student identity
+      if (remoteList.length === 0) {
+        const res = await fetch(`${targetUrl}/logs.json`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === 'object') {
+            const rawList = Object.entries(data).map(([key, val]) => ({
+              ...val,
+              id: val.id || key
+            }));
+            // Deduplicate: keep ONLY the newest event per student
+            const studentMap = new Map();
+            rawList.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+            for (const log of rawList) {
+              const k = (log.roll_no || log.email || log.name || '').toUpperCase().trim();
+              if (k && !studentMap.has(k)) {
+                studentMap.set(k, log);
+              }
+            }
+            remoteList = Array.from(studentMap.values());
+          }
+        }
       }
+
+      remoteList.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      if (remoteList.length > 0) {
+        setActivityLogs(remoteList);
+        try {
+          localStorage.setItem('bit_activity_logs', JSON.stringify(remoteList));
+        } catch (e) {}
+      }
+      setSheetSyncStatus('connected');
     } catch (e) {
       console.warn('Firebase sync error:', e);
       setSheetSyncStatus('connected');
@@ -903,7 +930,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [activeNav]);
 
-  // Log activity helper (saves locally & triggers Firebase / Google Sheets)
+  // Log activity helper (saves locally & overrides student presence in Firebase & Google Sheets)
   const logActivity = (student, action = 'Login') => {
     if (!student) return;
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
@@ -911,35 +938,56 @@ export default function App() {
     const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad/i.test(ua) ? 'iOS' : /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'Mac' : 'Device';
     const deviceStr = `${os} (${browser})`;
 
+    const rollNo = (student.id || student.roll_no || student.rollNo || 'Unknown').trim().toUpperCase();
+    const studentName = student.name || student.student_name || 'BIT Student';
+    const dept = student.department || student.dept || 'Computer Technology';
+    const studentEmail = student.email || `${rollNo.toLowerCase()}@bitsathy.ac.in`;
+
     const newEntry = {
-      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name: student.name || student.student_name || 'BIT Student',
-      roll_no: student.id || student.roll_no || 'Unknown',
-      department: student.department || student.dept || 'Computer Technology',
-      email: student.email || `${student.id || student.roll_no || 'student'}@bitsathy.ac.in`,
+      id: `student-${rollNo}`,
+      name: studentName,
+      roll_no: rollNo,
+      department: dept,
+      email: studentEmail,
       action: action,
       device: deviceStr,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isOnline: action !== 'Logout' && action !== 'Session Expired'
     };
 
+    // Override the student's entry in local state so same name is never duplicated
     setActivityLogs(prev => {
-      const updated = [newEntry, ...prev.slice(0, 499)];
+      const filtered = prev.filter(l => {
+        const existingRoll = (l.roll_no || l.id || '').toUpperCase().trim();
+        const existingName = (l.name || '').toUpperCase().trim();
+        return existingRoll !== rollNo && existingName !== studentName.toUpperCase().trim();
+      });
+      const updated = [newEntry, ...filtered].slice(0, 499);
       try {
         localStorage.setItem('bit_activity_logs', JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
 
-    // 1. Send to Firebase Realtime Database (default or configured URL)
+    // 1. Send / Override in Firebase Realtime Database
     const fUrl = localStorage.getItem('bit_firebase_url') || DEFAULT_FIREBASE_DB_URL;
     if (fUrl && fUrl.startsWith('http')) {
       const cleanFUrl = fUrl.trim().replace(/\/$/, '');
+      const sanitizedKey = (rollNo || studentEmail || studentName).replace(/[\.\#\$\/\[\]]/g, '_');
       try {
+        // Update/override unique student slot in active_users
+        fetch(`${cleanFUrl}/active_users/${encodeURIComponent(sanitizedKey)}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newEntry)
+        }).catch((err) => console.warn('Firebase active user update failed:', err));
+
+        // Also post to raw audit log
         fetch(`${cleanFUrl}/logs.json`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newEntry)
-        }).catch((err) => console.warn('Firebase log failed:', err));
+        }).catch(() => {});
       } catch (e) {}
     }
 
@@ -3803,11 +3851,26 @@ export default function App() {
                     isDarkMode ? 'border-slate-800 bg-slate-950/60' : 'border-slate-100 bg-slate-50'
                   }`}>
                     <div>
-                      <h3 className={`text-sm font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                        Live Student Activity Feed
-                      </h3>
-                      <p className={`text-[11px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {activityLogs.length} total logged sessions
+                      <div className="flex items-center gap-2">
+                        <h3 className={`text-sm font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                          Live Student Activity Feed
+                        </h3>
+                        {(() => {
+                          const onlineCount = activityLogs.filter(l => {
+                            if (!l.timestamp) return false;
+                            const diffMins = (Date.now() - new Date(l.timestamp).getTime()) / 60000;
+                            return diffMins < 5 && l.action !== 'Logout' && l.action !== 'Session Expired';
+                          }).length;
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                              {onlineCount} Online
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <p className={`text-[11px] mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {activityLogs.length} unique active students tracked in real time
                       </p>
                     </div>
 
@@ -3819,7 +3882,7 @@ export default function App() {
                           type="text"
                           value={logFilterQuery}
                           onChange={(e) => setLogFilterQuery(e.target.value)}
-                          placeholder="Filter name, rollno..."
+                          placeholder="Filter name, roll no, branch..."
                           className={`pl-8 pr-3 py-1.5 rounded-xl text-xs border outline-none ${
                             isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900 shadow-xs'
                           }`}
@@ -3836,21 +3899,22 @@ export default function App() {
                       }`}>
                         <tr>
                           <th className="py-2.5 px-3.5">Student</th>
+                          <th className="py-2.5 px-3">Status</th>
                           <th className="py-2.5 px-3">Department</th>
-                          <th className="py-2.5 px-3">Action</th>
+                          <th className="py-2.5 px-3">Latest Action</th>
                           <th className="py-2.5 px-3">Device / OS</th>
-                          <th className="py-2.5 px-3 text-right">Time</th>
+                          <th className="py-2.5 px-3 text-right">Last Active</th>
                         </tr>
                       </thead>
                       <tbody className={`text-xs divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                         {activityLogs.length === 0 ? (
                           <tr>
-                            <td colSpan="5" className="py-12 text-center text-xs text-slate-400">
+                            <td colSpan="6" className="py-12 text-center text-xs text-slate-400">
                               <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-2 text-slate-400">
                                 <Users className="w-5 h-5" />
                               </div>
                               <p className="font-bold text-slate-400">No student sessions recorded yet.</p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">Real-time logins and roll number searches will appear here live.</p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">Real-time logins and searches will automatically appear here.</p>
                             </td>
                           </tr>
                         ) : (
@@ -3861,39 +3925,70 @@ export default function App() {
                               return (
                                 (l.name && l.name.toLowerCase().includes(q)) ||
                                 (l.roll_no && l.roll_no.toLowerCase().includes(q)) ||
-                                (l.department && l.department.toLowerCase().includes(q))
+                                (l.department && l.department.toLowerCase().includes(q)) ||
+                                (l.action && l.action.toLowerCase().includes(q))
                               );
                             })
-                            .map((log) => (
-                              <tr key={log.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
-                                <td className="py-3 px-3.5">
-                                  <div className="font-bold truncate max-w-[140px] sm:max-w-[180px]">{log.name}</div>
-                                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
-                                    isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
-                                  }`}>
-                                    {log.roll_no}
-                                  </span>
-                                </td>
-                                <td className={`py-3 px-3 text-[11px] truncate max-w-[120px] ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  {log.department}
-                                </td>
-                                <td className="py-3 px-3">
-                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                                    log.action === 'Login'
-                                      ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
-                                      : 'bg-indigo-950/80 text-indigo-300 border-indigo-800'
-                                  }`}>
-                                    {log.action}
-                                  </span>
-                                </td>
-                                <td className={`py-3 px-3 text-[11px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  {log.device}
-                                </td>
-                                <td className={`py-3 px-3 text-right text-[10px] whitespace-nowrap ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </td>
-                              </tr>
-                            ))
+                            .map((log) => {
+                              const diffMins = log.timestamp ? Math.floor((Date.now() - new Date(log.timestamp).getTime()) / 60000) : 999;
+                              const isOnline = diffMins < 5 && log.action !== 'Logout' && log.action !== 'Session Expired';
+                              const isIdle = diffMins >= 5 && diffMins < 20 && log.action !== 'Logout' && log.action !== 'Session Expired';
+
+                              let actionBadge = 'bg-indigo-950/80 text-indigo-300 border-indigo-800';
+                              if (log.action === 'Login') {
+                                actionBadge = 'bg-emerald-950/80 text-emerald-300 border-emerald-800';
+                              } else if (log.action === 'Logout') {
+                                actionBadge = 'bg-rose-950/80 text-rose-300 border-rose-800';
+                              } else if (log.action === 'Session Expired') {
+                                actionBadge = 'bg-amber-950/80 text-amber-300 border-amber-800';
+                              } else if (log.action.startsWith('Search')) {
+                                actionBadge = 'bg-cyan-950/80 text-cyan-300 border-cyan-800';
+                              }
+
+                              return (
+                                <tr key={log.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
+                                  <td className="py-3 px-3.5">
+                                    <div className="font-bold truncate max-w-[140px] sm:max-w-[180px]">{log.name}</div>
+                                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                                      isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
+                                    }`}>
+                                      {log.roll_no}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-3">
+                                    {isOnline ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                        Online
+                                      </span>
+                                    ) : isIdle ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                        Idle ({diffMins}m)
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 bg-slate-800/40 px-2 py-0.5 rounded-full border border-slate-700/60">
+                                        Offline
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className={`py-3 px-3 text-[11px] truncate max-w-[120px] ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                    {log.department}
+                                  </td>
+                                  <td className="py-3 px-3">
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${actionBadge}`}>
+                                      {log.action}
+                                    </span>
+                                  </td>
+                                  <td className={`py-3 px-3 text-[11px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                    {log.device}
+                                  </td>
+                                  <td className={`py-3 px-3 text-right text-[10px] whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    {diffMins === 0 ? 'Just now' : diffMins < 60 ? `${diffMins}m ago` : new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </td>
+                                </tr>
+                              );
+                            })
                         )}
                       </tbody>
                     </table>
