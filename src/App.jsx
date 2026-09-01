@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutGrid,
   BarChart2,
@@ -340,6 +340,296 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
   }
 
   return { rollId, profileApiData, searchApiData };
+}
+
+// Flipkart-style Auto-sliding Featured Hero Banner Slider
+function DashboardHeroSlider({ 
+  weatherData, 
+  student, 
+  yearlyAverages, 
+  normalizeStudentYear, 
+  setActiveNav, 
+  isDarkMode 
+}) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const touchStartX = useRef(null);
+  const touchEndX = useRef(null);
+
+  // Compute dynamic Benchmark metrics based on active student & live API averages
+  const studentYearLabel = normalizeStudentYear 
+    ? normalizeStudentYear(student?.year || student?.batch, student?.id || student?.roll_no || student?.email) 
+    : 'Year IV';
+  const yearKeyMap = { 'Year I': 'year_1', 'Year II': 'year_2', 'Year III': 'year_3', 'Year IV': 'year_4' };
+  const targetYearKey = yearKeyMap[studentYearLabel] || 'year_4';
+  const targetYearAvg = Number(yearlyAverages ? yearlyAverages[targetYearKey] : 0) || 0;
+  
+  const rawPointsStr = (student?.currentPoints || student?.balance_points || student?.cumulativePoints || student?.cumulative_reward_points || '0').toString();
+  const studentPointsNum = parseFloat(rawPointsStr.replace(/,/g, '')) || 0;
+  const pointsDiff = studentPointsNum - targetYearAvg;
+  const isAboveAvg = pointsDiff >= 0;
+  const percentOfAvg = targetYearAvg > 0 ? Math.round((studentPointsNum / targetYearAvg) * 100) : 100;
+  const diffAbs = Math.abs(pointsDiff).toLocaleString();
+
+  const totalSlides = 4;
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide(prev => (prev + 1) % totalSlides);
+  }, [totalSlides]);
+
+  const prevSlide = useCallback(() => {
+    setCurrentSlide(prev => (prev - 1 + totalSlides) % totalSlides);
+  }, [totalSlides]);
+
+  // Auto slide interval (every 4.5 seconds)
+  useEffect(() => {
+    if (isPaused) return;
+    const interval = setInterval(nextSlide, 4500);
+    return () => clearInterval(interval);
+  }, [isPaused, nextSlide]);
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    const distance = touchStartX.current - touchEndX.current;
+    if (distance > 50) nextSlide();
+    if (distance < -50) prevSlide();
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
+
+  return (
+    <div 
+      className="relative w-full rounded-3xl overflow-hidden shadow-2xl mb-7 select-none group border border-white/10"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Slides Container */}
+      <div 
+        className="flex transition-transform duration-700 ease-out"
+        style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+      >
+        {/* SLIDE 1: LIVE CAMPUS CLIMATE & WEATHER */}
+        <div className="w-full flex-shrink-0 min-h-[200px] sm:min-h-[220px] p-6 sm:p-8 bg-gradient-to-r from-sky-600 via-indigo-700 to-slate-900 text-white relative overflow-hidden flex flex-col justify-between">
+          <div className="absolute -right-6 -bottom-8 opacity-20 text-[130px] sm:text-[160px] pointer-events-none select-none">
+            {weatherData?.icon || '🌤️'}
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
+                🌤️ Live Campus Climate
+              </span>
+              <span className="text-xs text-sky-200 font-semibold">
+                Sathyamangalam • BIT Campus
+              </span>
+            </div>
+            <div className="flex items-baseline gap-3 mt-1.5">
+              <span className="text-3xl sm:text-5xl font-black tracking-tight text-white drop-shadow-sm">
+                {weatherData ? `${weatherData.temp}°C` : '34°C'}
+              </span>
+              <span className="text-base sm:text-xl font-bold text-sky-200">
+                {weatherData?.condition || 'Clear & Sunny'}
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-sky-100/90 mt-2 max-w-xl">
+              Live weather for students residing in campus hostels & day scholars commuting from Erode, Tirupur, & Coimbatore.
+            </p>
+          </div>
+          <div className="relative z-10 flex items-center gap-2 sm:gap-3 flex-wrap mt-3 text-[11px] font-semibold text-white/90">
+            <span className="px-3 py-1 rounded-xl bg-black/30 backdrop-blur-md border border-white/10">
+              💨 Wind: {weatherData?.wind || 11} km/h
+            </span>
+            <span className="px-3 py-1 rounded-xl bg-black/30 backdrop-blur-md border border-white/10">
+              📍 11.5034° N, 77.2774° E
+            </span>
+            <span className="px-3 py-1 rounded-xl bg-black/30 backdrop-blur-md border border-white/10 hidden sm:inline">
+              🏫 Bannari Amman Institute of Technology
+            </span>
+          </div>
+        </div>
+
+        {/* SLIDE 2: BATCH AVERAGE & STANDING BENCHMARK */}
+        <div className={`w-full flex-shrink-0 min-h-[200px] sm:min-h-[220px] p-6 sm:p-8 text-white relative overflow-hidden flex flex-col justify-between ${
+          isAboveAvg 
+            ? 'bg-gradient-to-r from-emerald-600 via-teal-700 to-slate-900' 
+            : 'bg-gradient-to-r from-amber-600 via-rose-700 to-slate-900'
+        }`}>
+          <div className="absolute -right-6 -bottom-8 opacity-20 text-[130px] sm:text-[160px] pointer-events-none select-none">
+            {isAboveAvg ? '🚀' : '📊'}
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
+                {studentYearLabel} Batch Benchmark
+              </span>
+              <span className="text-xs text-white/80 font-medium">
+                Batch Average: <strong className="text-white font-mono">{targetYearAvg.toLocaleString()} RP</strong>
+              </span>
+            </div>
+
+            <div className="flex items-baseline gap-2 mt-1 flex-wrap">
+              <h3 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+                {isAboveAvg ? `+${diffAbs} RP Above Average` : `${diffAbs} RP Below Average`}
+              </h3>
+              <span className="text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-lg bg-black/25 border border-white/20">
+                {percentOfAvg}% of Batch Avg
+              </span>
+            </div>
+
+            <p className="text-xs sm:text-sm text-white/90 mt-2 max-w-xl">
+              {isAboveAvg 
+                ? `Outstanding performance, ${student?.name?.split(' ')[0] || 'Student'}! You are currently performing in the top percentile of ${studentYearLabel}.`
+                : `You are ${diffAbs} RP below the ${studentYearLabel} College Average. Earn ${diffAbs} more RP to surpass the batch benchmark!`}
+            </p>
+          </div>
+
+          <div className="relative z-10 mt-3 max-w-md w-full">
+            <div className="flex justify-between text-[11px] font-bold mb-1 text-white/90">
+              <span>Benchmark Progress</span>
+              <span>{percentOfAvg}%</span>
+            </div>
+            <div className="w-full h-2.5 rounded-full bg-black/35 overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full transition-all duration-700"
+                style={{ width: `${Math.min(100, Math.max(8, percentOfAvg))}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* SLIDE 3: COLLEGE YEAR-WISE AVERAGES & BENCHMARKS */}
+        <div className="w-full flex-shrink-0 min-h-[200px] sm:min-h-[220px] p-6 sm:p-8 bg-gradient-to-r from-purple-700 via-indigo-800 to-slate-900 text-white relative overflow-hidden flex flex-col justify-between">
+          <div className="absolute -right-6 -bottom-8 opacity-20 text-[130px] sm:text-[160px] pointer-events-none select-none">
+            🎓
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
+                🎓 College Average Points
+              </span>
+              <span className="text-xs text-purple-200 font-semibold">
+                BIT Batch Benchmarks
+              </span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">
+              Your Year Average: <span className="text-emerald-300 font-mono">{targetYearAvg.toLocaleString()} RP</span>
+            </h3>
+            <p className="text-xs sm:text-sm text-purple-200 mt-1 max-w-xl">
+              Official average reward points earned across all student batches in Bannari Amman Institute of Technology.
+            </p>
+          </div>
+
+          <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-3">
+            {[
+              { label: 'Year I', val: yearlyAverages?.year_1 || 0 },
+              { label: 'Year II', val: yearlyAverages?.year_2 || 1981 },
+              { label: 'Year III', val: yearlyAverages?.year_3 || 2953 },
+              { label: 'Year IV', val: yearlyAverages?.year_4 || 1633 }
+            ].map((y, i) => {
+              const isUserBatch = y.label === studentYearLabel;
+              return (
+                <div 
+                  key={i} 
+                  className={`px-3 py-2 rounded-2xl border flex flex-col justify-between backdrop-blur-md transition-all ${
+                    isUserBatch 
+                      ? 'bg-white/25 border-emerald-400/80 shadow-md ring-2 ring-emerald-400/50' 
+                      : 'bg-white/10 border-white/20'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[10px] font-bold text-purple-200">
+                    <span>{y.label}</span>
+                    {isUserBatch && <span className="px-1.5 py-0.2 rounded bg-emerald-500/80 text-white font-extrabold text-[8px] uppercase">Your Year</span>}
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-white font-mono mt-0.5">
+                    {Number(y.val).toLocaleString()} <span className="text-[10px] font-normal text-purple-200">RP</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* SLIDE 4: CAMPUS DINING & HOSTEL MESS SPECIALS */}
+        <div className="w-full flex-shrink-0 min-h-[200px] sm:min-h-[220px] p-6 sm:p-8 bg-gradient-to-r from-amber-600 via-rose-700 to-slate-900 text-white relative overflow-hidden flex flex-col justify-between">
+          <div className="absolute -right-6 -bottom-8 opacity-20 text-[130px] sm:text-[160px] pointer-events-none select-none">
+            🍽️
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
+                🍽️ Campus Dining Menu
+              </span>
+              <span className="text-xs text-amber-200 font-semibold">
+                Live Hostel Food Schedule
+              </span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">
+              Today's Boys & Girls Hostel Meals
+            </h3>
+            <p className="text-xs sm:text-sm text-amber-100 mt-1 max-w-xl">
+              Check live breakfast, lunch, snacks, and dinner meal timings and food items anytime.
+            </p>
+          </div>
+
+          <div className="relative z-10 mt-3">
+            <button
+              onClick={() => setActiveNav && setActiveNav('Menu Details')}
+              className="px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-amber-100 transition-all cursor-pointer shadow-lg inline-flex items-center gap-2"
+            >
+              <span>View Today's Meal Menu</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Arrows (Desktop / Tablet) */}
+      <button
+        onClick={prevSlide}
+        className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/35 hover:bg-black/65 text-white backdrop-blur-md border border-white/20 items-center justify-center transition-all cursor-pointer shadow-md opacity-0 group-hover:opacity-100 z-20"
+        title="Previous Slide"
+        aria-label="Previous Slide"
+      >
+        <ChevronLeft className="w-5 h-5" />
+      </button>
+
+      <button
+        onClick={nextSlide}
+        className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/35 hover:bg-black/65 text-white backdrop-blur-md border border-white/20 items-center justify-center transition-all cursor-pointer shadow-md opacity-0 group-hover:opacity-100 z-20"
+        title="Next Slide"
+        aria-label="Next Slide"
+      >
+        <ChevronRight className="w-5 h-5" />
+      </button>
+
+      {/* Bottom Slider Dots / Indicator Pills (Flipkart Style) */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+        {Array.from({ length: totalSlides }).map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => setCurrentSlide(idx)}
+            className={`transition-all duration-300 rounded-full h-1.5 cursor-pointer ${
+              currentSlide === idx 
+                ? 'w-6 bg-white shadow-xs' 
+                : 'w-1.5 bg-white/40 hover:bg-white/70'
+            }`}
+            title={`Slide ${idx + 1}`}
+            aria-label={`Go to slide ${idx + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // Standalone Login Page Component
@@ -763,6 +1053,9 @@ export default function App() {
   // Dynamic API state for Student Detail Modal
   const [modalRewardsData, setModalRewardsData] = useState([]);
   const [loadingModalRewards, setLoadingModalRewards] = useState(false);
+
+  // Live Campus Weather State (Open-Meteo API)
+  const [weatherData, setWeatherData] = useState(null);
 
   // Campus Mess & Dining Menu State
   const [messHostel, setMessHostel] = useState('boys');
@@ -1446,6 +1739,51 @@ export default function App() {
     fetchAverages();
   }, []);
 
+  // Fetch live Sathyamangalam BIT Campus weather from Open-Meteo API
+  useEffect(() => {
+    async function fetchCampusWeather() {
+      try {
+        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=11.5034&longitude=77.2774&current_weather=true');
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.current_weather) {
+            const cw = json.current_weather;
+            const code = cw.weathercode;
+            let icon = '🌤️';
+            let condition = 'Partly Cloudy';
+            if (code === 0) {
+              icon = cw.is_day ? '☀️' : '🌙';
+              condition = 'Clear Sky';
+            } else if ([1, 2, 3].includes(code)) {
+              icon = '🌤️';
+              condition = 'Partly Cloudy';
+            } else if ([45, 48].includes(code)) {
+              icon = '🌫️';
+              condition = 'Foggy';
+            } else if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) {
+              icon = '🌧️';
+              condition = 'Rain Showers';
+            } else if ([95, 96, 99].includes(code)) {
+              icon = '⛈️';
+              condition = 'Thunderstorm';
+            }
+            setWeatherData({
+              temp: Math.round(cw.temperature),
+              wind: Math.round(cw.windspeed),
+              icon,
+              condition
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Weather fetch fallback:', e);
+      }
+    }
+    fetchCampusWeather();
+    const timer = setInterval(fetchCampusWeather, 15 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Live API Search on searchQuery change (with debouncing)
   useEffect(() => {
     const query = searchQuery.trim();
@@ -1731,6 +2069,24 @@ export default function App() {
 
           {/* Right Action Icons & Developer Info */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Live Sathyamangalam BIT Campus Weather Pill */}
+            {weatherData && (
+              <div 
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all shadow-2xs ${
+                  isDarkMode 
+                    ? 'bg-slate-900/90 border-slate-800 text-slate-200 hover:border-slate-700' 
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+                title={`Live Sathyamangalam Weather: ${weatherData.temp}°C, ${weatherData.condition}, Wind ${weatherData.wind} km/h`}
+              >
+                <span className="text-sm">{weatherData.icon}</span>
+                <span className="font-extrabold text-indigo-600 dark:text-indigo-400">{weatherData.temp}°C</span>
+                <span className={`text-[10px] hidden xl:inline font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Sathyamangalam
+                </span>
+              </div>
+            )}
+
             {/* Top Right Developer Details */}
             <div className={`hidden lg:flex flex-col text-right pr-2 border-r mr-1 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
               <span className={`text-[11px] font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2112,6 +2468,16 @@ export default function App() {
                 </p>
               </div>
 
+              {/* Flipkart-style Featured Hero Banner Slider */}
+              <DashboardHeroSlider
+                weatherData={weatherData}
+                student={student}
+                yearlyAverages={yearlyAverages}
+                normalizeStudentYear={normalizeStudentYear}
+                setActiveNav={setActiveNav}
+                isDarkMode={isDarkMode}
+              />
+
               {/* SECTION 1: SEARCH RESULTS */}
               <section className="mb-8">
                 <div className="flex items-center justify-between mb-3">
@@ -2375,9 +2741,14 @@ export default function App() {
 
               {/* SECTION 3: AVERAGE REWARD POINTS BY YEAR */}
               <section>
-                <h2 className={`text-xs font-black tracking-wider uppercase mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  AVERAGE REWARD POINTS BY YEAR
-                </h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className={`text-xs font-black tracking-wider uppercase ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    AVERAGE REWARD POINTS BY YEAR
+                  </h2>
+                  <span className={`text-[11px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Official College Benchmarks
+                  </span>
+                </div>
 
                 {/* 4 Year Cards Grid (Dynamic from API & Highlighted for Current User) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
