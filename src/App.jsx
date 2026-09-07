@@ -43,6 +43,10 @@ import {
   Menu,
   ShieldCheck,
   FileSpreadsheet,
+  Copy,
+  Filter,
+  ChevronDown,
+  RotateCcw,
   Download,
   RefreshCw,
   Smartphone,
@@ -356,7 +360,8 @@ function DashboardHeroSlider({
   normalizeStudentYear, 
   setActiveNav, 
   isDarkMode,
-  leavesList = []
+  leavesList = [],
+  facultyList = []
 }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -382,7 +387,7 @@ function DashboardHeroSlider({
   const todayStr = new Date().toISOString().slice(0, 10);
   const nextLeave = (leavesList || []).find(l => (l.to_date || l.from_date) >= todayStr) || (leavesList && leavesList[0]);
 
-  const totalSlides = 5;
+  const totalSlides = 6;
 
   const nextSlide = useCallback(() => {
     setCurrentSlide(prev => (prev + 1) % totalSlides);
@@ -639,6 +644,41 @@ function DashboardHeroSlider({
                 <span>Next: {nextLeave.name} ({nextLeave.from_date})</span>
               </span>
             )}
+          </div>
+        </div>
+
+        {/* SLIDE 6: CAMPUS FACULTY & STAFF DIRECTORY */}
+        <div className="w-full flex-shrink-0 min-h-[200px] sm:min-h-[220px] p-6 sm:p-8 bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white relative overflow-hidden flex flex-col justify-between border-l-4 border-purple-500">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
+                <GraduationCap className="w-3.5 h-3.5 text-purple-400" />
+                <span>Campus Directory</span>
+              </span>
+              <span className="text-xs text-purple-200 font-medium">
+                Official BIT Faculty & Staff Portal
+              </span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
+              331+ Faculty & Department Mentors
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
+              Instant access to verified faculty emails, direct phone lines, department designations, and office contacts across all BIT departments.
+            </p>
+          </div>
+
+          <div className="relative z-10 mt-3 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setActiveNav && setActiveNav('Faculty Directory')}
+              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-all cursor-pointer shadow-md inline-flex items-center gap-2"
+            >
+              <span>Explore Faculty Directory</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-purple-400" />
+              <span>{facultyList.length || 331} Faculty Members</span>
+            </span>
           </div>
         </div>
       </div>
@@ -1043,6 +1083,7 @@ export default function App() {
   const [selectedStudent, setSelectedStudent] = useState(STUDENTS_DATABASE[0]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Leave Schedule State
@@ -1051,6 +1092,15 @@ export default function App() {
   const [leavesError, setLeavesError] = useState('');
   const [selectedLeaveFilter, setSelectedLeaveFilter] = useState('ALL'); // 'ALL' | 'UPCOMING' | 'GP' | 'HOLIDAY'
   const [leaveSearchQuery, setLeaveSearchQuery] = useState('');
+
+  // Faculty & Staff Directory State
+  const [facultyList, setFacultyList] = useState([]);
+  const [loadingFaculty, setLoadingFaculty] = useState(false);
+  const [facultyError, setFacultyError] = useState('');
+  const [selectedFacultyDept, setSelectedFacultyDept] = useState('ALL');
+  const [facultySearchQuery, setFacultySearchQuery] = useState('');
+  const [copiedFacultyContact, setCopiedFacultyContact] = useState(null);
+  const facultyChipsRef = useRef(null);
 
   // Theme Mode: 'system' (default), 'dark', or 'light'
   const [themeMode, setThemeMode] = useState(() => {
@@ -1699,6 +1749,33 @@ export default function App() {
     fetchLeavesSchedule();
   }, []);
 
+  // Fetch campus faculty & staff directory from BIT Central
+  const fetchFacultyDirectory = async () => {
+    setLoadingFaculty(true);
+    setFacultyError('');
+    try {
+      const res = await bitcentralFetch('/faculty');
+      if (res.ok) {
+        const json = await res.json();
+        const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+        setFacultyList(list);
+      } else {
+        setFacultyError('Unable to load faculty directory.');
+      }
+    } catch (e) {
+      console.warn('Faculty directory error:', e);
+      setFacultyError('Network error while fetching faculty directory.');
+    } finally {
+      setLoadingFaculty(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeNav === 'Faculty Directory' && facultyList.length === 0) {
+      fetchFacultyDirectory();
+    }
+  }, [activeNav]);
+
   // Fetch live rewards history from endpoint whenever displayed student changes
   useEffect(() => {
     if (!displayedStudent || !displayedStudent.id) return;
@@ -2263,7 +2340,7 @@ export default function App() {
             </div>
 
             <button
-              onClick={handleLogout}
+              onClick={() => setShowLogoutModal(true)}
               className={`p-1.5 sm:p-2 rounded-full transition-colors cursor-pointer ${
                 isDarkMode ? 'hover:bg-slate-800 text-rose-400 hover:text-rose-300' : 'hover:bg-slate-100 text-rose-600 hover:text-rose-700'
               }`}
@@ -2518,6 +2595,20 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => { setActiveNav('Faculty Directory'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Faculty Directory'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <GraduationCap className="w-5 h-5" strokeWidth={activeNav === 'Faculty Directory' ? 2.2 : 1.8} />
+            <span>Faculty Directory</span>
+          </button>
+
+          <button
             onClick={() => { setActiveNav('Settings'); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
               activeNav === 'Settings'
@@ -2628,6 +2719,7 @@ export default function App() {
                 setActiveNav={setActiveNav}
                 isDarkMode={isDarkMode}
                 leavesList={leavesList}
+                facultyList={facultyList}
               />
 
               {/* SECTION 1: SEARCH RESULTS */}
@@ -4170,6 +4262,513 @@ export default function App() {
             </div>
           )}
 
+          {/* VIEW 3.6: FACULTY DIRECTORY */}
+          {activeNav === 'Faculty Directory' && (
+            <div className="max-w-6xl mx-auto w-full space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 text-[10px] font-bold border border-purple-200 dark:border-purple-800/60 uppercase tracking-wider">
+                      BIT Campus Directory • 331+ Members
+                    </span>
+                  </div>
+                  <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Faculty & Staff Directory
+                  </h1>
+                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Official contact repository for professors, assistant professors, and mentors across all BIT engineering and science departments.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    onClick={fetchFacultyDirectory}
+                    disabled={loadingFaculty}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isDarkMode 
+                        ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' 
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-xs'
+                    }`}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingFaculty ? 'animate-spin text-purple-500' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+
+                  <div className={`text-xs font-semibold px-3 py-2 rounded-xl border flex items-center gap-1.5 ${
+                    isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                  }`}>
+                    <GraduationCap className="w-3.5 h-3.5 text-purple-500" />
+                    <span>Total: <strong className="font-mono text-purple-500 dark:text-purple-400">{facultyList.length || 331} Faculty</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Department Extraction & Filtering */}
+              {(() => {
+                // Extract unique departments & counts
+                const deptCountMap = {};
+                (facultyList || []).forEach(f => {
+                  const d = (f.department || 'OTHER').trim().toUpperCase();
+                  deptCountMap[d] = (deptCountMap[d] || 0) + 1;
+                });
+
+                const sortedDepts = Object.keys(deptCountMap).sort((a, b) => deptCountMap[b] - deptCountMap[a]);
+
+                // Filter faculty list by search query and selected department
+                const q = facultySearchQuery.toLowerCase().trim();
+                const filteredFaculty = (facultyList || []).filter(f => {
+                  const dept = (f.department || '').trim().toUpperCase();
+                  if (selectedFacultyDept !== 'ALL' && dept !== selectedFacultyDept) {
+                    return false;
+                  }
+                  if (!q) return true;
+                  const nameMatch = (f.name || '').toLowerCase().includes(q);
+                  const emailMatch = (f.email || '').toLowerCase().includes(q);
+                  const phoneMatch = (f.phone || '').toLowerCase().includes(q);
+                  const deptMatch = dept.toLowerCase().includes(q);
+                  const titleMatch = (f.job_title || '').toLowerCase().includes(q);
+                  return nameMatch || emailMatch || phoneMatch || deptMatch || titleMatch;
+                });
+
+                const getInitials = (name) => {
+                  if (!name) return 'FC';
+                  const parts = name.trim().split(/\s+/);
+                  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+                  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+                };
+
+                const copyToClipboard = (text, type, id) => {
+                  if (!text) return;
+                  if (navigator?.clipboard?.writeText) {
+                    navigator.clipboard.writeText(text);
+                  }
+                  setCopiedFacultyContact({ id, type });
+                  setTimeout(() => {
+                    setCopiedFacultyContact(null);
+                  }, 2000);
+                };
+
+                return (
+                  <div className="space-y-6">
+                    {/* Top Highlight Metric Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                      {/* Card 1: Total Faculty */}
+                      <div className={`p-5 rounded-3xl border flex items-center justify-between transition-all ${
+                        isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                      }`}>
+                        <div>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Verified BIT Faculty
+                          </span>
+                          <div className="text-2xl font-black font-mono mt-1 text-purple-600 dark:text-purple-400">
+                            {facultyList.length || 331}
+                          </div>
+                          <span className={`text-[11px] font-medium mt-0.5 block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Across all disciplines
+                          </span>
+                        </div>
+                        <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center border border-purple-500/20">
+                          <Users className="w-6 h-6" />
+                        </div>
+                      </div>
+
+                      {/* Card 2: Total Departments */}
+                      <div className={`p-5 rounded-3xl border flex items-center justify-between transition-all ${
+                        isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                      }`}>
+                        <div>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Academic Departments
+                          </span>
+                          <div className="text-2xl font-black font-mono mt-1 text-indigo-600 dark:text-indigo-400">
+                            {sortedDepts.length || 27}
+                          </div>
+                          <span className={`text-[11px] font-medium mt-0.5 block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Engineering & Sciences
+                          </span>
+                        </div>
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center border border-indigo-500/20">
+                          <Building2 className="w-6 h-6" />
+                        </div>
+                      </div>
+
+                      {/* Card 3: Active Filter Results */}
+                      <div className={`p-5 rounded-3xl border sm:col-span-2 lg:col-span-1 flex items-center justify-between transition-all ${
+                        isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                      }`}>
+                        <div>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Matching Results
+                          </span>
+                          <div className="text-2xl font-black font-mono mt-1 text-emerald-600 dark:text-emerald-400">
+                            {filteredFaculty.length}
+                          </div>
+                          <span className={`text-[11px] font-medium mt-0.5 block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {selectedFacultyDept === 'ALL' ? 'In all departments' : `In ${selectedFacultyDept} department`}
+                          </span>
+                        </div>
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
+                          <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Search & Department Filters Bar */}
+                    <div className={`p-3.5 sm:p-5 rounded-3xl border space-y-3 sm:space-y-3.5 transition-all ${
+                      isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                    }`}>
+                      {/* Search Bar */}
+                      <div className="relative w-full">
+                        <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`} />
+                        <input
+                          type="text"
+                          value={facultySearchQuery}
+                          onChange={(e) => setFacultySearchQuery(e.target.value)}
+                          placeholder="Search by faculty name, dept, email..."
+                          className={`w-full pl-10 pr-10 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-medium border transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 ${
+                            isDarkMode 
+                              ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-500' 
+                              : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                          }`}
+                        />
+                        {facultySearchQuery && (
+                          <button
+                            onClick={() => setFacultySearchQuery('')}
+                            className={`absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-xs transition-all ${
+                              isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Professional Department Dropdown & Redesigned Reset Button Row */}
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative flex-1">
+                          <Filter className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-purple-500" />
+                          <select
+                            value={selectedFacultyDept}
+                            onChange={(e) => setSelectedFacultyDept(e.target.value)}
+                            className={`w-full appearance-none pl-9 pr-9 py-2.5 rounded-2xl text-xs sm:text-sm font-bold border transition-all outline-none cursor-pointer ${
+                              isDarkMode 
+                                ? 'bg-slate-800/90 hover:bg-slate-800 border-slate-700 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30' 
+                                : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30'
+                            }`}
+                          >
+                            <option value="ALL">All Departments ({facultyList.length || 331})</option>
+                            {sortedDepts.map(dept => (
+                              <option key={dept} value={dept}>
+                                {dept} ({deptCountMap[dept] || 0} Faculty)
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="w-3.5 h-3.5 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+                        </div>
+
+                        {/* Professional Reset Button */}
+                        <button
+                          onClick={() => { setSelectedFacultyDept('ALL'); setFacultySearchQuery(''); }}
+                          disabled={selectedFacultyDept === 'ALL' && !facultySearchQuery}
+                          className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 ${
+                            selectedFacultyDept !== 'ALL' || facultySearchQuery
+                              ? 'bg-purple-600 hover:bg-purple-500 text-white border border-purple-500 shadow-md shadow-purple-500/20 cursor-pointer active:scale-95'
+                              : isDarkMode
+                                ? 'border border-slate-800 bg-slate-800/40 text-slate-600 cursor-not-allowed opacity-50'
+                                : 'border border-slate-200 bg-slate-100/60 text-slate-400 cursor-not-allowed opacity-50'
+                          }`}
+                          title="Reset search and filters"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reset</span>
+                        </button>
+                      </div>
+
+                      {/* Department Chips with Left and Right Scroll Arrows */}
+                      <div className="flex items-center gap-1.5 sm:gap-2 pt-0.5">
+                        {/* Left Scroll Arrow Button */}
+                        <button
+                          onClick={() => facultyChipsRef.current?.scrollBy({ left: -140, behavior: 'smooth' })}
+                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer active:scale-95 ${
+                            isDarkMode 
+                              ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-purple-600 hover:text-white hover:border-purple-600' 
+                              : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-purple-600 hover:text-white hover:border-purple-600 shadow-2xs'
+                          }`}
+                          title="Scroll left"
+                          aria-label="Scroll left"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+
+                        {/* Scrollable Department Chips Container */}
+                        <div 
+                          ref={facultyChipsRef}
+                          className="flex-1 flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 scroll-smooth scrollbar-none"
+                        >
+                          <button
+                            onClick={() => setSelectedFacultyDept('ALL')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer flex-shrink-0 ${
+                              selectedFacultyDept === 'ALL'
+                                ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25'
+                                : isDarkMode
+                                  ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
+                            }`}
+                          >
+                            <span>All Departments</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                              selectedFacultyDept === 'ALL' ? 'bg-purple-800 text-purple-100' : isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                              {facultyList.length || 331}
+                            </span>
+                          </button>
+
+                          {sortedDepts.map(dept => {
+                            const count = deptCountMap[dept] || 0;
+                            const isSelected = selectedFacultyDept === dept;
+                            return (
+                              <button
+                                key={dept}
+                                onClick={() => setSelectedFacultyDept(dept)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer flex-shrink-0 ${
+                                  isSelected
+                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25'
+                                    : isDarkMode
+                                      ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
+                                }`}
+                              >
+                                <span>{dept}</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                                  isSelected ? 'bg-purple-800 text-purple-100' : isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Right Scroll Arrow Button */}
+                        <button
+                          onClick={() => facultyChipsRef.current?.scrollBy({ left: 140, behavior: 'smooth' })}
+                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer active:scale-95 ${
+                            isDarkMode 
+                              ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-purple-600 hover:text-white hover:border-purple-600' 
+                              : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-purple-600 hover:text-white hover:border-purple-600 shadow-2xs'
+                          }`}
+                          title="Scroll right"
+                          aria-label="Scroll right"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Faculty Cards Grid */}
+                    {loadingFaculty && facultyList.length === 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {[1, 2, 3, 4, 5, 6].map(n => (
+                          <div key={n} className={`p-5 rounded-3xl border animate-pulse space-y-4 ${
+                            isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                          }`}>
+                            <div className="flex items-center gap-3">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-700/50" />
+                              <div className="space-y-2 flex-1">
+                                <div className="h-4 bg-slate-700/50 rounded-md w-3/4" />
+                                <div className="h-3 bg-slate-700/30 rounded-md w-1/2" />
+                              </div>
+                            </div>
+                            <div className="h-8 bg-slate-700/30 rounded-xl" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : filteredFaculty.length === 0 ? (
+                      <div className={`p-10 rounded-3xl border text-center space-y-3 ${
+                        isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      }`}>
+                        <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                          <Users className="w-7 h-7" />
+                        </div>
+                        <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                          No faculty members found
+                        </h3>
+                        <p className={`text-xs max-w-md mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          No staff members matched your current filter &quot;{facultySearchQuery || selectedFacultyDept}&quot;. Try resetting your search query or selecting All Departments.
+                        </p>
+                        <button
+                          onClick={() => { setFacultySearchQuery(''); setSelectedFacultyDept('ALL'); }}
+                          className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+                        >
+                          Clear Filters
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                        {filteredFaculty.map((f, idx) => {
+                          const isCopiedEmail = copiedFacultyContact?.id === f.id && copiedFacultyContact?.type === 'email';
+                          const isCopiedPhone = copiedFacultyContact?.id === f.id && copiedFacultyContact?.type === 'phone';
+
+                          return (
+                            <div 
+                              key={f.id || idx}
+                              className={`p-5 rounded-3xl border flex flex-col justify-between transition-all hover:shadow-lg ${
+                                isDarkMode 
+                                  ? 'bg-slate-900/90 border-slate-800/90 hover:border-slate-700' 
+                                  : 'bg-white border-slate-200/90 hover:border-purple-200 shadow-xs'
+                              }`}
+                            >
+                              <div>
+                                {/* Top Avatar + Department Badge */}
+                                <div className="flex items-start gap-3.5 mb-3.5">
+                                  <div className="relative flex-shrink-0">
+                                    {f.photo_url ? (
+                                      <img
+                                        src={f.photo_url}
+                                        alt={f.name}
+                                        className="w-13 h-13 rounded-2xl object-cover border border-purple-500/20 shadow-xs"
+                                        onError={(e) => {
+                                          e.target.onerror = null;
+                                          e.target.style.display = 'none';
+                                          if (e.target.nextSibling) {
+                                            e.target.nextSibling.style.display = 'flex';
+                                          }
+                                        }}
+                                      />
+                                    ) : null}
+                                    <div 
+                                      className={`w-13 h-13 rounded-2xl items-center justify-center font-black text-sm text-purple-200 bg-gradient-to-br from-purple-700 to-indigo-900 border border-purple-500/30 ${
+                                        f.photo_url ? 'hidden' : 'flex'
+                                      }`}
+                                    >
+                                      {getInitials(f.name)}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25">
+                                        {f.department || 'FACULTY'}
+                                      </span>
+                                      {f.job_title && (
+                                        <span className={`text-[9px] font-medium px-1.5 py-0.2 rounded border ${
+                                          isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'
+                                        }`}>
+                                          {f.job_title}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <h4 className={`text-sm sm:text-base font-black tracking-tight leading-snug truncate ${
+                                      isDarkMode ? 'text-white' : 'text-slate-900'
+                                    }`} title={f.name}>
+                                      {f.name}
+                                    </h4>
+                                    <span className={`text-[11px] font-medium block truncate ${
+                                      isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                                    }`}>
+                                      Bannari Amman Institute of Technology
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Contact Information Items */}
+                                <div className={`p-3 rounded-2xl border space-y-2 text-xs mb-3.5 ${
+                                  isDarkMode ? 'bg-slate-950/40 border-slate-800/80' : 'bg-slate-50/70 border-slate-200/80'
+                                }`}>
+                                  {/* Official Email */}
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Mail className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                                      <a 
+                                        href={`mailto:${f.email}`}
+                                        className={`font-mono text-[11px] truncate hover:underline ${
+                                          isDarkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-purple-600'
+                                        }`}
+                                        title={f.email}
+                                      >
+                                        {f.email || 'N/A'}
+                                      </a>
+                                    </div>
+                                    {f.email && (
+                                      <button
+                                        onClick={() => copyToClipboard(f.email, 'email', f.id)}
+                                        className={`p-1 rounded-md transition-all cursor-pointer ${
+                                          isCopiedEmail 
+                                            ? 'text-emerald-500 bg-emerald-500/10' 
+                                            : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                                        }`}
+                                        title="Copy Email"
+                                      >
+                                        {isCopiedEmail ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Phone / Mobile */}
+                                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/40 dark:border-slate-800/60">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Phone className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+                                      <a 
+                                        href={`tel:${f.phone}`}
+                                        className={`font-mono text-[11px] truncate hover:underline ${
+                                          isDarkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-indigo-600'
+                                        }`}
+                                        title={f.phone}
+                                      >
+                                        {f.phone ? `+91 ${f.phone}` : 'N/A'}
+                                      </a>
+                                    </div>
+                                    {f.phone && (
+                                      <button
+                                        onClick={() => copyToClipboard(f.phone, 'phone', f.id)}
+                                        className={`p-1 rounded-md transition-all cursor-pointer ${
+                                          isCopiedPhone 
+                                            ? 'text-emerald-500 bg-emerald-500/10' 
+                                            : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                                        }`}
+                                        title="Copy Phone Number"
+                                      >
+                                        {isCopiedPhone ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="grid grid-cols-2 gap-2 pt-1">
+                                <a
+                                  href={`mailto:${f.email}`}
+                                  className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer text-center"
+                                >
+                                  <Mail className="w-3 h-3" />
+                                  <span>Send Email</span>
+                                </a>
+
+                                <a
+                                  href={`tel:${f.phone}`}
+                                  className={`w-full py-2 px-3 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer text-center ${
+                                    isDarkMode 
+                                      ? 'border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200' 
+                                      : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-xs'
+                                  }`}
+                                >
+                                  <Phone className="w-3 h-3 text-indigo-500" />
+                                  <span>Call Staff</span>
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* VIEW 4: SETTINGS */}
           {activeNav === 'Settings' && (
             <div className="max-w-5xl mx-auto w-full space-y-6">
@@ -4261,7 +4860,7 @@ export default function App() {
 
                   <div className={`pt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                     <button
-                      onClick={handleLogout}
+                      onClick={() => setShowLogoutModal(true)}
                       className="w-full py-2.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <LogOut className="w-3.5 h-3.5" />
@@ -5140,6 +5739,76 @@ export default function App() {
             >
               Got it
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 6. LOGOUT CONFIRMATION MODAL */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div 
+            className={`relative w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-2xl border transition-all transform scale-100 ${
+              isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
+            }`}
+          >
+            {/* Close X Button */}
+            <button
+              onClick={() => setShowLogoutModal(false)}
+              className={`absolute top-5 right-5 p-1.5 rounded-full transition-colors cursor-pointer ${
+                isDarkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Icon & Header */}
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 text-rose-500 flex items-center justify-center border border-rose-500/25 flex-shrink-0">
+                <LogOut className="w-6 h-6" />
+              </div>
+              <div className="flex-1 pr-4">
+                <h3 className={`text-lg sm:text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                  Confirm Sign Out
+                </h3>
+                <p className={`text-xs sm:text-sm mt-1 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Are you sure you want to log out of <strong className="text-slate-800 dark:text-slate-200">{currentUser?.name || 'your account'}</strong>?
+                </p>
+              </div>
+            </div>
+
+            {/* Information Notice */}
+            <div className={`mt-4 p-3.5 rounded-2xl border text-xs leading-relaxed ${
+              isDarkMode ? 'bg-slate-950/60 border-slate-800/80 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              You will need to sign in again with your institutional Google account (<span className="font-mono text-indigo-500 dark:text-indigo-400 font-bold">{currentUser?.email}</span>) to access your points and dashboard.
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                  isDarkMode 
+                    ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white' 
+                    : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  handleLogout(false);
+                }}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-rose-500/25 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Yes, Log Out</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
