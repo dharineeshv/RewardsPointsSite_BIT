@@ -1,0 +1,41 @@
+name: Daily BIT Placement Sync
+run-name: Sync Daily BIT Newspaper Placement Data
+
+on:
+  schedule:
+    # Runs everyday at 5:30 PM IST (12:00 PM UTC)
+    - cron: '0 12 * * *'
+  workflow_dispatch: # Allows manual one-click trigger from GitHub Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  sync-placement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Run Daily Placement Sync Script
+        run: node scripts/sync_placements.cjs
+
+      - name: Check for Changes & Commit
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add src/data/placementData.json
+          if git diff --staged --quiet; then
+            echo "No new placement updates today."
+          else
+            git commit -m "chore(placement): auto-sync daily BIT newspaper placement data [skip ci]"
+            git push origin main
+          fi

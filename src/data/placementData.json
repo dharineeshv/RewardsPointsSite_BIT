@@ -1,0 +1,178 @@
+{
+  "lastUpdated": "September 04, 2026",
+  "targetBatch": "2023-2027 Batch",
+  "totalStudentsPlaced": 498,
+  "totalCompaniesVisited": 86,
+  "editionDate": "05-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/a456584a60ed0504eb2a48ea84630b7af33a490e.pdf",
+  "totalPages": 7,
+  "placementPageNumber": 6,
+  "drivesPageNumber": 7,
+  "upcomingDrives": [
+    {
+      "company": "Cytrusst Intelligence Pvt. Ltd.",
+      "role": "Software & AI Engineering Roles",
+      "targetBatch": "2023-2027 Batch",
+      "startDate": "07 Sep 2026",
+      "endDate": "26 Sep 2026",
+      "status": "Active On-Campus Drive",
+      "badge": "Upcoming Recruitment Drive",
+      "eligibility": "All Circuit & Tech Branches"
+    }
+  ],
+  "upcomingContests": [
+    {
+      "name": "Datathon 2026",
+      "type": "Data Science & Machine Learning Contest",
+      "status": "Open / Ongoing",
+      "endDate": "September 2026"
+    }
+  ],
+  "salaryTiers": [
+    {
+      "tier": "10 LPA & Above",
+      "tierCategory": "Super Dream",
+      "range": ">= 10.00 LPA",
+      "offerCount": 17,
+      "color": "from-amber-500 to-orange-500",
+      "badgeColor": "bg-amber-500/10 text-amber-400 border-amber-500/20",
+      "companies": [
+        "Caterpillar",
+        "EXL Service",
+        "Integra Connect",
+        "Multicoreware",
+        "NETGEAR",
+        "Presidio",
+        "Soliton"
+      ]
+    },
+    {
+      "tier": "7 - 10 LPA",
+      "tierCategory": "Dream Tier",
+      "range": "7.00 - 10.00 LPA",
+      "offerCount": 86,
+      "color": "from-purple-500 to-indigo-500",
+      "badgeColor": "bg-purple-500/10 text-purple-400 border-purple-500/20",
+      "companies": [
+        "Affordmed",
+        "GoML",
+        "Multicoreware",
+        "Rocket India (Mr. Cooper)",
+        "SurveySparrow",
+        "TCS",
+        "Zohocorp"
+      ]
+    },
+    {
+      "tier": "6 - 7 LPA",
+      "tierCategory": "Prime Tier",
+      "range": "6.00 - 7.00 LPA",
+      "offerCount": 20,
+      "color": "from-blue-500 to-cyan-500",
+      "badgeColor": "bg-blue-500/10 text-blue-400 border-blue-500/20",
+      "companies": [
+        "Codemagen",
+        "EXL Service",
+        "IDP Education",
+        "Infineon Technologies",
+        "The Alter Office",
+        "Zohocorp"
+      ]
+    },
+    {
+      "tier": "5 - 6 LPA",
+      "tierCategory": "Core Plus",
+      "range": "5.00 - 6.00 LPA",
+      "offerCount": 43,
+      "color": "from-emerald-500 to-teal-500",
+      "badgeColor": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      "companies": [
+        "Aerele Technologies",
+        "Bi3 Technologies",
+        "Bootlabs",
+        "Conversight.AI",
+        "EQREV",
+        "Mistral Solutions",
+        "Orangewood",
+        "Shakra Innovations",
+        "Workhall",
+        "ZeAI Soft"
+      ]
+    },
+    {
+      "tier": "4 - 5 LPA",
+      "tierCategory": "Standard Tier",
+      "range": "4.00 - 5.00 LPA",
+      "offerCount": 112,
+      "color": "from-sky-500 to-blue-500",
+      "badgeColor": "bg-sky-500/10 text-sky-400 border-sky-500/20",
+      "companies": [
+        "Bi3 Technologies",
+        "Cartrabbit",
+        "Cloudvice",
+        "Excelacom Technologies",
+        "Forvia Hella",
+        "Hexaware",
+        "Killis Bird",
+        "Leaf Corporation",
+        "Lucid Imaging",
+        "MGM-Varvel Power Transmission",
+        "Rajsriya Automotive",
+        "RapidData Technologies",
+        "Tridots",
+        "VST Tillers Tractors",
+        "Zohocorp"
+      ]
+    },
+    {
+      "tier": "3 - 4 LPA",
+      "tierCategory": "Base Tier",
+      "range": "3.00 - 4.00 LPA",
+      "offerCount": 220,
+      "color": "from-slate-500 to-zinc-500",
+      "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
+      "companies": [
+        "Advanced Clothing Concepts",
+        "Ahill Apparel",
+        "Aizentify",
+        "Bassh Clothing",
+        "Bannari Amman Public School",
+        "Confluence Valley Flavors",
+        "Data Platr",
+        "Cotton Blossoms",
+        "EnSmart Controls",
+        "Foresight Software Solutions",
+        "GAC Logistics",
+        "GigHz",
+        "Harita Techserv",
+        "HomeLines Textiles",
+        "Jayanti Herbs & Spice",
+        "JAYEM Automotives",
+        "Kovai Maruthi Papers & Boards",
+        "Lucid Imaging",
+        "Mayflower Enterprises",
+        "Motherson",
+        "Pharmag Instruments",
+        "RK Ecran",
+        "Robonetics Automation Solutions",
+        "Royal Automation",
+        "RSJ Inspection",
+        "S.R.K. Garments",
+        "Sapphire IMS",
+        "Schaeffler India",
+        "Schnell Energy Equipments",
+        "Shanthi Gears",
+        "Slicktronix Medisens",
+        "Sublime Structures",
+        "Surinova",
+        "TCS",
+        "Ultra Engineering Works",
+        "Value Health",
+        "Virtual Maze",
+        "Vishwaa Apparels",
+        "Viswa Envirotech",
+        "Yuvi Labs and Technologies"
+      ]
+    }
+  ]
+}
