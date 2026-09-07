@@ -2432,7 +2432,7 @@ export default function App() {
       }
     }
     fetchRewards();
-  }, [displayedStudent.id]);
+  }, [displayedStudent?.id]);
 
   // Fetch live rewards specifically for selectedStudent in the Detail Modal
   useEffect(() => {
