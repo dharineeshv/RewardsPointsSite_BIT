@@ -1572,7 +1572,7 @@ export default function App() {
       const placementNotif = {
         id: `placement_${Date.now()}`,
         type: 'placement_update',
-        title: `📰 Placement Bulletin Updated (${BIT_DAILY_PLACEMENT_DATA.targetBatch})`,
+        title: `📰 Placement Updated (${BIT_DAILY_PLACEMENT_DATA.targetBatch})`,
         description: `${BIT_DAILY_PLACEMENT_DATA.totalStudentsPlaced} students placed across ${BIT_DAILY_PLACEMENT_DATA.totalCompaniesVisited || 60}+ companies. New drive: ${recentDrive}.`,
         timestamp: new Date().toISOString(),
         read: false,
@@ -3067,7 +3067,7 @@ export default function App() {
                             {notificationFilter === 'unread' ? 'All caught up!' : 'No notifications yet'}
                           </p>
                           <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                            When reward points are credited, placement bulletins update, or campus drives are announced, you will see alerts here.
+                            When reward points are credited, placement updates are announced, or drives are scheduled, you will see alerts here.
                           </p>
                         </div>
                       ) : (
