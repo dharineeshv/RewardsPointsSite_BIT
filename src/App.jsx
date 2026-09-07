@@ -1395,10 +1395,11 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState(() => {
     try {
+      const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
       const saved = localStorage.getItem('bit_rp_user');
-      if (saved) return JSON.parse(saved);
+      if (isLogged && saved) return JSON.parse(saved);
     } catch (e) {}
-    return STUDENTS_DATABASE[0];
+    return null;
   });
 
   const [activeNav, setActiveNav] = useState('Dashboard');
@@ -1410,13 +1411,14 @@ export default function App() {
   // Selected student currently displayed in dashboard
   const [displayedStudent, setDisplayedStudent] = useState(() => {
     try {
+      const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
       const saved = localStorage.getItem('bit_rp_user');
-      if (saved) return JSON.parse(saved);
+      if (isLogged && saved) return JSON.parse(saved);
     } catch (e) {}
-    return STUDENTS_DATABASE[0];
+    return null;
   });
 
-  const [selectedStudent, setSelectedStudent] = useState(STUDENTS_DATABASE[0]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -1425,9 +1427,12 @@ export default function App() {
   // Live Notifications State & Persistence
   const [notifications, setNotifications] = useState(() => {
     try {
+      const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
+      if (!isLogged) return [];
       const savedUser = localStorage.getItem('bit_rp_user');
       const parsedUser = savedUser ? JSON.parse(savedUser) : null;
-      const userKey = parsedUser?.email?.toLowerCase() || 'default';
+      const userKey = parsedUser?.email?.toLowerCase();
+      if (!userKey) return [];
       const saved = localStorage.getItem(`bit_notifications_${userKey}`);
       if (saved) return JSON.parse(saved);
     } catch (e) {}
@@ -1438,7 +1443,11 @@ export default function App() {
 
   // Sync notifications when logged-in user changes
   useEffect(() => {
-    const userKey = currentUser?.email?.toLowerCase() || 'default';
+    if (!isLoggedIn || !currentUser?.email) {
+      setNotifications([]);
+      return;
+    }
+    const userKey = currentUser.email.toLowerCase();
     try {
       const saved = localStorage.getItem(`bit_notifications_${userKey}`);
       if (saved) {
@@ -1447,7 +1456,7 @@ export default function App() {
         setNotifications([]);
       }
     } catch (e) {}
-  }, [currentUser?.email]);
+  }, [currentUser?.email, isLoggedIn]);
 
   // Ref locks to avoid duplicate processing on rapid re-renders
   const lastProcessedRpRef = useRef(null);
@@ -1455,7 +1464,7 @@ export default function App() {
 
   // Automated Reward Points Change Detector (Logged-In User Only)
   useEffect(() => {
-    if (!currentUser?.email) return;
+    if (!isLoggedIn || !currentUser?.email) return;
 
     const userKey = currentUser.email.toLowerCase();
     const currentPointsRaw = (currentUser?.currentPoints || currentUser?.balance_points || '0').toString();
@@ -1542,11 +1551,11 @@ export default function App() {
         return prev;
       });
     }
-  }, [currentUser?.email, currentUser?.name, currentUser?.student_name, currentUser?.displayName, currentUser?.roll_no, currentUser?.currentPoints, currentUser?.balance_points]);
+  }, [isLoggedIn, currentUser?.email, currentUser?.name, currentUser?.student_name, currentUser?.displayName, currentUser?.roll_no, currentUser?.currentPoints, currentUser?.balance_points]);
 
   // Automated Placement Bulletin Update Detector
   useEffect(() => {
-    if (!BIT_DAILY_PLACEMENT_DATA?.lastUpdated) return;
+    if (!isLoggedIn || !currentUser?.email || !BIT_DAILY_PLACEMENT_DATA?.lastUpdated) return;
 
     const userKey = currentUser?.email?.toLowerCase() || 'default';
     const notifKey = `bit_notifications_${userKey}`;
@@ -1588,7 +1597,7 @@ export default function App() {
         localStorage.setItem(placementKey, currentEdition);
       } catch (e) {}
     }
-  }, [BIT_DAILY_PLACEMENT_DATA?.lastUpdated, BIT_DAILY_PLACEMENT_DATA?.editionDate, BIT_DAILY_PLACEMENT_DATA?.targetBatch, currentUser?.email]);
+  }, [isLoggedIn, BIT_DAILY_PLACEMENT_DATA?.lastUpdated, BIT_DAILY_PLACEMENT_DATA?.editionDate, BIT_DAILY_PLACEMENT_DATA?.targetBatch, currentUser?.email]);
 
   // Notification Helper Actions
   const unreadNotificationCount = useMemo(() => {
@@ -2458,16 +2467,20 @@ export default function App() {
     return () => { isMounted = false; };
   }, [isModalOpen, selectedStudent?.id]);
 
-  // Initial load: fetch profile from v2/profile (uses logged-in user email or default)
+  // Initial load: fetch profile from v2/profile (only for active logged-in session)
   useEffect(() => {
     async function fetchInitialStudent() {
+      const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
+      if (!isLogged) return;
+
       let savedUser = null;
       try {
         const saved = localStorage.getItem('bit_rp_user');
         if (saved) savedUser = JSON.parse(saved);
       } catch (e) {}
 
-      const targetEmail = savedUser?.email || 'dharineesh.ct23@bitsathy.ac.in';
+      if (!savedUser?.email) return;
+      const targetEmail = savedUser.email;
 
       try {
         const { rollId, profileApiData: profileApi, searchApiData: searchApi } = await resolveStudentRollAndProfile(targetEmail, savedUser?.name || '');
@@ -2643,7 +2656,7 @@ export default function App() {
     }
   };
 
-  const student = displayedStudent;
+  const student = displayedStudent || currentUser || STUDENTS_DATABASE[0];
 
   // Compute progress bar relative to highest average
   const maxYearAvg = Math.max(
@@ -2677,6 +2690,12 @@ export default function App() {
   const handleLogout = (isTimeout = false) => {
     logActivity(currentUser, isTimeout ? 'Session Expired' : 'Logout');
     setIsLoggedIn(false);
+    setCurrentUser(null);
+    setDisplayedStudent(null);
+    setSelectedStudent(null);
+    setNotifications([]);
+    lastProcessedRpRef.current = null;
+    lastProcessedPlacementRef.current = null;
     if (isTimeout) {
       setSessionTimeoutNotice('Session timed out after 10 minutes of inactivity. Please sign in again.');
     } else {
