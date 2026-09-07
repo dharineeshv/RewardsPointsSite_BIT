@@ -81,7 +81,11 @@ import {
   Palmtree,
   MapPin,
   FileText,
-  PartyPopper
+  PartyPopper,
+  Layers,
+  Navigation,
+  ArrowRightLeft,
+  Route
 } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
@@ -1111,6 +1115,10 @@ export default function App() {
   const [loadingExamHall, setLoadingExamHall] = useState(false);
   const [examHallSearched, setExamHallSearched] = useState(false);
   const [examHallError, setExamHallError] = useState('');
+
+  // BIT Map Navigation State
+  const [mapFromLocation, setMapFromLocation] = useState('SF Block (CT & Special Functions)');
+  const [mapToLocation, setMapToLocation] = useState('Main Auditorium');
 
   // Theme Mode: 'system' (default), 'dark', or 'light'
   const [themeMode, setThemeMode] = useState(() => {
@@ -2667,6 +2675,21 @@ export default function App() {
             <Compass className="w-5 h-5" strokeWidth={activeNav === 'Exam Hall Finder' ? 2.2 : 1.8} />
             <span>Exam Hall Finder</span>
           </button>
+
+          <button
+            onClick={() => { setActiveNav('GeoBITS'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'GeoBITS'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Navigation className="w-5 h-5" strokeWidth={activeNav === 'GeoBITS' ? 2.2 : 1.8} />
+            <span>BIT Map</span>
+          </button>
+
 
           <button
             onClick={() => { setActiveNav('Settings'); setIsSidebarOpen(false); }}
@@ -5100,6 +5123,187 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* VIEW 3.8: BIT MAP & CAMPUS VENUE LOCATOR */}
+          {activeNav === 'GeoBITS' && (() => {
+            const CAMPUS_VENUES = [
+              'SF Block (CT & Special Functions)',
+              'IB Block (CSE, IT, AI/DS Labs)',
+              'AS Block (Applied Science & Math)',
+              'Mech Block (Mechanical Workshops)',
+              'Research Park (Advanced Computing)',
+              'Central Learning Centre (Library)',
+              'Main Auditorium',
+              'Internet Centre (Wi-Fi Zone)',
+              'Food Court & Cafeteria',
+              'Indoor Sports Stadium',
+              'Boys Hostel Block',
+              'Girls Hostel Block'
+            ];
+
+            // Approximate distance / walk time calculation
+            const isSame = mapFromLocation === mapToLocation;
+            const fromIdx = CAMPUS_VENUES.indexOf(mapFromLocation);
+            const toIdx = CAMPUS_VENUES.indexOf(mapToLocation);
+            const diff = Math.abs((fromIdx >= 0 ? fromIdx : 0) - (toIdx >= 0 ? toIdx : 5));
+            const estMeters = isSame ? 0 : Math.max(60, diff * 45 + 50);
+            const estMins = isSame ? 0 : Math.max(1, Math.round(estMeters / 75));
+
+            const swapLocations = () => {
+              const temp = mapFromLocation;
+              setMapFromLocation(mapToLocation);
+              setMapToLocation(temp);
+            };
+
+            return (
+              <div className="max-w-6xl mx-auto w-full space-y-4 animate-fadeIn">
+                {/* Responsive Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-wider">
+                        Live 3D / 2D GPS
+                      </span>
+                    </div>
+                    <h1 className={`text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                      BIT Campus Map & Venue Locator
+                    </h1>
+                    <p className={`text-xs sm:text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Interactive campus navigation covering academic blocks, auditoriums, labs, and amenities.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                    <a
+                      href="https://geobits.onrender.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`text-xs font-semibold px-3.5 py-2 rounded-xl border flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isDarkMode 
+                          ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700' 
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs'
+                      }`}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Open Fullscreen</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Interactive From ➔ To Campus Route Planner */}
+                <div className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all ${
+                  isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                }`}>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <Route className="w-4 h-4 text-indigo-500" />
+                      <span className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Campus Route & Directions Finder
+                      </span>
+                    </div>
+
+                    {!isSame && (
+                      <div className="flex items-center gap-2 text-xs font-mono">
+                        <span className="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 font-bold border border-indigo-500/20 flex items-center gap-1">
+                          <span>🚶 {estMeters}m</span>
+                          <span className="opacity-40">•</span>
+                          <span>~{estMins} min walk</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Responsive From / To Selector Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr,auto,1fr] items-center gap-2.5">
+                    {/* FROM INPUT */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-emerald-500 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        <span>Starting Point (From)</span>
+                      </label>
+                      <select
+                        value={mapFromLocation}
+                        onChange={(e) => setMapFromLocation(e.target.value)}
+                        aria-label="Select Starting Point (From)"
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer ${
+                          isDarkMode
+                            ? 'bg-slate-800 border-slate-700 text-white'
+                            : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      >
+                        {CAMPUS_VENUES.map((v, i) => (
+                          <option key={i} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* SWAP BUTTON */}
+                    <div className="flex justify-center pt-0 sm:pt-4">
+                      <button
+                        type="button"
+                        onClick={swapLocations}
+                        title="Swap From and To locations"
+                        className={`p-2.5 rounded-xl border transition-all cursor-pointer hover:scale-105 active:scale-95 ${
+                          isDarkMode
+                            ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <ArrowRightLeft className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* TO INPUT */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-indigo-500 flex items-center gap-1">
+                        <Navigation className="w-3 h-3" />
+                        <span>Destination (To)</span>
+                      </label>
+                      <select
+                        value={mapToLocation}
+                        onChange={(e) => setMapToLocation(e.target.value)}
+                        aria-label="Select Destination (To)"
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer ${
+                          isDarkMode
+                            ? 'bg-slate-800 border-slate-700 text-white'
+                            : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      >
+                        {CAMPUS_VENUES.map((v, i) => (
+                          <option key={i} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Mobile Tip */}
+                  <div className={`mt-3 pt-2.5 border-t text-[11px] leading-relaxed flex items-center gap-2 ${
+                    isDarkMode ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'
+                  }`}>
+                    <span className="font-bold text-indigo-500">💡 Tip:</span>
+                    <span>Use the search bar inside the map or tap the route icon (<strong>☷</strong>) on the map's right toolbar for interactive 3D turn navigation.</span>
+                  </div>
+                </div>
+
+                {/* Map Container */}
+                <div className={`rounded-2xl sm:rounded-3xl border overflow-hidden shadow-xl transition-all ${
+                  isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-md'
+                }`}>
+                  <div className="relative w-full h-[58vh] sm:h-[680px] min-h-[460px] bg-slate-950">
+                    <iframe
+                      src="https://geobits.onrender.com"
+                      title="BIT Campus Map"
+                      className="w-full h-full border-0"
+                      allow="geolocation; fullscreen"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+
 
           {/* VIEW 4: SETTINGS */}
           {activeNav === 'Settings' && (
