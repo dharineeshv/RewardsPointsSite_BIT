@@ -38,3 +38,50 @@ body {
   background: #475569;
 }
 
+/* Robot Bot Animations */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+
+.animate-float {
+  animation: floatSlow 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+@keyframes taraBlink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+@keyframes taraWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-5deg); }
+  75% { transform: rotate(5deg); }
+}
+
+@keyframes taraGlowRing {
+  0%, 100% { box-shadow: 0 0 12px rgba(56, 189, 248, 0.4), 0 0 25px rgba(99, 102, 241, 0.3); }
+  50% { box-shadow: 0 0 22px rgba(56, 189, 248, 0.8), 0 0 40px rgba(99, 102, 241, 0.6); }
+}
+
+.animate-tara-blink {
+  animation: taraBlink 4.5s infinite;
+}
+
+.animate-tara-wiggle {
+  animation: taraWiggle 2.5s ease-in-out infinite;
+}
+
+.tara-avatar-glow {
+  animation: taraGlowRing 3s infinite ease-in-out;
+}
+

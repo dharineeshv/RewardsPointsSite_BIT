@@ -94,7 +94,11 @@ import {
   Bell,
   BellRing,
   CheckCheck,
-  Trash2
+  Trash2,
+  Send,
+  MessageSquare,
+  MessageCircle,
+  HelpCircle
 } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
@@ -1359,6 +1363,823 @@ function formatRelativeTime(isoString) {
   } catch (e) {
     return 'Recently';
   }
+}
+
+// Interactive Animated Smiling Robot Face for Tara
+function TaraRobotFace({ size = 44, mood = 'happy', className = '' }) {
+  return (
+    <div className={`relative inline-flex items-center justify-center select-none ${className}`} style={{ width: size, height: size }}>
+      <svg
+        viewBox="0 0 100 100"
+        className="w-full h-full drop-shadow-md overflow-visible"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <linearGradient id="taraBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#4f46e5" />
+            <stop offset="50%" stopColor="#06b6d4" />
+            <stop offset="100%" stopColor="#3b82f6" />
+          </linearGradient>
+          <linearGradient id="taraVisorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#0f172a" />
+            <stop offset="100%" stopColor="#1e1b4b" />
+          </linearGradient>
+          <filter id="taraGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        {/* Antenna with Pulsing Light */}
+        <g className="animate-tara-wiggle origin-bottom">
+          <line x1="50" y1="18" x2="50" y2="8" stroke="#38bdf8" strokeWidth="3.5" strokeLinecap="round" />
+          <circle cx="50" cy="6" r="4.5" fill="#38bdf8" className="animate-pulse" filter="url(#taraGlow)" />
+        </g>
+
+        {/* Ear Bolts */}
+        <rect x="10" y="42" width="6" height="16" rx="3" fill="#6366f1" />
+        <rect x="84" y="42" width="6" height="16" rx="3" fill="#6366f1" />
+
+        {/* Robot Head Body */}
+        <rect x="16" y="18" width="68" height="64" rx="22" fill="url(#taraBodyGrad)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+
+        {/* Digital Screen Visor */}
+        <rect x="23" y="27" width="54" height="46" rx="14" fill="url(#taraVisorGrad)" stroke="#38bdf8" strokeWidth="1" strokeOpacity="0.5" />
+
+        {/* Visor Reflection Line */}
+        <path d="M28 32 Q 50 30 72 32" stroke="rgba(255,255,255,0.2)" strokeWidth="1" strokeLinecap="round" />
+
+        {/* Interactive Glowing Eyes */}
+        {mood === 'happy' || mood === 'idle' ? (
+          <g className="animate-tara-blink origin-center" filter="url(#taraGlow)">
+            {/* Happy Smiling Curved Eyes */}
+            <path d="M33 46 Q 39 37 45 46" stroke="#22d3ee" strokeWidth="4" strokeLinecap="round" fill="none" />
+            <path d="M55 46 Q 61 37 67 46" stroke="#22d3ee" strokeWidth="4" strokeLinecap="round" fill="none" />
+            {/* Eye Sparkle Highlights */}
+            <circle cx="39" cy="40" r="1.5" fill="#ffffff" />
+            <circle cx="61" cy="40" r="1.5" fill="#ffffff" />
+          </g>
+        ) : mood === 'thinking' ? (
+          <g filter="url(#taraGlow)">
+            <ellipse cx="39" cy="44" rx="5" ry="5" fill="#f59e0b" className="animate-pulse" />
+            <ellipse cx="61" cy="44" rx="5" ry="5" fill="#f59e0b" className="animate-pulse" />
+          </g>
+        ) : (
+          <g filter="url(#taraGlow)">
+            <ellipse cx="39" cy="44" rx="4.5" ry="4.5" fill="#22d3ee" />
+            <ellipse cx="61" cy="44" rx="4.5" ry="4.5" fill="#22d3ee" />
+          </g>
+        )}
+
+        {/* Cute Pink Rosy Cheeks */}
+        <circle cx="30" cy="54" r="3.5" fill="#f43f5e" opacity="0.65" />
+        <circle cx="70" cy="54" r="3.5" fill="#f43f5e" opacity="0.65" />
+
+        {/* Sweet Smiling Glowing LED Mouth */}
+        <path
+          d="M40 56 Q 50 67 60 56"
+          stroke="#38bdf8"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          fill="none"
+          filter="url(#taraGlow)"
+        />
+      </svg>
+    </div>
+  );
+}
+
+// Quick Portal Shortcuts Data
+const BIT_PORTAL_SHORTCUTS = [
+  {
+    id: 'bip',
+    name: 'BIP Portal',
+    badge: 'Projects & Innovation',
+    url: 'https://bip.bitsathy.ac.in',
+    icon: Zap,
+    color: 'from-amber-500 to-orange-500',
+    desc: 'BIT Innovation Platform for projects, hackathons & reviews'
+  },
+  {
+    id: 'ps',
+    name: 'PS Portal',
+    badge: 'Special Labs',
+    url: 'https://ps.bitsathy.ac.in',
+    icon: Code,
+    color: 'from-blue-600 to-indigo-600',
+    desc: 'Periodic Skill development & Special Lab submissions'
+  },
+  {
+    id: 'pcdp',
+    name: 'PCDP App',
+    badge: 'Career & Placements',
+    url: 'https://pcdp.bitsathy.ac.in',
+    icon: Briefcase,
+    color: 'from-purple-600 to-indigo-600',
+    desc: 'Personality & Career Development Program for placements & skill tests'
+  },
+  {
+    id: 'wiki',
+    name: 'BIT Wiki',
+    badge: 'Campus Handbook',
+    url: 'https://wiki.bitsathy.ac.in',
+    icon: BookOpen,
+    color: 'from-emerald-500 to-teal-600',
+    desc: 'Campus guidelines, curriculum, club details, and knowledge base'
+  },
+  {
+    id: 'website',
+    name: 'BIT Website',
+    badge: 'Official College',
+    url: 'https://www.bitsathy.ac.in',
+    icon: Globe,
+    color: 'from-cyan-500 to-blue-600',
+    desc: 'Official Bannari Amman Institute of Technology website'
+  }
+];
+
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+
+function getTimeBasedGreeting() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'Good Morning';
+  if (hour >= 12 && hour < 17) return 'Good Afternoon';
+  if (hour >= 17 && hour < 22) return 'Good Evening';
+  return 'Good Night';
+}
+
+function BitRobotChatAssistant({
+  currentUser,
+  student,
+  yearlyAverages,
+  leavesList,
+  placementData,
+  setActiveNav,
+  isDarkMode
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isCalloutVisible, setIsCalloutVisible] = useState(true);
+  const [calloutIndex, setCalloutIndex] = useState(0);
+  const [isCalloutDismissed, setIsCalloutDismissed] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [isGeminiLive, setIsGeminiLive] = useState(true);
+  const messagesEndRef = useRef(null);
+
+  const studentName = currentUser?.name || student?.name || 'Student';
+  const firstName = studentName.split(' ')[0] || 'Student';
+  const currentPoints = student?.currentPoints || currentUser?.currentPoints || '0';
+  const department = currentUser?.department || student?.department || 'Engineering & Technology';
+
+  // Dynamic Rotation Messages
+  const calloutMessages = useMemo(() => [
+    `Hi I am Tara... Reach Me To Get Your College Websites`,
+    `Hi ${firstName} I am Tara... How Can I Help You`,
+    `Hi ${firstName} I am Tara... Can we Interact Together`,
+    `Hii ${firstName} Did U have Any Questions? Reach Me for an Help...`,
+    `Hi ${firstName} ${getTimeBasedGreeting()}! ✨`
+  ], [firstName]);
+
+  // Automatic cycle: visible for 6 seconds, disappears for 4 seconds, then shows next message
+  useEffect(() => {
+    if (isCalloutDismissed || isOpen) {
+      setIsCalloutVisible(false);
+      return;
+    }
+
+    let hideTimer = null;
+    let showTimer = null;
+
+    // Show for 6 seconds
+    setIsCalloutVisible(true);
+    hideTimer = setTimeout(() => {
+      // Disappear for 4 seconds
+      setIsCalloutVisible(false);
+
+      showTimer = setTimeout(() => {
+        // Switch to next content and reappear
+        setCalloutIndex(prev => (prev + 1) % calloutMessages.length);
+        setIsCalloutVisible(true);
+      }, 4000);
+    }, 6000);
+
+    return () => {
+      if (hideTimer) clearTimeout(hideTimer);
+      if (showTimer) clearTimeout(showTimer);
+    };
+  }, [calloutIndex, isCalloutDismissed, isOpen, calloutMessages.length]);
+
+  const [messages, setMessages] = useState(() => [
+    {
+      id: 'welcome',
+      sender: 'bot',
+      text: `Hello ${firstName}! 👋 I am **Tara**, your smiling BIT campus assistant.\n\nI can help you open college portals (BIP, PS, PCDP, Wiki, Website), check your active Reward Points, view Placements, today's Mess menu, or answer any campus & study questions. Tap a shortcut below or ask me anything!`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      shortcuts: true
+    }
+  ]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+      setIsCalloutVisible(false);
+    }
+  }, [isOpen, messages, isTyping]);
+
+  const handlePortalClick = (portal) => {
+    window.open(portal.url, '_blank', 'noopener,noreferrer');
+    
+    const userMsg = {
+      id: `user_${Date.now()}`,
+      sender: 'user',
+      text: `Open ${portal.name}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const botMsg = {
+      id: `bot_${Date.now() + 1}`,
+      sender: 'bot',
+      text: `🚀 Launching **${portal.name}** (${portal.url})\n\n📌 *${portal.desc}*`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      linkUrl: portal.url,
+      linkText: `Open ${portal.name}`
+    };
+
+    setMessages(prev => [...prev, userMsg, botMsg]);
+  };
+
+  const getFallbackRuleReply = (queryText) => {
+    const lower = queryText.toLowerCase().trim();
+    let replyText = '';
+    let replyNav = null;
+    let replyLink = null;
+    let replyLinkText = null;
+
+    if (lower.includes('bip') || lower.includes('innovation') || lower.includes('project')) {
+      replyText = `⚡ **BIP Portal (BIT Innovation Platform)**\nUse BIP for submitting your special lab project proposals, hackathons, reviews, and faculty evaluations.\n\n🌐 Portal Link: https://bip.bitsathy.ac.in`;
+      replyLink = 'https://bip.bitsathy.ac.in';
+      replyLinkText = 'Open BIP Portal';
+    } else if (lower.includes('ps') || lower.includes('periodic') || lower.includes('special lab')) {
+      replyText = `💻 **PS Portal (Periodic Skills Portal)**\nAccess periodic skill assessments, coding tracks, and special lab problem statements.\n\n🌐 Portal Link: https://ps.bitsathy.ac.in`;
+      replyLink = 'https://ps.bitsathy.ac.in';
+      replyLinkText = 'Open PS Portal';
+    } else if (lower.includes('pcdp') || lower.includes('career') || lower.includes('training') || lower.includes('placement app')) {
+      replyText = `🎯 **PCDP App (Personality & Career Development Program)**\nAccess placement assessments, aptitude practice modules, mock interviews, and skill benchmarks.\n\n🌐 Portal Link: https://pcdp.bitsathy.ac.in`;
+      replyLink = 'https://pcdp.bitsathy.ac.in';
+      replyLinkText = 'Open PCDP App';
+    } else if (lower.includes('wiki') || lower.includes('handbook') || lower.includes('rules')) {
+      replyText = `📚 **BIT Wiki**\nThe official campus handbook containing curriculum outlines, club information, campus protocols, and student guides.\n\n🌐 Portal Link: https://wiki.bitsathy.ac.in`;
+      replyLink = 'https://wiki.bitsathy.ac.in';
+      replyLinkText = 'Open BIT Wiki';
+    } else if (lower.includes('website') || lower.includes('college') || lower.includes('portal')) {
+      replyText = `🌐 **Official BIT Website**\nDiscover campus events, department news, official circulars, and announcements.\n\n🌐 Portal Link: https://www.bitsathy.ac.in`;
+      replyLink = 'https://www.bitsathy.ac.in';
+      replyLinkText = 'Open BIT Website';
+    } else if (lower.includes('point') || lower.includes('balance') || lower.includes('rp') || lower.includes('reward')) {
+      replyText = `🏆 **Your Reward Points Status**\n• Student: **${studentName}**\n• Active Balance: **${currentPoints} RP**\n• Cumulative Earned: **${student?.cumulativePoints || currentPoints} RP**\n• Redeemed: **${student?.redeemedPoints || '0'} RP**\n\nKeep attending technical events, hackathons, and certifications to earn more points!`;
+      replyNav = 'Dashboard';
+    } else if (lower.includes('placement') || lower.includes('job') || lower.includes('salary') || lower.includes('drive')) {
+      const totalPlaced = placementData?.totalStudentsPlaced || 510;
+      const totalComp = placementData?.totalCompaniesVisited || 87;
+      const batch = placementData?.targetBatch || '2023-2027 Batch';
+      const topTier = placementData?.salaryTiers?.[0]?.offerCount || 17;
+      replyText = `📰 **BIT Placements Overview (${batch})**\n• Total Students Placed: **${totalPlaced}**\n• Total Companies Visited: **${totalComp}**\n• Super Dream Offers (≥10 LPA): **${topTier} offers**\n\nCheck out the interactive breakdown, hero slider, and upcoming drives!`;
+      replyNav = 'BIT Placements';
+    } else if (lower.includes('mess') || lower.includes('food') || lower.includes('lunch') || lower.includes('dinner') || lower.includes('breakfast')) {
+      replyText = `🍽️ **Hostel Mess Menu**\nLive daily menus for Boys and Girls hostels with breakfast, lunch, snacks, and dinner schedules are available in the Mess Menu tab.`;
+      replyNav = 'Mess Menu';
+    } else if (lower.includes('leave') || lower.includes('holiday') || lower.includes('gp') || lower.includes('gate pass')) {
+      const nextLeave = leavesList?.[0];
+      replyText = `📅 **Academic Leave & Gate Pass Schedule**\n${nextLeave ? `• Next Event: **${nextLeave.name}** (${nextLeave.from_date} to ${nextLeave.to_date})` : '• You can view the full semester leave schedule and upcoming Gate Pass dates.'}`;
+      replyNav = 'Leave Schedule';
+    } else if (lower.includes('exam') || lower.includes('hall') || lower.includes('seat')) {
+      replyText = `🪑 **Exam Hall & Seating Finder**\nFind your exact exam hall number, block, and desk number instantly using your register number.`;
+      replyNav = 'Exam Seating';
+    } else if (lower.includes('bus') || lower.includes('transport') || lower.includes('route')) {
+      replyText = `🚌 **Campus Bus Routes & Transport**\nExplore bus timings, stop lists, and route maps across Coimbatore, Erode, Tirupur, Salem, Gobi, and Mettupalayam.`;
+      replyNav = 'Bus Routes';
+    } else if (lower.includes('faculty') || lower.includes('staff') || lower.includes('mentor') || lower.includes('teacher') || lower.includes('hod')) {
+      replyText = `👥 **Faculty & Staff Directory**\nSearch faculty by department, find office cabins, phone numbers, and official email addresses.`;
+      replyNav = 'Faculty Directory';
+    } else if (lower.includes('who are you') || lower.includes('your name') || lower.includes('tara')) {
+      replyText = `🤖✨ I am **Tara**, your intelligent and smiling BIT campus assistant! I'm here to help you navigate college portals, track your Reward Points, find exam halls, and stay updated on placements.`;
+    } else if (lower.includes('about') || lower.includes('who made') || lower.includes('developer') || lower.includes('creator') || lower.includes('contact') || lower.includes('email')) {
+      replyText = `ℹ️ **About Us**\nThis is a third-party platform designed to help students easily track, earn, and redeem their reward points while accessing essential campus resources.\n\n📬 **Have queries or suggestions? Reach out:**\n• **Email:** dharineeshv18@gmail.com\n• **LinkedIn:** https://www.linkedin.com/in/dharineesh-v-8ba7022ba\n• **Developer:** **Dharineesh V** (Department of Computer Technology, B.Tech)`;
+      replyLink = 'https://www.linkedin.com/in/dharineesh-v-8ba7022ba';
+      replyLinkText = 'Connect on LinkedIn';
+    } else {
+      replyText = `😊 **Tara is here to help!** You can ask me about:\n• **Portals**: BIP, PS, PCDP, Wiki, Website\n• **Academics**: My RP Balance, Exam Seating, Faculty Directory\n• **Campus Life**: Placements, Mess Menu, Leave Schedule, Bus Routes\n• **About Us**: Developer info & contact`;
+    }
+
+    return { replyText, replyNav, replyLink, replyLinkText };
+  };
+
+  const handleActionQuery = async (queryText) => {
+    if (!queryText.trim()) return;
+
+    const userMsg = {
+      id: `user_${Date.now()}`,
+      sender: 'user',
+      text: queryText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const currentHistory = [...messages, userMsg];
+    setMessages(currentHistory);
+    setInputValue('');
+    setIsTyping(true);
+
+    try {
+      // System Prompt with deep BIT Sathy context
+      const systemPrompt = `You are "Tara", the intelligent, cheerful, and smiling AI assistant for Bannari Amman Institute of Technology (BIT Sathy).
+Current Student Information:
+- Name: ${studentName}
+- Department: ${department}
+- Active Reward Points (RP): ${currentPoints} RP
+- Cumulative Points Earned: ${student?.cumulativePoints || currentPoints} RP
+- Redeemed Points: ${student?.redeemedPoints || '0'} RP
+
+Official College Portals & URLs:
+- BIP Portal (BIT Innovation Platform): https://bip.bitsathy.ac.in (Project submissions, special lab reviews, hackathons)
+- PS Portal (Periodic Skills Portal): https://ps.bitsathy.ac.in (Skill assessments, coding tracks, problem statements)
+- PCDP App (Personality & Career Development Program): https://pcdp.bitsathy.ac.in (Placement training, aptitude, mock interviews)
+- BIT Wiki: https://wiki.bitsathy.ac.in (Student handbook, campus rules, clubs, syllabus)
+- Official BIT Website: https://www.bitsathy.ac.in (Campus news, circulars, department updates)
+
+Key App Features / Tabs:
+- Dashboard: Active RP Balance, store to redeem tech gadgets, stationery, cafeteria vouchers
+- BIT Placements: Stats (${placementData?.totalStudentsPlaced || 510}+ placed across ${placementData?.totalCompaniesVisited || 87}+ companies), super dream offers
+- Mess Menu: Live breakfast, lunch, snacks, dinner schedules for boys & girls hostels
+- Leave Schedule: Semester holidays & gate pass schedule
+- Exam Seating: Search exam hall, block, and desk allocation by register number
+- Campus Bus Routes: Bus routes, timings, and stops across Coimbatore, Erode, Tirupur, Salem, Gobi, Mettupalayam
+- Faculty Directory: Cabin locations, contact numbers, official emails
+
+About Us & Developer Contact:
+- It is a third-party website created to help students reach their reward points and access campus activities easily.
+- If students have any queries or suggestions, they can reach out at:
+  • Email: dharineeshv18@gmail.com
+  • LinkedIn: https://www.linkedin.com/in/dharineesh-v-8ba7022ba
+- Developer: Dharineesh V (Department of Computer Technology, B.Tech).
+
+Response Instructions:
+- Answer cheerily, concisely, and helpfully as Tara. Use emojis 😊 ✨ 🚀 🏆 💡.
+- Format responses cleanly with bold text and bullet points.
+- If asked about About Us, Developer, or Contact, provide the platform description, email (dharineeshv18@gmail.com), and LinkedIn (https://www.linkedin.com/in/dharineesh-v-8ba7022ba).
+- If the student asks for a portal or college website, include the exact link.
+- If asked about app features (e.g. placements, mess menu, exam seating), provide relevant info and encourage exploring that tab.`;
+
+      // Build conversation contents for Gemini API (last 6 turns)
+      const contents = currentHistory
+        .filter(m => m.id !== 'welcome' && !m.id.startsWith('welcome_'))
+        .slice(-6)
+        .map(m => ({
+          role: m.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: m.text }]
+        }));
+
+      if (!GEMINI_API_KEY) {
+        throw new Error('Gemini API key not found in environment');
+      }
+
+      // Call Gemini 2.5 Flash API
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 400
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!generatedText) {
+        throw new Error('No response text from Gemini');
+      }
+
+      setIsGeminiLive(true);
+
+      // Auto-detect links or internal tab triggers from user query and response
+      let replyLink = null;
+      let replyLinkText = null;
+      let replyNav = null;
+
+      const genLower = generatedText.toLowerCase();
+      const queryLower = queryText.toLowerCase().trim();
+      const isAboutQuery = queryLower.includes('about') || queryLower.includes('developer') || queryLower.includes('creator') || queryLower.includes('contact') || queryLower.includes('who made') || queryLower.includes('linkedin');
+
+      if (isAboutQuery || genLower.includes('linkedin.com/in/dharineesh')) {
+        replyLink = 'https://www.linkedin.com/in/dharineesh-v-8ba7022ba';
+        replyLinkText = 'Connect on LinkedIn';
+      } else if (queryLower.includes('bip') || genLower.includes('bip.bitsathy.ac.in')) {
+        replyLink = 'https://bip.bitsathy.ac.in';
+        replyLinkText = 'Open BIP Portal';
+      } else if (queryLower.includes('ps portal') || queryLower === 'ps' || genLower.includes('ps.bitsathy.ac.in')) {
+        replyLink = 'https://ps.bitsathy.ac.in';
+        replyLinkText = 'Open PS Portal';
+      } else if (queryLower.includes('pcdp') || genLower.includes('pcdp.bitsathy.ac.in')) {
+        replyLink = 'https://pcdp.bitsathy.ac.in';
+        replyLinkText = 'Open PCDP App';
+      } else if (queryLower.includes('wiki') || genLower.includes('wiki.bitsathy.ac.in')) {
+        replyLink = 'https://wiki.bitsathy.ac.in';
+        replyLinkText = 'Open BIT Wiki';
+      } else if (queryLower.includes('website') || queryLower.includes('college portal')) {
+        replyLink = 'https://www.bitsathy.ac.in';
+        replyLinkText = 'Open BIT Website';
+      }
+
+      if (queryLower.includes('placement') || queryLower.includes('job') || queryLower.includes('salary package')) {
+        replyNav = 'BIT Placements';
+      } else if (queryLower.includes('mess') || queryLower.includes('food') || queryLower.includes('lunch') || queryLower.includes('dinner') || queryLower.includes('breakfast')) {
+        replyNav = 'Mess Menu';
+      } else if (queryLower.includes('leave') || queryLower.includes('gate pass') || queryLower.includes('holiday')) {
+        replyNav = 'Leave Schedule';
+      } else if (queryLower.includes('exam') || queryLower.includes('seating') || queryLower.includes('hall ticket')) {
+        replyNav = 'Exam Seating';
+      } else if (queryLower.includes('bus') || queryLower.includes('transport') || queryLower.includes('route')) {
+        replyNav = 'Bus Routes';
+      } else if (queryLower.includes('faculty') || queryLower.includes('staff') || queryLower.includes('mentor') || queryLower.includes('hod')) {
+        replyNav = 'Faculty Directory';
+      } else if (queryLower.includes('reward point') || queryLower.includes('rp balance') || queryLower.includes('store') || queryLower.includes('redeem')) {
+        replyNav = 'Dashboard';
+      }
+
+      const botMsg = {
+        id: `bot_${Date.now() + 1}`,
+        sender: 'bot',
+        text: generatedText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        navTab: replyNav,
+        linkUrl: replyLink,
+        linkText: replyLinkText,
+        isGemini: true
+      };
+
+      setMessages(prev => [...prev, botMsg]);
+    } catch (err) {
+      console.warn('Gemini API fallback to local rules:', err);
+      setIsGeminiLive(false);
+
+      const fallback = getFallbackRuleReply(queryText);
+      const botMsg = {
+        id: `bot_${Date.now() + 1}`,
+        sender: 'bot',
+        text: fallback.replyText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        navTab: fallback.replyNav,
+        linkUrl: fallback.replyLink,
+        linkText: fallback.replyLinkText,
+        isGemini: false
+      };
+
+      setMessages(prev => [...prev, botMsg]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleResetChat = () => {
+    setMessages([
+      {
+        id: `welcome_${Date.now()}`,
+        sender: 'bot',
+        text: `Chat refreshed! 👋 What would you like to check? Quick shortcuts are available below.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        shortcuts: true
+      }
+    ]);
+  };
+
+  return (
+    <>
+      {/* Floating Callout Speech Bubble (Clickable & Dynamic 6s Show / 4s Hide Cycle) */}
+      {!isOpen && !isCalloutDismissed && (
+        <div 
+          onClick={() => setIsOpen(true)}
+          className={`fixed bottom-21 right-4 sm:bottom-23 sm:right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-950/95 via-slate-900/95 to-indigo-950/95 text-white text-xs font-semibold px-3.5 py-2.5 rounded-2xl shadow-2xl border border-indigo-500/50 backdrop-blur-md cursor-pointer hover:border-cyan-400 hover:scale-102 transition-all duration-500 max-w-[280px] sm:max-w-xs select-none ${
+            isCalloutVisible
+              ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto animate-float'
+              : 'opacity-0 translate-y-3 scale-95 pointer-events-none'
+          }`}
+        >
+          <TaraRobotFace size={32} mood="happy" className="shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1 text-[10px] text-cyan-300 font-bold uppercase tracking-wider">
+              <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
+              <span>Tara • BIT Assistant</span>
+            </div>
+            <p 
+              key={calloutIndex} 
+              className="text-[11.5px] leading-snug text-slate-100 mt-0.5 font-medium transition-opacity duration-300 animate-fadeIn"
+            >
+              {calloutMessages[calloutIndex]}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCalloutDismissed(true);
+            }}
+            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer shrink-0 ml-0.5"
+            title="Dismiss bubble"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Floating Robot Action Button (FAB with Smiling Tara) */}
+      <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40">
+        <button
+          type="button"
+          onClick={() => setIsOpen(prev => !prev)}
+          className={`group relative flex items-center justify-center w-14 h-14 sm:w-15 sm:h-15 rounded-full cursor-pointer transition-all duration-300 active:scale-95 shadow-xl ${
+            isOpen 
+              ? 'bg-gradient-to-tr from-rose-600 to-red-500 shadow-rose-500/40 rotate-90' 
+              : 'bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 shadow-indigo-500/40 hover:scale-108 animate-float tara-avatar-glow'
+          }`}
+          title={isOpen ? 'Close Assistant' : 'Chat with Tara'}
+          aria-label="Open Tara BIT Assistant"
+        >
+          {/* Animated Ambient Halo Glow */}
+          {!isOpen && (
+            <span className="absolute -inset-1.5 bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 rounded-full blur-md opacity-60 group-hover:opacity-100 animate-pulse-glow -z-10 pointer-events-none" />
+          )}
+
+          {isOpen ? (
+            <X className="w-6 h-6 text-white transition-transform duration-200" />
+          ) : (
+            <>
+              <TaraRobotFace size={40} mood="happy" className="group-hover:scale-110 transition-transform duration-200" />
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Floating Chat Modal */}
+      {isOpen && (
+        <div className={`fixed bottom-22 right-3.5 sm:right-6 w-[calc(100vw-28px)] sm:w-[440px] h-[580px] max-h-[82vh] rounded-3xl z-50 flex flex-col shadow-2xl border backdrop-blur-2xl transition-all duration-200 overflow-hidden ${
+          isDarkMode 
+            ? 'bg-slate-900/95 border-slate-700/80 text-white shadow-black/80' 
+            : 'bg-white/95 border-slate-200/90 text-slate-900 shadow-indigo-950/20'
+        }`}>
+          {/* 1. Header with Tara Branding */}
+          <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white flex items-center justify-between shadow-md shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center shadow-inner">
+                <TaraRobotFace size={34} mood={isTyping ? 'thinking' : 'happy'} />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="font-extrabold text-sm tracking-tight">Tara</h3>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-indigo-100 font-medium">
+                  <span className={`w-1.5 h-1.5 rounded-full inline-block ${isGeminiLive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                  <span>{isTyping ? 'Tara is thinking...' : isGeminiLive ? 'AI Active • Ready to assist 😊' : 'Ready to assist 😊'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleResetChat}
+                className="p-1.5 rounded-xl hover:bg-white/15 text-indigo-100 hover:text-white transition-colors cursor-pointer"
+                title="Restart Conversation"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-white/15 text-indigo-100 hover:text-white transition-colors cursor-pointer"
+                title="Minimize Chat"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Messages Stream */}
+          <div className="flex-1 p-3.5 overflow-y-auto space-y-3.5">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                {msg.sender === 'bot' && (
+                  <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-600 flex items-center justify-center shrink-0 mt-0.5 shadow-sm overflow-hidden p-0.5">
+                    <TaraRobotFace size={24} mood="happy" />
+                  </div>
+                )}
+
+                <div className={`max-w-[88%] rounded-2xl p-3 text-xs leading-relaxed shadow-xs ${
+                  msg.sender === 'user'
+                    ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-br-xs'
+                    : isDarkMode
+                      ? 'bg-slate-800/90 border border-slate-700/60 text-slate-100 rounded-bl-xs'
+                      : 'bg-slate-100 border border-slate-200 text-slate-800 rounded-bl-xs'
+                }`}>
+                  {/* Text Content */}
+                  <div className="whitespace-pre-line font-normal">
+                    {msg.text}
+                  </div>
+
+                  {/* Quick Action Link / Button if present */}
+                  {msg.linkUrl && (
+                    <a
+                      href={msg.linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-[11px] shadow-sm transition-all"
+                    >
+                      <span>{msg.linkText || 'Open Portal'}</span>
+                      <ExternalLink className="w-3 h-3 ml-0.5 opacity-80" />
+                    </a>
+                  )}
+
+                  {/* Internal Navigation Tab Switcher */}
+                  {msg.navTab && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveNav(msg.navTab);
+                        setIsOpen(false);
+                      }}
+                      className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-[11px] shadow-sm transition-all cursor-pointer"
+                    >
+                      <span>Go to {msg.navTab} Tab</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  )}
+
+                  {/* Interactive Portal Shortcuts Inside Chat */}
+                  {msg.shortcuts && (
+                    <div className="mt-3 pt-2.5 border-t border-slate-700/30 space-y-2.5">
+                      <div>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1.5 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-400" />
+                          <span>College Portals:</span>
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {BIT_PORTAL_SHORTCUTS.map(portal => {
+                            const IconComp = portal.icon;
+                            return (
+                              <button
+                                key={portal.id}
+                                type="button"
+                                onClick={() => handlePortalClick(portal)}
+                                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs hover:scale-102 active:scale-98 ${
+                                  isDarkMode 
+                                    ? 'bg-slate-700/70 hover:bg-indigo-950/70 text-slate-100 hover:text-white border-slate-600 hover:border-indigo-400' 
+                                    : 'bg-white hover:bg-indigo-50 text-slate-800 hover:text-indigo-600 border-slate-200 hover:border-indigo-300'
+                                }`}
+                              >
+                                <IconComp className="w-3.5 h-3.5 text-indigo-400" />
+                                <span>Open {portal.name.replace(' Portal', '')}</span>
+                                <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1.5">
+                          Quick Academic Actions:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleActionQuery('What are my active reward points?')}
+                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-colors cursor-pointer ${
+                              isDarkMode ? 'bg-slate-800/80 hover:bg-slate-700 text-indigo-300 border-slate-700' : 'bg-white hover:bg-slate-50 text-indigo-700 border-slate-200'
+                            }`}
+                          >
+                            🏆 My RP Balance
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleActionQuery('Show latest placement updates')}
+                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-colors cursor-pointer ${
+                              isDarkMode ? 'bg-slate-800/80 hover:bg-slate-700 text-indigo-300 border-slate-700' : 'bg-white hover:bg-slate-50 text-indigo-700 border-slate-200'
+                            }`}
+                          >
+                            📰 Placements
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleActionQuery('What is today mess menu?')}
+                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-colors cursor-pointer ${
+                              isDarkMode ? 'bg-slate-800/80 hover:bg-slate-700 text-indigo-300 border-slate-700' : 'bg-white hover:bg-slate-50 text-indigo-700 border-slate-200'
+                            }`}
+                          >
+                            🍽️ Mess Menu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleActionQuery('When is the next gate pass or holiday?')}
+                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-colors cursor-pointer ${
+                              isDarkMode ? 'bg-slate-800/80 hover:bg-slate-700 text-indigo-300 border-slate-700' : 'bg-white hover:bg-slate-50 text-indigo-700 border-slate-200'
+                            }`}
+                          >
+                            📅 Next Leave / GP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleActionQuery('About Us')}
+                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-colors cursor-pointer ${
+                              isDarkMode ? 'bg-slate-800/80 hover:bg-slate-700 text-indigo-300 border-slate-700' : 'bg-white hover:bg-slate-50 text-indigo-700 border-slate-200'
+                            }`}
+                          >
+                            ℹ️ About Us
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`text-[9px] mt-1 text-right font-mono ${
+                    msg.sender === 'user' ? 'text-indigo-200' : isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                  }`}>
+                    {msg.timestamp}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Typing Indicator with Tara Face */}
+            {isTyping && (
+              <div className="flex gap-2.5 items-center">
+                <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-600 flex items-center justify-center shrink-0 shadow-sm p-0.5">
+                  <TaraRobotFace size={24} mood="thinking" />
+                </div>
+                <div className={`p-3 rounded-2xl rounded-bl-xs flex items-center gap-1.5 ${
+                  isDarkMode ? 'bg-slate-800 border border-slate-700/60' : 'bg-slate-100 border border-slate-200'
+                }`}>
+                  <span className="text-[11px] text-indigo-400 font-semibold mr-1">Tara is typing</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* 3. Chat Input Bar */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleActionQuery(inputValue);
+            }}
+            className={`p-2.5 border-t shrink-0 flex items-center gap-2 ${
+              isDarkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}
+          >
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Ask Tara anything or enter a portal name (BIP, PS, Wiki)..."
+              className={`flex-1 px-3.5 py-2.5 rounded-2xl text-xs outline-none border transition-all ${
+                isDarkMode 
+                  ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500' 
+                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
+              }`}
+            />
+            <button
+              type="submit"
+              disabled={!inputValue.trim()}
+              className="w-10 h-10 rounded-2xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-md"
+              title="Send message"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        </div>
+      )}
+    </>
+  );
 }
 
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
@@ -7360,6 +8181,17 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Floating Animated Robot Assistant & Portal Shortcuts */}
+      <BitRobotChatAssistant
+        currentUser={currentUser}
+        student={student}
+        yearlyAverages={yearlyAverages}
+        leavesList={leavesList}
+        placementData={BIT_DAILY_PLACEMENT_DATA}
+        setActiveNav={setActiveNav}
+        isDarkMode={isDarkMode}
+      />
 
     </div>
   );
