@@ -79,6 +79,8 @@ import {
   Bot,
   Compass,
   Palmtree,
+  MapPin,
+  FileText,
   PartyPopper
 } from 'lucide-react';
 
@@ -1102,6 +1104,14 @@ export default function App() {
   const [copiedFacultyContact, setCopiedFacultyContact] = useState(null);
   const facultyChipsRef = useRef(null);
 
+  // Exam Hall Finder State
+  const [examRegNo, setExamRegNo] = useState('');
+  const [examDate, setExamDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [examHallResult, setExamHallResult] = useState(null);
+  const [loadingExamHall, setLoadingExamHall] = useState(false);
+  const [examHallSearched, setExamHallSearched] = useState(false);
+  const [examHallError, setExamHallError] = useState('');
+
   // Theme Mode: 'system' (default), 'dark', or 'light'
   const [themeMode, setThemeMode] = useState(() => {
     try {
@@ -1775,6 +1785,42 @@ export default function App() {
       fetchFacultyDirectory();
     }
   }, [activeNav]);
+
+  // Sync exam register number with active logged in student
+  useEffect(() => {
+    if (currentUser && (currentUser.id || currentUser.register_no)) {
+      setExamRegNo(currentUser.register_no || currentUser.id);
+    }
+  }, [currentUser]);
+
+  // Fetch Exam Hall & Seating allocation from BIT Central
+  const fetchExamHall = async (regNo = examRegNo, date = examDate) => {
+    const cleanReg = (regNo || '').trim().toUpperCase();
+    if (!cleanReg) {
+      setExamHallError('Please enter your Register / Roll Number.');
+      return;
+    }
+    setLoadingExamHall(true);
+    setExamHallError('');
+    setExamHallSearched(true);
+    try {
+      const dateParam = date ? `&date=${encodeURIComponent(date)}` : '';
+      const res = await bitcentralFetch(`/exam-hall?registerNo=${encodeURIComponent(cleanReg)}${dateParam}`);
+      const json = await res.json();
+      if (res.ok && json && (json.data || json.hall_no || json.room_no || json.block)) {
+        setExamHallResult(json.data || json);
+      } else {
+        setExamHallResult(null);
+        setExamHallError('Currently no exam hall are allocated for you by COE');
+      }
+    } catch (e) {
+      console.warn('Exam hall fetch error:', e);
+      setExamHallResult(null);
+      setExamHallError('Currently no exam hall are allocated for you by COE');
+    } finally {
+      setLoadingExamHall(false);
+    }
+  };
 
   // Fetch live rewards history from endpoint whenever displayed student changes
   useEffect(() => {
@@ -2606,6 +2652,20 @@ export default function App() {
           >
             <GraduationCap className="w-5 h-5" strokeWidth={activeNav === 'Faculty Directory' ? 2.2 : 1.8} />
             <span>Faculty Directory</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveNav('Exam Hall Finder'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Exam Hall Finder'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Compass className="w-5 h-5" strokeWidth={activeNav === 'Exam Hall Finder' ? 2.2 : 1.8} />
+            <span>Exam Hall Finder</span>
           </button>
 
           <button
@@ -4766,6 +4826,278 @@ export default function App() {
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {/* VIEW 3.7: EXAM HALL & SEATING FINDER */}
+          {activeNav === 'Exam Hall Finder' && (
+            <div className="max-w-5xl mx-auto w-full space-y-6">
+              {/* Header */}
+              <div>
+                <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                  Exam Hall & Seating Finder
+                </h1>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Search and locate your allocated examination hall, room number, floor block, and desk position.
+                </p>
+              </div>
+
+              {/* Form Input Card */}
+              <div className={`p-5 sm:p-7 rounded-3xl border space-y-5 transition-all ${
+                isDarkMode ? 'bg-slate-900/90 border-slate-800 shadow-xl' : 'bg-white border-slate-200 shadow-md'
+              }`}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Register / Roll Number Input */}
+                  <div className="space-y-1.5">
+                    <label className={`text-xs font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Student Register / Roll Number
+                    </label>
+                    <div className="relative">
+                      <IdCard className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`} />
+                      <input
+                        type="text"
+                        value={examRegNo}
+                        onChange={(e) => setExamRegNo(e.target.value.toUpperCase())}
+                        placeholder="e.g. 7376232CT109"
+                        className={`w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-mono font-bold uppercase border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
+                          isDarkMode 
+                            ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-500' 
+                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Calendar / Exam Date Input */}
+                  <div className="space-y-1.5">
+                    <label className={`text-xs font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Exam Date
+                    </label>
+                    <div className="relative">
+                      <Calendar className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`} />
+                      <input
+                        type="date"
+                        value={examDate}
+                        onChange={(e) => setExamDate(e.target.value)}
+                        className={`w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
+                          isDarkMode 
+                            ? 'bg-slate-800/80 border-slate-700 text-white [color-scheme:dark]' 
+                            : 'bg-slate-50 border-slate-200 text-slate-900 [color-scheme:light]'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExamHallResult(null);
+                      setExamHallSearched(false);
+                      setExamHallError('');
+                    }}
+                    className={`px-4 py-2.5 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
+                      isDarkMode 
+                        ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' 
+                        : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Clear
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fetchExamHall(examRegNo, examDate)}
+                    disabled={loadingExamHall || !examRegNo}
+                    className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-indigo-500/25 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                  >
+                    <Compass className={`w-4 h-4 ${loadingExamHall ? 'animate-spin' : ''}`} />
+                    <span>{loadingExamHall ? 'Searching Hall...' : 'Find Exam Hall'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Results & Status Display */}
+              {loadingExamHall ? (
+                <div className={`p-10 rounded-3xl border text-center space-y-4 animate-pulse ${
+                  isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                }`}>
+                  <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="font-bold text-sm text-slate-400">
+                    Checking exam hall allocation for {examRegNo}...
+                  </p>
+                </div>
+              ) : examHallResult ? (
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Active Allocation Banner */}
+                  <div className="p-6 rounded-3xl bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white border border-indigo-500/30 shadow-xl relative overflow-hidden">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
+                        Allocated Examination Hall
+                      </span>
+                      <span className="text-xs text-indigo-300 font-mono">
+                        {examRegNo}
+                      </span>
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+                      {examHallResult.hall_no || examHallResult.room_no || 'Examination Hall Assigned'}
+                    </h3>
+                    {examDate && (
+                      <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                        Date: <strong className="text-white font-mono">{examDate}</strong>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Hall Details Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Room Block */}
+                    <div className={`p-5 rounded-3xl border ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                    }`}>
+                      <div className="flex items-center gap-2 text-indigo-500 mb-1">
+                        <Building2 className="w-4 h-4" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Block / Floor</span>
+                      </div>
+                      <div className="text-xl font-black font-mono mt-1">
+                        {examHallResult.block || 'Main Block'}
+                      </div>
+                      <span className="text-xs text-slate-400 block mt-0.5">
+                        {examHallResult.floor || 'Level 1'}
+                      </span>
+                    </div>
+
+                    {/* Desk Seat Number */}
+                    <div className={`p-5 rounded-3xl border ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                    }`}>
+                      <div className="flex items-center gap-2 text-emerald-500 mb-1">
+                        <MapPin className="w-4 h-4" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Assigned Desk / Seat</span>
+                      </div>
+                      <div className="text-xl font-black font-mono mt-1 text-emerald-500 dark:text-emerald-400">
+                        {examHallResult.seat_no || examHallResult.bench_no || 'Desk Allocated'}
+                      </div>
+                      <span className="text-xs text-slate-400 block mt-0.5">
+                        Verify roll slip on desk
+                      </span>
+                    </div>
+
+                    {/* Session Schedule */}
+                    <div className={`p-5 rounded-3xl border ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                    }`}>
+                      <div className="flex items-center gap-2 text-purple-500 mb-1">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Exam Session</span>
+                      </div>
+                      <div className="text-xl font-black font-mono mt-1 text-purple-500 dark:text-purple-400">
+                        {examHallResult.session || 'FN Session'}
+                      </div>
+                      <span className="text-xs text-slate-400 block mt-0.5">
+                        09:30 AM – 12:30 PM
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : examHallSearched ? (
+                /* No Match / Not-Found Card */
+                <div className={`p-6 sm:p-8 rounded-3xl border space-y-4 transition-all ${
+                  isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                }`}>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center border border-indigo-500/25 flex-shrink-0">
+                      <Compass className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`text-lg sm:text-xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Currently no exam hall are allocated for you by COE
+                      </h3>
+                      <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Examination seating arrangements are published by the Controller of Examinations (COE) prior to scheduled End Semester Examinations.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Exam Guidelines Box */}
+                  <div className={`p-4 rounded-2xl border text-xs space-y-2 ${
+                    isDarkMode ? 'bg-slate-950/60 border-slate-800/80 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}>
+                    <div className="font-bold uppercase tracking-wider text-[10px] text-indigo-500 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Standard BIT Examination Day Guidelines:</span>
+                    </div>
+                    <ul className="list-disc list-inside space-y-1 text-[11px] leading-relaxed pl-1 text-slate-500 dark:text-slate-400">
+                      <li>Ensure you carry your physical <strong>BIT Student ID Card</strong> and official <strong>Hall Ticket</strong>.</li>
+                      <li>Report to your allocated examination hall block at least <strong>15 minutes</strong> before session commencement.</li>
+                      <li>Smartphones, digital smartwatches, and programmable calculators are strictly prohibited inside the hall.</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                /* Initial Prompt Card */
+                <div className={`p-8 sm:p-10 rounded-3xl border text-center space-y-3 ${
+                  isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                }`}>
+                  <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center border border-indigo-500/20">
+                    <Compass className="w-7 h-7" />
+                  </div>
+                  <h3 className={`text-base sm:text-lg font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Lookup Your Examination Hall
+                  </h3>
+                  <p className={`text-xs sm:text-sm max-w-md mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Select your exam date and verify your roll number above, then click <strong>Find Exam Hall</strong>.
+                  </p>
+                </div>
+              )}
+
+              {/* Campus Examination Blocks Guide */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Campus Examination Venues
+                  </h3>
+                  <span className={`text-[11px] font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    5 Designated Blocks
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {[
+                    { code: 'IB Block', tag: 'Exam Venue', iconColor: 'text-indigo-500 dark:text-indigo-400', iconBg: 'bg-indigo-500/10 border-indigo-500/20', dot: 'bg-indigo-500' },
+                    { code: 'SF Block', tag: 'Exam Venue', iconColor: 'text-blue-500 dark:text-blue-400', iconBg: 'bg-blue-500/10 border-blue-500/20', dot: 'bg-blue-500' },
+                    { code: 'AS Block', tag: 'Exam Venue', iconColor: 'text-emerald-500 dark:text-emerald-400', iconBg: 'bg-emerald-500/10 border-emerald-500/20', dot: 'bg-emerald-500' },
+                    { code: 'Mech Block', tag: 'Exam Venue', iconColor: 'text-amber-500 dark:text-amber-400', iconBg: 'bg-amber-500/10 border-amber-500/20', dot: 'bg-amber-500' },
+                    { code: 'Research Park', tag: 'Exam Venue', iconColor: 'text-purple-500 dark:text-purple-400', iconBg: 'bg-purple-500/10 border-purple-500/20', dot: 'bg-purple-500' }
+                  ].map((blk, idx) => (
+                    <div 
+                      key={idx}
+                      className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between hover:shadow-md hover:-translate-y-0.5 ${
+                        isDarkMode 
+                          ? 'bg-slate-900/80 border-slate-800 hover:border-slate-700' 
+                          : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${blk.iconBg} ${blk.iconColor}`}>
+                          <Building2 className="w-4 h-4" />
+                        </div>
+                        <span className={`w-2 h-2 rounded-full ${blk.dot}`}></span>
+                      </div>
+                      <div>
+                        <div className={`text-sm font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                          {blk.code}
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider block mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {blk.tag}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
