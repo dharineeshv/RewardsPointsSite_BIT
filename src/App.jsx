@@ -3566,30 +3566,6 @@ export default function App() {
             </button>
           )}
         </nav>
-
-        {/* Quick Info & Theme Box in Drawer */}
-        <div className={`mt-auto p-3 rounded-2xl border transition-colors duration-200 ${
-          isDarkMode ? 'bg-slate-800/50 border-slate-700/60 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700 shadow-xs'
-        }`}>
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>BIT Rewards Site</span>
-            </div>
-            <button
-              onClick={toggleTheme}
-              className={`p-1 rounded-lg transition-colors cursor-pointer text-xs ${
-                isDarkMode ? 'bg-slate-700 text-amber-400 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-              }`}
-              title="Toggle Theme"
-            >
-              {isDarkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-          <p className={`text-[10px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            Official academic & extracurricular rewards management platform.
-          </p>
-        </div>
       </aside>
 
       {/* 3. BODY LAYOUT: MAIN CONTENT */}
