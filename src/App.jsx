@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import placementData from './data/placementData.json';
-import GoogleMapsCampusView from './components/GoogleMapsCampusView';
 import {
   LayoutGrid,
   BarChart2,
@@ -6745,16 +6744,15 @@ export default function App() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-amber-400" />
-                      Google Maps Style • Live Campus Navigator
+                    <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-wider">
+                      Interactive 3D / 2D GPS
                     </span>
                   </div>
                   <h1 className={`text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                    BIT Campus Navigator & Venue Map
+                    BIT Campus Map & Venue Locator
                   </h1>
                   <p className={`text-xs sm:text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Explore key campus blocks: <strong>IB Block</strong>, <strong>AS Block</strong>, <strong>Central Library</strong>, <strong>SF Block</strong>, <strong>Principal Office</strong>, <strong>Main Gate</strong>, and <strong>Cafeteria</strong>. Search any block or tap a pin for directions!
+                    Search any classroom, exam hall, lab, or academic block. Use the search bar inside the map to automatically hover and navigate.
                   </p>
                 </div>
 
@@ -6770,13 +6768,25 @@ export default function App() {
                     }`}
                   >
                     <ExternalLink className="w-4 h-4 text-indigo-500" />
-                    <span>GeoBITS 3D (Render)</span>
+                    <span>Open in Fullscreen</span>
                   </a>
                 </div>
               </div>
 
-              {/* Native Google Maps Style Campus Navigator Component */}
-              <GoogleMapsCampusView isDarkMode={isDarkMode} />
+              {/* Live Interactive Map Canvas */}
+              <div className={`rounded-2xl sm:rounded-3xl border overflow-hidden shadow-xl transition-all relative ${
+                isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-md'
+              }`}>
+                <div className="relative w-full h-[72vh] sm:h-[760px] min-h-[520px] bg-slate-950">
+                  <iframe
+                    src="https://geobits.onrender.com"
+                    title="BIT Campus Map"
+                    className="w-full h-full border-0"
+                    allow="geolocation; fullscreen"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
