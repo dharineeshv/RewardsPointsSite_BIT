@@ -67,11 +67,15 @@ import {
   UtensilsCrossed,
   Calendar,
   CalendarCheck,
+  CalendarDays,
   Clock,
   Coffee,
   Scissors,
   Library,
-  Bot
+  Bot,
+  Compass,
+  Palmtree,
+  PartyPopper
 } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
@@ -351,7 +355,8 @@ function DashboardHeroSlider({
   yearlyAverages, 
   normalizeStudentYear, 
   setActiveNav, 
-  isDarkMode 
+  isDarkMode,
+  leavesList = []
 }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -373,7 +378,11 @@ function DashboardHeroSlider({
   const percentOfAvg = targetYearAvg > 0 ? Math.round((studentPointsNum / targetYearAvg) * 100) : 100;
   const diffAbs = Math.abs(pointsDiff).toLocaleString();
 
-  const totalSlides = 4;
+  // Find next upcoming leave
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const nextLeave = (leavesList || []).find(l => (l.to_date || l.from_date) >= todayStr) || (leavesList && leavesList[0]);
+
+  const totalSlides = 5;
 
   const nextSlide = useCallback(() => {
     setCurrentSlide(prev => (prev + 1) % totalSlides);
@@ -591,6 +600,45 @@ function DashboardHeroSlider({
               <span>View Today's Meal Menu</span>
               <span>→</span>
             </button>
+          </div>
+        </div>
+
+        {/* SLIDE 5: COLLEGE LEAVE & GENERAL PERMISSIONS (GP) SCHEDULE */}
+        <div className="w-full flex-shrink-0 min-h-[200px] sm:min-h-[220px] p-6 sm:p-8 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white relative overflow-hidden flex flex-col justify-between border-l-4 border-indigo-500">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
+                <CalendarDays className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Academic Calendar</span>
+              </span>
+              <span className="text-xs text-slate-300 font-medium">
+                Official BIT Leave Schedule
+              </span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
+              {nextLeave ? `Upcoming: ${nextLeave.name}` : '21 Scheduled Academic Leaves & Holidays'}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
+              {nextLeave 
+                ? `Scheduled from ${nextLeave.from_date}${nextLeave.to_date && nextLeave.to_date !== nextLeave.from_date ? ` to ${nextLeave.to_date}` : ''} ${nextLeave.from_half_day ? `(${nextLeave.from_half_day} Session Gate Pass)` : ''}.`
+                : 'View official schedule of General Permissions (GP), national holidays, and semester vacation periods.'}
+            </p>
+          </div>
+
+          <div className="relative z-10 mt-3 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setActiveNav && setActiveNav('Leave Schedule')}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all cursor-pointer shadow-md inline-flex items-center gap-2"
+            >
+              <span>View Leave Schedule</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            {nextLeave && (
+              <span className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Next: {nextLeave.name} ({nextLeave.from_date})</span>
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -996,6 +1044,13 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Leave Schedule State
+  const [leavesList, setLeavesList] = useState([]);
+  const [loadingLeaves, setLoadingLeaves] = useState(false);
+  const [leavesError, setLeavesError] = useState('');
+  const [selectedLeaveFilter, setSelectedLeaveFilter] = useState('ALL'); // 'ALL' | 'UPCOMING' | 'GP' | 'HOLIDAY'
+  const [leaveSearchQuery, setLeaveSearchQuery] = useState('');
 
   // Theme Mode: 'system' (default), 'dark', or 'light'
   const [themeMode, setThemeMode] = useState(() => {
@@ -1619,6 +1674,31 @@ export default function App() {
     }
   }, [activeNav, messHostel, selectedMessDate]);
 
+  // Fetch official college leave schedule
+  const fetchLeavesSchedule = async () => {
+    setLoadingLeaves(true);
+    setLeavesError('');
+    try {
+      const res = await bitcentralFetch('/leaves');
+      if (res.ok) {
+        const json = await res.json();
+        const list = Array.isArray(json?.data) ? json.data : [];
+        setLeavesList(list);
+      } else {
+        setLeavesError('Unable to load college leave schedule.');
+      }
+    } catch (e) {
+      console.warn('Leaves schedule error:', e);
+      setLeavesError('Network error while fetching leave schedule.');
+    } finally {
+      setLoadingLeaves(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLeavesSchedule();
+  }, []);
+
   // Fetch live rewards history from endpoint whenever displayed student changes
   useEffect(() => {
     if (!displayedStudent || !displayedStudent.id) return;
@@ -1860,7 +1940,7 @@ export default function App() {
     setDisplayedStudent(transformed);
     setShowDropdown(false);
     setSearchQuery(apiItem.roll_no || apiItem.student_name);
-    logActivity(transformed, 'Search');
+    logActivity(currentUser, `Search (${apiItem.roll_no || apiItem.student_name})`);
   };
 
   const handleSearchKeyDown = (e) => {
@@ -1984,11 +2064,11 @@ export default function App() {
       }`}>
         <div className="max-w-[1600px] mx-auto px-3.5 sm:px-6 md:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-3 sm:gap-4">
           
-          {/* Hamburger Menu Toggle Button & Logo Section (Hamburger hidden on mobile) */}
+          {/* Hamburger Menu Toggle Button & Logo Section (Visible on all screen sizes) */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button
               onClick={() => setIsSidebarOpen(prev => !prev)}
-              className={`hidden md:flex p-2 rounded-xl transition-all cursor-pointer items-center justify-center ${
+              className={`flex p-2 rounded-xl transition-all cursor-pointer items-center justify-center ${
                 isDarkMode 
                   ? 'hover:bg-slate-800 text-slate-300 hover:text-white' 
                   : 'hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-xs'
@@ -2015,13 +2095,19 @@ export default function App() {
             </div>
           </div>
 
-          {/* Desktop & Tablet Search Bar (Hidden on Mobile) */}
+          {/* Desktop & Tablet Search Bar */}
           <div className="hidden sm:block flex-1 max-w-xl mx-4 relative">
-            <div className="relative flex items-center">
+            <div className={`relative flex items-center rounded-2xl border transition-all duration-200 shadow-2xs ${
+              isDarkMode 
+                ? 'bg-slate-900/90 border-slate-700/80 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:bg-slate-900' 
+                : 'bg-slate-100/90 border-slate-200/90 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 focus-within:bg-white'
+            }`}>
               {isSearching ? (
-                <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-4"></div>
+                <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-3.5"></div>
               ) : (
-                <Search className={`w-4 h-4 absolute left-4 pointer-events-none ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+                <Search className={`w-4 h-4 absolute left-3.5 pointer-events-none transition-colors ${
+                  isDarkMode ? 'text-slate-400' : 'text-slate-400'
+                }`} />
               )}
               
               <input
@@ -2031,17 +2117,18 @@ export default function App() {
                 onKeyDown={handleSearchKeyDown}
                 onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
                 placeholder="Search by rollno eg. CT109, CT120..."
-                className={`w-full pl-11 pr-10 py-2 rounded-full text-xs sm:text-sm font-medium transition-all outline-none border ${
-                  isDarkMode 
-                    ? 'bg-slate-800/90 border-slate-700 text-slate-100 placeholder-slate-400 focus:border-indigo-500 focus:bg-slate-800' 
-                    : 'bg-slate-100 border-slate-300 text-slate-900 placeholder-slate-500 focus:border-indigo-500 focus:bg-white shadow-xs'
+                className={`w-full pl-10 pr-10 py-2 rounded-2xl text-xs sm:text-sm font-medium outline-none bg-transparent ${
+                  isDarkMode ? 'text-slate-100 placeholder-slate-400' : 'text-slate-900 placeholder-slate-400'
                 }`}
               />
               
               {searchQuery && (
                 <button 
                   onClick={() => { setSearchQuery(''); setShowDropdown(false); }}
-                  className={`absolute right-3.5 text-xs font-semibold p-1 ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`absolute right-3 p-1 rounded-md transition-colors ${
+                    isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                  }`}
+                  title="Clear search"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -2189,13 +2276,17 @@ export default function App() {
 
         {/* Mobile Search Bar Sub-Strip (Immediately Downwards After Header on Phones) */}
         <div className={`block sm:hidden px-3.5 py-2.5 border-b relative transition-colors duration-200 ${
-          isDarkMode ? 'bg-slate-950 border-slate-800/80' : 'bg-white border-slate-200/80 shadow-xs'
+          isDarkMode ? 'bg-slate-950 border-slate-800/80' : 'bg-white border-slate-200/80 shadow-2xs'
         }`}>
-          <div className="relative flex items-center max-w-md mx-auto">
+          <div className={`relative flex items-center max-w-md mx-auto rounded-2xl border transition-all duration-200 ${
+            isDarkMode 
+              ? 'bg-slate-900 border-slate-700/80 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20' 
+              : 'bg-slate-100/90 border-slate-200 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15 focus-within:bg-white'
+          }`}>
             {isSearching ? (
-              <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-3.5 z-10"></div>
+              <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin absolute left-3 z-10"></div>
             ) : (
-              <Search className={`w-4 h-4 absolute left-3.5 pointer-events-none transition-colors z-10 ${
+              <Search className={`w-4 h-4 absolute left-3 pointer-events-none transition-colors z-10 ${
                 isDarkMode ? 'text-slate-400' : 'text-slate-400'
               }`} strokeWidth={2} />
             )}
@@ -2207,18 +2298,16 @@ export default function App() {
               onKeyDown={handleSearchKeyDown}
               onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
               placeholder="Search by rollno eg. CT109, CT120..."
-              className={`w-full h-9 pl-10 pr-9 rounded-full text-xs font-semibold transition-all outline-none border ${
-                isDarkMode 
-                  ? 'bg-slate-900 border-slate-700/80 text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:bg-slate-900' 
-                  : 'bg-slate-100/90 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 focus:bg-white'
+              className={`w-full h-9 pl-9 pr-9 rounded-2xl text-xs font-semibold outline-none bg-transparent ${
+                isDarkMode ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
               }`}
             />
             
             {searchQuery && (
               <button 
                 onClick={() => { setSearchQuery(''); setShowDropdown(false); }}
-                className={`absolute right-2.5 p-1 rounded-full transition-colors z-10 ${
-                  isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                className={`absolute right-2.5 p-1 rounded-md transition-colors z-10 ${
+                  isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
                 }`}
                 title="Clear search"
               >
@@ -2415,6 +2504,20 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => { setActiveNav('Leave Schedule'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Leave Schedule'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <CalendarDays className="w-5 h-5" strokeWidth={activeNav === 'Leave Schedule' ? 2.2 : 1.8} />
+            <span>Leave Schedule</span>
+          </button>
+
+          <button
             onClick={() => { setActiveNav('Settings'); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
               activeNav === 'Settings'
@@ -2452,9 +2555,24 @@ export default function App() {
           {isInstallable && (
             <button
               onClick={() => { handleInstallClick(); setIsSidebarOpen(false); }}
-              className="mt-3 w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+              className={`mt-2.5 w-full flex items-center justify-between p-3 rounded-2xl border text-xs font-semibold transition-all cursor-pointer group ${
+                isDarkMode 
+                  ? 'bg-gradient-to-r from-slate-800/90 to-indigo-950/50 border-indigo-500/30 text-slate-200 hover:border-indigo-400 hover:bg-slate-800 shadow-xs' 
+                  : 'bg-gradient-to-r from-indigo-50/80 to-blue-50/50 border-indigo-200 text-indigo-950 hover:bg-indigo-100/70 hover:border-indigo-300 shadow-2xs'
+              }`}
             >
-              <span>📲 Install Web App</span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Download className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-left">
+                  <span className="font-bold text-xs block leading-tight">Install Web App</span>
+                  <span className={`text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Add to Home Screen</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                Install
+              </span>
             </button>
           )}
         </nav>
@@ -2486,7 +2604,7 @@ export default function App() {
 
       {/* 3. BODY LAYOUT: MAIN CONTENT */}
       <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
-        <main className="flex-1 p-3.5 sm:p-6 md:p-8 lg:p-10 max-w-full overflow-x-hidden pb-24 md:pb-10">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 lg:p-10 max-w-full overflow-x-hidden pb-10">
           
           {/* VIEW 1: DASHBOARD */}
           {activeNav === 'Dashboard' && (
@@ -2509,6 +2627,7 @@ export default function App() {
                 normalizeStudentYear={normalizeStudentYear}
                 setActiveNav={setActiveNav}
                 isDarkMode={isDarkMode}
+                leavesList={leavesList}
               />
 
               {/* SECTION 1: SEARCH RESULTS */}
@@ -3648,6 +3767,409 @@ export default function App() {
             </div>
           )}
 
+          {/* VIEW 3.5: LEAVE SCHEDULE */}
+          {activeNav === 'Leave Schedule' && (
+            <div className="max-w-6xl mx-auto w-full space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800/60 uppercase tracking-wider">
+                      Academic Year 2026 – 2027
+                    </span>
+                  </div>
+                  <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                    College Leave Schedule
+                  </h1>
+                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Official BIT General Permissions (GP), festival holidays, and academic calendar leaves.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    onClick={fetchLeavesSchedule}
+                    disabled={loadingLeaves}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isDarkMode 
+                        ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' 
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-xs'
+                    }`}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingLeaves ? 'animate-spin text-indigo-500' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+
+                  <div className={`text-xs font-semibold px-3 py-2 rounded-xl border flex items-center gap-1.5 ${
+                    isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                  }`}>
+                    <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>Total: <strong className="font-mono text-indigo-500 dark:text-indigo-400">{leavesList.length || 21} Leaves</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Highlight Metric Cards */}
+              {(() => {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const nextLeave = (leavesList || []).find(l => (l.to_date || l.from_date) >= todayStr) || (leavesList && leavesList[0]);
+                const gpCount = (leavesList || []).filter(l => (l.name || '').toLowerCase().includes('gp')).length;
+                const festCount = (leavesList || []).filter(l => !(l.name || '').toLowerCase().includes('gp')).length;
+                const upcomingCount = (leavesList || []).filter(l => (l.to_date || l.from_date) >= todayStr).length;
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    {/* Next Upcoming Holiday Card */}
+                    <div className="sm:col-span-2 p-5 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl relative overflow-hidden flex flex-col justify-between border border-slate-800 border-l-4 border-l-indigo-500">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 text-indigo-400" />
+                            <span>Next Upcoming Leave</span>
+                          </span>
+                          {nextLeave && nextLeave.from_half_day && (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">
+                              {nextLeave.from_half_day} Session Gate Pass
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white mt-1">
+                          {nextLeave ? nextLeave.name : 'Academic Leave Schedule'}
+                        </h3>
+                        <p className="text-xs text-slate-300 mt-1 font-medium">
+                          {nextLeave 
+                            ? `Scheduled from ${nextLeave.from_date}${nextLeave.to_date && nextLeave.to_date !== nextLeave.from_date ? ` to ${nextLeave.to_date}` : ''} ${nextLeave.day ? `(${nextLeave.day})` : ''}` 
+                            : 'All official General Permissions and holidays are active.'}
+                        </p>
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+                        <span className="text-indigo-300 font-medium flex items-center gap-1.5">
+                          <CalendarCheck className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>{upcomingCount} Upcoming Leaves Remaining</span>
+                        </span>
+                        <span className="text-[11px] font-mono bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700 text-slate-300">
+                          {nextLeave?.from_date || 'Active'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* General Permissions (GP) Card */}
+                    <div className={`p-5 rounded-3xl border flex flex-col justify-between transition-all ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          General Permissions
+                        </span>
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                          <Compass className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <div className="text-2xl sm:text-3xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+                          {gpCount || 8} <span className="text-xs font-semibold text-slate-400">GPs</span>
+                        </div>
+                        <p className={`text-[11px] mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Scheduled long-weekend breaks with gate passes.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Festival & National Holidays Card */}
+                    <div className={`p-5 rounded-3xl border flex flex-col justify-between transition-all ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Festivals & Holidays
+                        </span>
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <div className="text-2xl sm:text-3xl font-black font-mono text-amber-600 dark:text-amber-400">
+                          {festCount || 13} <span className="text-xs font-semibold text-slate-400">Days</span>
+                        </div>
+                        <p className={`text-[11px] mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Gazetted national holidays and festival leaves.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Filters & Search Controls */}
+              <div className={`p-4 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-3 ${
+                isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 flex-wrap w-full md:w-auto">
+                  {[
+                    { id: 'ALL', label: `All Leaves (${leavesList.length || 21})` },
+                    { id: 'UPCOMING', label: 'Upcoming' },
+                    { id: 'GP', label: 'General Permissions' },
+                    { id: 'HOLIDAY', label: 'Festivals & National' }
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setSelectedLeaveFilter(f.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        selectedLeaveFilter === f.id
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : isDarkMode 
+                            ? 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700' 
+                            : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search Input */}
+                <div className="relative w-full md:w-72">
+                  <Search className={`w-4 h-4 absolute left-3.5 top-3 pointer-events-none ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <input
+                    type="text"
+                    value={leaveSearchQuery}
+                    onChange={(e) => setLeaveSearchQuery(e.target.value)}
+                    placeholder="Search holiday, month..."
+                    className={`w-full pl-9 pr-4 py-2 rounded-xl text-xs font-medium border outline-none transition-all ${
+                      isDarkMode 
+                        ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-indigo-500' 
+                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
+                    }`}
+                  />
+                  {leaveSearchQuery && (
+                    <button
+                      onClick={() => setLeaveSearchQuery('')}
+                      className="absolute right-2.5 top-2.5 text-xs text-slate-400 hover:text-slate-200"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Leaves Grid */}
+              {loadingLeaves ? (
+                <div className={`p-12 rounded-3xl border text-center ${
+                  isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                }`}>
+                  <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                  <p className="text-sm font-semibold text-slate-400">Loading live college leave schedule from BIT Central...</p>
+                </div>
+              ) : leavesError ? (
+                <div className="p-6 rounded-3xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-center">
+                  <p className="text-sm font-semibold mb-2">{leavesError}</p>
+                  <button
+                    onClick={fetchLeavesSchedule}
+                    className="px-4 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-bold shadow-md cursor-pointer hover:bg-rose-700"
+                  >
+                    Retry Loading
+                  </button>
+                </div>
+              ) : (() => {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                
+                const filtered = (leavesList || []).filter(item => {
+                  const nameMatch = (item.name || '').toLowerCase().includes(leaveSearchQuery.toLowerCase()) ||
+                                   (item.from_date || '').includes(leaveSearchQuery) ||
+                                   (item.to_date || '').includes(leaveSearchQuery) ||
+                                   (item.day || '').toLowerCase().includes(leaveSearchQuery.toLowerCase());
+                  if (!nameMatch) return false;
+
+                  const isGP = (item.name || '').toLowerCase().includes('gp');
+                  const isUpcoming = (item.to_date || item.from_date) >= todayStr;
+
+                  if (selectedLeaveFilter === 'UPCOMING') return isUpcoming;
+                  if (selectedLeaveFilter === 'GP') return isGP;
+                  if (selectedLeaveFilter === 'HOLIDAY') return !isGP;
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className={`p-10 rounded-3xl border text-center ${
+                      isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500 shadow-sm'
+                    }`}>
+                      <Calendar className="w-10 h-10 mx-auto mb-2 text-slate-400 opacity-60" />
+                      <p className="text-sm font-bold">No leaves match your current search or filter.</p>
+                      <button
+                        onClick={() => { setSelectedLeaveFilter('ALL'); setLeaveSearchQuery(''); }}
+                        className="mt-3 text-xs font-bold text-indigo-500 hover:underline"
+                      >
+                        Reset Filters
+                      </button>
+                    </div>
+                  );
+                }
+
+                // Month formatter helper
+                const getMonthName = (dateStr) => {
+                  if (!dateStr) return 'DATE';
+                  const parts = dateStr.split('-');
+                  if (parts.length < 2) return 'DATE';
+                  const mIndex = parseInt(parts[1], 10) - 1;
+                  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+                  return months[mIndex] || 'DATE';
+                };
+
+                const getDayString = (fromDate, toDate) => {
+                  if (!fromDate) return '--';
+                  const p1 = fromDate.split('-');
+                  const d1 = parseInt(p1[2], 10) || fromDate;
+                  if (toDate && toDate !== fromDate) {
+                    const p2 = toDate.split('-');
+                    const d2 = parseInt(p2[2], 10) || toDate;
+                    return `${d1}-${d2}`;
+                  }
+                  return `${d1}`;
+                };
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filtered.map((leave, idx) => {
+                      const isGP = (leave.name || '').toLowerCase().includes('gp');
+                      const isMultiDay = leave.from_date && leave.to_date && leave.from_date !== leave.to_date;
+                      const isUpcoming = (leave.to_date || leave.from_date) > todayStr;
+                      const isToday = (leave.from_date <= todayStr && (leave.to_date || leave.from_date) >= todayStr);
+
+                      // Calculate duration days
+                      let durationDays = 1;
+                      if (leave.from_date && leave.to_date) {
+                        const d1 = new Date(leave.from_date);
+                        const d2 = new Date(leave.to_date);
+                        durationDays = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+                      }
+
+                      const monthLabel = getMonthName(leave.from_date);
+                      const dayLabel = getDayString(leave.from_date, leave.to_date);
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-5 rounded-2xl border transition-all duration-200 flex flex-col justify-between ${
+                            isToday
+                              ? 'bg-amber-500/5 border-amber-400/80 shadow-md ring-1 ring-amber-400/40'
+                              : isUpcoming
+                                ? isDarkMode
+                                  ? 'bg-slate-900 border-slate-800 hover:border-slate-700 shadow-sm hover:shadow-md'
+                                  : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-sm'
+                                : isDarkMode
+                                  ? 'bg-slate-900/40 border-slate-800/60 opacity-65'
+                                  : 'bg-slate-50/70 border-slate-200/80 opacity-70'
+                          }`}
+                        >
+                          <div>
+                            {/* Card Header Tag & Status */}
+                            <div className="flex items-center justify-between gap-2 mb-3.5">
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                                isGP
+                                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                              }`}>
+                                {isGP ? 'General Permission' : 'Holiday'}
+                              </span>
+
+                              {isToday ? (
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  Today
+                                </span>
+                              ) : isUpcoming ? (
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  Upcoming
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60">
+                                  Completed
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Clean Date Badge + Holiday Name */}
+                            <div className="flex items-start gap-3.5 mt-1">
+                              {/* Sleek Minimalist Date Tile */}
+                              <div className={`flex flex-col items-center justify-center w-14 rounded-xl border overflow-hidden flex-shrink-0 text-center ${
+                                isToday
+                                  ? 'border-amber-400/80 bg-amber-500/10'
+                                  : isUpcoming
+                                    ? isDarkMode
+                                      ? 'border-slate-700 bg-slate-800'
+                                      : 'border-slate-200 bg-slate-100'
+                                    : isDarkMode
+                                      ? 'border-slate-800 bg-slate-900/80'
+                                      : 'border-slate-200 bg-slate-100/60'
+                              }`}>
+                                <div className={`w-full text-[9px] font-extrabold uppercase py-0.5 ${
+                                  isToday
+                                    ? 'bg-amber-500 text-white'
+                                    : isGP
+                                      ? 'bg-indigo-600 text-white'
+                                      : 'bg-slate-700 text-slate-200'
+                                }`}>
+                                  {monthLabel}
+                                </div>
+                                <div className={`text-xs font-mono font-black py-1 px-1 ${
+                                  isDarkMode ? 'text-white' : 'text-slate-900'
+                                }`}>
+                                  {dayLabel}
+                                </div>
+                              </div>
+
+                              {/* Title & Day Subtitle */}
+                              <div className="min-w-0 flex-1">
+                                <h3 className={`text-sm sm:text-base font-bold tracking-tight leading-snug truncate ${
+                                  isDarkMode ? 'text-white' : 'text-slate-900'
+                                }`} title={leave.name}>
+                                  {leave.name}
+                                </h3>
+                                <p className={`text-xs font-medium mt-0.5 ${
+                                  isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                                }`}>
+                                  {leave.day || (isMultiDay ? 'Multi-day leave' : 'Single day')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Date Range & Session Footer */}
+                          <div className={`mt-4 pt-3 border-t flex items-center justify-between text-xs ${
+                            isDarkMode ? 'border-slate-800' : 'border-slate-100'
+                          }`}>
+                            <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                              {leave.from_date}
+                              {isMultiDay && <span> → {leave.to_date}</span>}
+                            </span>
+
+                            <div className="flex items-center gap-1.5">
+                              {leave.from_half_day && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 font-mono">
+                                  {leave.from_half_day} Gate Pass
+                                </span>
+                              )}
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                                isMultiDay
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                              }`}>
+                                {durationDays} {durationDays === 1 ? 'Day' : 'Days'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* VIEW 4: SETTINGS */}
           {activeNav === 'Settings' && (
             <div className="max-w-5xl mx-auto w-full space-y-6">
@@ -4407,75 +4929,8 @@ export default function App() {
         </main>
       </div>
 
-      {/* 3. MOBILE BOTTOM NAVIGATION BAR (Phones & Small Screens) */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl border-t px-4 py-2 flex items-center justify-around shadow-2xl transition-colors duration-200 ${
-        isDarkMode ? 'bg-slate-950/95 border-slate-800/80' : 'bg-white/95 border-slate-200 shadow-lg'
-      }`}>
-        <button
-          onClick={() => setActiveNav('Dashboard')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Dashboard' 
-              ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
-              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <LayoutGrid className="w-5 h-5" strokeWidth={activeNav === 'Dashboard' ? 2.4 : 1.8} />
-          <span className="text-[10px]">Dashboard</span>
-        </button>
-
-        <button
-          onClick={() => setActiveNav('Leaderboard')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Leaderboard' 
-              ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
-              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <BarChart2 className="w-5 h-5" strokeWidth={activeNav === 'Leaderboard' ? 2.4 : 1.8} />
-          <span className="text-[10px]">Rankings</span>
-        </button>
-
-        <button
-          onClick={() => setActiveNav('Menu Details')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Menu Details' 
-              ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
-              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <UtensilsCrossed className="w-5 h-5" strokeWidth={activeNav === 'Menu Details' ? 2.4 : 1.8} />
-          <span className="text-[10px]">Menu</span>
-        </button>
-
-        <button
-          onClick={() => setActiveNav('Settings')}
-          className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl transition-all cursor-pointer ${
-            activeNav === 'Settings' 
-              ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' 
-              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Settings className="w-5 h-5" strokeWidth={activeNav === 'Settings' ? 2.4 : 1.8} />
-          <span className="text-[10px]">Settings</span>
-        </button>
-
-        {isAdminUser && (
-          <button
-            onClick={() => setActiveNav('Admin Console')}
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
-              activeNav === 'Admin Console' 
-                ? 'text-purple-600 dark:text-purple-400 font-extrabold' 
-                : isDarkMode ? 'text-purple-400/70 hover:text-purple-300' : 'text-purple-600/70 hover:text-purple-800'
-            }`}
-          >
-            <ShieldCheck className="w-5 h-5" strokeWidth={activeNav === 'Admin Console' ? 2.4 : 1.8} />
-            <span className="text-[10px]">Admin</span>
-          </button>
-        )}
-      </div>
-
       {/* 4. FOOTER */}
-      <footer className={`w-full border-t py-3.5 px-4 sm:px-6 md:px-10 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs mb-14 md:mb-0 transition-colors duration-200 ${
+      <footer className={`w-full border-t py-3.5 px-4 sm:px-6 md:px-10 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs transition-colors duration-200 ${
         isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-200 bg-white text-slate-600 shadow-xs'
       }`}>
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 sm:gap-2 text-center sm:text-left">
