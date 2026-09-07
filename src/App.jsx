@@ -27,6 +27,7 @@ import {
   ChevronRight,
   ChevronLeft,
   TrendingUp,
+  TrendingDown,
   Sparkles,
   Shield,
   Lock,
@@ -89,7 +90,11 @@ import {
   ArrowRightLeft,
   Route,
   Newspaper,
-  Briefcase
+  Briefcase,
+  Bell,
+  BellRing,
+  CheckCheck,
+  Trash2
 } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
@@ -1326,7 +1331,7 @@ function transformApiStudent(apiItem) {
     history: [
       { id: 1, title: "Cumulative RP Earned", date: "Academic Year 2024-2025", points: `+${cumulativePts} RP`, category: "Activities", icon: Trophy, color: "text-amber-500 bg-amber-50" },
       { id: 2, title: "Redeemed Points", date: "Benefits & Vouchers", points: `-${redeemedPts} RP`, category: "Redemption", icon: Gift, color: "text-indigo-500 bg-indigo-50" },
-      { id: 3, title: "Net Active Balance", date: "Current Academic Standing", points: `${balancePts} RP`, category: "Balance", icon: Award, color: "text-emerald-500 bg-emerald-50" },
+      { id: 3, title: "Net Active Balance", date: "Current Academic Standing", points: `${balancePts} RP`, category: "Balance", icon: Award, color: "text-emerald-500 bg-emerald-50" }
     ],
     breakdown: [
       { label: "Active Net Balance", pts: parseFloat(balanceRaw) || 0, percent: 65, color: "bg-[#4f46e5]" },
@@ -1334,6 +1339,26 @@ function transformApiStudent(apiItem) {
       { label: "Redeemed Points", pts: parseFloat(apiItem.redeemed_points?.replace(/,/g, '') || 0), percent: 15, color: "bg-amber-500" },
     ]
   };
+}
+
+function formatRelativeTime(isoString) {
+  if (!isoString) return 'Just now';
+  try {
+    const diffMs = Date.now() - new Date(isoString).getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHours = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return new Date(isoString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch (e) {
+    return 'Recently';
+  }
 }
 
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
@@ -1352,6 +1377,7 @@ export default function App() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try {
+      if (sessionTimeoutNotice) return false;
       const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
       if (!isLogged) return false;
       const lastActive = parseInt(localStorage.getItem('bit_rp_last_active') || '0', 10);
@@ -1395,6 +1421,230 @@ export default function App() {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Live Notifications State & Persistence
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('bit_rp_user');
+      const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+      const userKey = parsedUser?.email?.toLowerCase() || 'default';
+      const saved = localStorage.getItem(`bit_notifications_${userKey}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notificationFilter, setNotificationFilter] = useState('all'); // 'all' | 'unread' | 'points' | 'placements'
+
+  // Sync notifications when logged-in user changes
+  useEffect(() => {
+    const userKey = currentUser?.email?.toLowerCase() || 'default';
+    try {
+      const saved = localStorage.getItem(`bit_notifications_${userKey}`);
+      if (saved) {
+        setNotifications(JSON.parse(saved));
+      } else {
+        setNotifications([]);
+      }
+    } catch (e) {}
+  }, [currentUser?.email]);
+
+  // Ref locks to avoid duplicate processing on rapid re-renders
+  const lastProcessedRpRef = useRef(null);
+  const lastProcessedPlacementRef = useRef(null);
+
+  // Automated Reward Points Change Detector (Logged-In User Only)
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    const userKey = currentUser.email.toLowerCase();
+    const currentPointsRaw = (currentUser?.currentPoints || currentUser?.balance_points || '0').toString();
+    const currentPoints = parseFloat(currentPointsRaw.replace(/,/g, '')) || 0;
+
+    // Skip if already processed in-memory for this session/value
+    if (lastProcessedRpRef.current === `${userKey}_${currentPoints}`) return;
+
+    const storageKey = `bit_last_rp_${userKey}`;
+    const notifKey = `bit_notifications_${userKey}`;
+    const storedRpStr = localStorage.getItem(storageKey);
+
+    if (storedRpStr !== null) {
+      const storedRp = parseFloat(storedRpStr);
+      if (!isNaN(storedRp) && currentPoints !== storedRp) {
+        lastProcessedRpRef.current = `${userKey}_${currentPoints}`;
+        const diff = currentPoints - storedRp;
+        const isCredit = diff > 0;
+        const newNotif = {
+          id: `rp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          type: isCredit ? 'points_credited' : 'points_debited',
+          title: isCredit 
+            ? `🎉 +${diff.toLocaleString()} Reward Points Credited!` 
+            : `📉 -${Math.abs(diff).toLocaleString()} Reward Points Deducted!`,
+          description: isCredit 
+            ? `Your reward points increased from ${storedRp.toLocaleString()} RP to ${currentPoints.toLocaleString()} RP.` 
+            : `Your reward points decreased from ${storedRp.toLocaleString()} RP to ${currentPoints.toLocaleString()} RP.`,
+          points: diff,
+          balance: currentPoints,
+          timestamp: new Date().toISOString(),
+          read: false,
+          linkTab: 'Dashboard'
+        };
+
+        // Immediately update storage before state to prevent race conditions
+        try {
+          localStorage.setItem(storageKey, currentPoints.toString());
+        } catch (e) {}
+
+        setNotifications(prev => {
+          // Strictly prevent duplicate notifications within 2 minutes with identical title
+          const isDuplicate = prev.some(n => 
+            n.title === newNotif.title && 
+            Math.abs(new Date(n.timestamp).getTime() - Date.now()) < 120000
+          );
+          if (isDuplicate) return prev;
+
+          const updated = [newNotif, ...prev.filter(n => n.id !== newNotif.id)].slice(0, 50);
+          try {
+            localStorage.setItem(notifKey, JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+      } else {
+        lastProcessedRpRef.current = `${userKey}_${currentPoints}`;
+      }
+    } else {
+      // First-time snapshot for this student
+      lastProcessedRpRef.current = `${userKey}_${currentPoints}`;
+      try {
+        localStorage.setItem(storageKey, currentPoints.toString());
+      } catch (e) {}
+      
+      // Show personalized welcome notification for newly logged-in student
+      const studentName = currentUser?.name || currentUser?.student_name || currentUser?.displayName || currentUser?.roll_no || 'Student';
+      setNotifications(prev => {
+        const hasWelcome = prev.some(n => n.type === 'welcome');
+        if (!hasWelcome) {
+          const welcomeNotif = {
+            id: `welcome_${Date.now()}`,
+            type: 'welcome',
+            title: `👋 Welcome To the Rewards App, ${studentName}!`,
+            description: `Welcome to the Rewards Points Portal! Your active balance is ${currentPoints.toLocaleString()} RP.`,
+            timestamp: new Date().toISOString(),
+            read: false,
+            linkTab: 'Dashboard'
+          };
+          const initialList = [welcomeNotif, ...prev];
+          try {
+            localStorage.setItem(notifKey, JSON.stringify(initialList));
+          } catch (e) {}
+          return initialList;
+        }
+        return prev;
+      });
+    }
+  }, [currentUser?.email, currentUser?.name, currentUser?.student_name, currentUser?.displayName, currentUser?.roll_no, currentUser?.currentPoints, currentUser?.balance_points]);
+
+  // Automated Placement Bulletin Update Detector
+  useEffect(() => {
+    if (!BIT_DAILY_PLACEMENT_DATA?.lastUpdated) return;
+
+    const userKey = currentUser?.email?.toLowerCase() || 'default';
+    const notifKey = `bit_notifications_${userKey}`;
+    const placementKey = `bit_last_placement_${userKey}`;
+    const currentEdition = `${BIT_DAILY_PLACEMENT_DATA.editionDate || ''}_${BIT_DAILY_PLACEMENT_DATA.lastUpdated || ''}`;
+
+    if (lastProcessedPlacementRef.current === `${userKey}_${currentEdition}`) return;
+
+    const savedEdition = localStorage.getItem(placementKey);
+
+    if (savedEdition && savedEdition !== currentEdition) {
+      lastProcessedPlacementRef.current = `${userKey}_${currentEdition}`;
+      const recentDrive = BIT_DAILY_PLACEMENT_DATA.upcomingDrives?.[0]?.company || 'On-Campus Drive';
+      const placementNotif = {
+        id: `placement_${Date.now()}`,
+        type: 'placement_update',
+        title: `📰 Placement Bulletin Updated (${BIT_DAILY_PLACEMENT_DATA.targetBatch})`,
+        description: `${BIT_DAILY_PLACEMENT_DATA.totalStudentsPlaced} students placed across ${BIT_DAILY_PLACEMENT_DATA.totalCompaniesVisited || 60}+ companies. New drive: ${recentDrive}.`,
+        timestamp: new Date().toISOString(),
+        read: false,
+        linkTab: 'BIT Placements'
+      };
+
+      try {
+        localStorage.setItem(placementKey, currentEdition);
+      } catch (e) {}
+
+      setNotifications(prev => {
+        if (prev.some(n => n.title === placementNotif.title)) return prev;
+        const updated = [placementNotif, ...prev].slice(0, 50);
+        try {
+          localStorage.setItem(notifKey, JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+    } else {
+      lastProcessedPlacementRef.current = `${userKey}_${currentEdition}`;
+      try {
+        localStorage.setItem(placementKey, currentEdition);
+      } catch (e) {}
+    }
+  }, [BIT_DAILY_PLACEMENT_DATA?.lastUpdated, BIT_DAILY_PLACEMENT_DATA?.editionDate, BIT_DAILY_PLACEMENT_DATA?.targetBatch, currentUser?.email]);
+
+  // Notification Helper Actions
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter(n => !n.read).length;
+  }, [notifications]);
+
+  const markNotificationAsRead = useCallback((id) => {
+    setNotifications(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
+      try {
+        const userKey = currentUser?.email?.toLowerCase() || 'default';
+        localStorage.setItem(`bit_notifications_${userKey}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  }, [currentUser?.email]);
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, read: true }));
+      try {
+        const userKey = currentUser?.email?.toLowerCase() || 'default';
+        localStorage.setItem(`bit_notifications_${userKey}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  }, [currentUser?.email]);
+
+  const deleteNotification = useCallback((id, e) => {
+    if (e) e.stopPropagation();
+    setNotifications(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      try {
+        const userKey = currentUser?.email?.toLowerCase() || 'default';
+        localStorage.setItem(`bit_notifications_${userKey}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  }, [currentUser?.email]);
+
+  const clearAllNotifications = useCallback(() => {
+    setNotifications([]);
+    try {
+      const userKey = currentUser?.email?.toLowerCase() || 'default';
+      localStorage.setItem(`bit_notifications_${userKey}`, JSON.stringify([]));
+    } catch (e) {}
+  }, [currentUser?.email]);
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(n => {
+      if (notificationFilter === 'unread') return !n.read;
+      if (notificationFilter === 'points') return n.type === 'points_credited' || n.type === 'points_debited' || n.type === 'welcome';
+      if (notificationFilter === 'placements') return n.type === 'placement_update';
+      return true;
+    });
+  }, [notifications, notificationFilter]);
 
   // Leave Schedule State
   const [leavesList, setLeavesList] = useState([]);
@@ -2659,6 +2909,237 @@ export default function App() {
               <span className={`text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 (Dept. of Computer Technology)
               </span>
+            </div>
+
+            {/* Live Notification Bell Icon with Red Badge */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsNotificationOpen(prev => !prev)}
+                className={`p-1.5 sm:p-2 rounded-full transition-all cursor-pointer relative ${
+                  isNotificationOpen
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
+                    : isDarkMode 
+                      ? 'hover:bg-slate-800 text-slate-300 hover:text-white' 
+                      : 'hover:bg-slate-100 text-slate-700 hover:text-indigo-600'
+                }`}
+                title={`Notifications (${unreadNotificationCount} unread)`}
+                aria-label="Open Notifications"
+              >
+                {unreadNotificationCount > 0 ? (
+                  <BellRing className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 dark:text-indigo-400" strokeWidth={2.2} />
+                ) : (
+                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
+                )}
+
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-white dark:border-slate-950 shadow-sm animate-pulse">
+                    {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Dropdown Panel */}
+              {isNotificationOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs sm:bg-transparent sm:backdrop-blur-none" 
+                    onClick={() => setIsNotificationOpen(false)} 
+                  />
+                  <div className={`fixed inset-x-3.5 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2.5 w-auto sm:w-[420px] max-w-[calc(100vw-28px)] sm:max-w-[420px] rounded-3xl shadow-2xl border backdrop-blur-2xl z-50 animate-fadeIn overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[520px] ${
+                    isDarkMode 
+                      ? 'border-slate-800 bg-slate-900/98 text-slate-100' 
+                      : 'border-slate-200 bg-white/98 text-slate-900 shadow-indigo-500/15'
+                  }`}>
+                    {/* Panel Header */}
+                    <div className={`p-4 border-b flex items-center justify-between gap-2 ${
+                      isDarkMode ? 'border-slate-800/80 bg-slate-950/40' : 'border-slate-100 bg-slate-50/70'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center">
+                          <Bell className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-extrabold tracking-tight">Notifications</h3>
+                            {unreadNotificationCount > 0 && (
+                              <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-bold">
+                                {unreadNotificationCount} new
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-medium">Real-time alerts & RP updates</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {unreadNotificationCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={markAllNotificationsAsRead}
+                            className={`p-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                              isDarkMode ? 'text-indigo-400 hover:bg-slate-800' : 'text-indigo-600 hover:bg-indigo-50'
+                            }`}
+                            title="Mark all as read"
+                          >
+                            <CheckCheck className="w-4 h-4" />
+                            <span className="hidden sm:inline text-[11px]">Read All</span>
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={clearAllNotifications}
+                            className={`p-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                              isDarkMode ? 'text-slate-400 hover:text-rose-400 hover:bg-slate-800' : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
+                            }`}
+                            title="Clear all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIsNotificationOpen(false)}
+                          className={`p-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                            isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                          }`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div className={`flex items-center gap-1 px-3 py-2 border-b text-xs ${
+                      isDarkMode ? 'border-slate-800 bg-slate-950/20' : 'border-slate-100 bg-slate-50/40'
+                    }`}>
+                      {[
+                        { id: 'all', label: `All (${notifications.length})` },
+                        { id: 'unread', label: `Unread (${unreadNotificationCount})` },
+                        { id: 'points', label: 'Points' },
+                        { id: 'placements', label: 'Placements' }
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setNotificationFilter(tab.id)}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                            notificationFilter === tab.id
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : isDarkMode
+                                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Notifications List */}
+                    <div className="max-h-[58vh] sm:max-h-[380px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 p-1">
+                      {filteredNotifications.length === 0 ? (
+                        <div className="p-8 text-center space-y-2">
+                          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 mx-auto flex items-center justify-center">
+                            <Bell className="w-6 h-6 opacity-60" />
+                          </div>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            {notificationFilter === 'unread' ? 'All caught up!' : 'No notifications yet'}
+                          </p>
+                          <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                            When reward points are credited, placement bulletins update, or campus drives are announced, you will see alerts here.
+                          </p>
+                        </div>
+                      ) : (
+                        filteredNotifications.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              markNotificationAsRead(item.id);
+                              if (item.linkTab) {
+                                setActiveNav(item.linkTab);
+                                setIsNotificationOpen(false);
+                              }
+                            }}
+                            className={`p-3.5 rounded-2xl transition-all cursor-pointer flex items-start gap-3 relative group ${
+                              !item.read
+                                ? isDarkMode
+                                  ? 'bg-slate-800/60 hover:bg-slate-800'
+                                  : 'bg-indigo-50/50 hover:bg-indigo-50'
+                                : isDarkMode
+                                  ? 'hover:bg-slate-800/40 opacity-75 hover:opacity-100'
+                                  : 'hover:bg-slate-50 opacity-80 hover:opacity-100'
+                            }`}
+                          >
+                            {/* Type Icon */}
+                            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 border ${
+                              item.type === 'points_credited'
+                                ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20'
+                                : item.type === 'points_debited'
+                                  ? 'bg-rose-500/15 text-rose-500 border-rose-500/20'
+                                  : item.type === 'placement_update'
+                                    ? 'bg-indigo-500/15 text-indigo-500 border-indigo-500/20'
+                                    : 'bg-blue-500/15 text-blue-500 border-blue-500/20'
+                            }`}>
+                              {item.type === 'points_credited' ? (
+                                <Trophy className="w-4 h-4 text-emerald-500" />
+                              ) : item.type === 'points_debited' ? (
+                                <TrendingDown className="w-4 h-4 text-rose-500" />
+                              ) : item.type === 'placement_update' ? (
+                                <Briefcase className="w-4 h-4 text-indigo-500" />
+                              ) : (
+                                <Sparkles className="w-4 h-4 text-blue-500" />
+                              )}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0 pr-4">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h4 className={`text-xs font-bold leading-snug truncate ${
+                                  !item.read ? 'text-indigo-600 dark:text-indigo-400' : isDarkMode ? 'text-slate-200' : 'text-slate-800'
+                                }`}>
+                                  {item.title}
+                                </h4>
+                                {!item.read && (
+                                  <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                                )}
+                              </div>
+                              <p className={`text-[11px] mt-0.5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                {item.description}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400 font-medium">
+                                <span>{formatRelativeTime(item.timestamp)}</span>
+                                {item.linkTab && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-indigo-500 hover:underline font-bold flex items-center gap-0.5">
+                                      <span>View {item.linkTab}</span>
+                                      <ChevronRight className="w-3 h-3" />
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Dismiss Individual Button */}
+                            <button
+                              type="button"
+                              onClick={(e) => deleteNotification(item.id, e)}
+                              className={`opacity-0 group-hover:opacity-100 p-1 rounded-lg transition-all absolute top-3 right-3 text-slate-400 hover:text-rose-500 ${
+                                isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-200'
+                              }`}
+                              title="Delete alert"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Dark / Light Theme Toggle */}
