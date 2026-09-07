@@ -1,13 +1,13 @@
 {
-  "lastUpdated": "September 04, 2026",
+  "lastUpdated": "September 06, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 498,
-  "totalCompaniesVisited": 86,
-  "editionDate": "05-09-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/a456584a60ed0504eb2a48ea84630b7af33a490e.pdf",
-  "totalPages": 7,
-  "placementPageNumber": 6,
-  "drivesPageNumber": 7,
+  "totalStudentsPlaced": 510,
+  "totalCompaniesVisited": 87,
+  "editionDate": "07-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/0dada89c691c3b32b09ca5b007f468dbd82a9cbb.pdf",
+  "totalPages": 9,
+  "placementPageNumber": 8,
+  "drivesPageNumber": 9,
   "upcomingDrives": [
     {
       "company": "Cytrusst Intelligence Pvt. Ltd.",
@@ -128,7 +128,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 220,
+      "offerCount": 232,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [
@@ -152,6 +152,7 @@
         "Lucid Imaging",
         "Mayflower Enterprises",
         "Motherson",
+        "Orchid Pharma",
         "Pharmag Instruments",
         "RK Ecran",
         "Robonetics Automation Solutions",
