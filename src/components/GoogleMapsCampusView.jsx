@@ -31,7 +31,7 @@ export const BIT_CAMPUS_PLACES = [
   {
     id: 'main_gate',
     name: 'MAIN GATE',
-    shortCode: 'GATE-01',
+    shortCode: 'MAIN GATE',
     category: 'Entrance',
     tagline: 'Primary Campus Security & Entry Checkpoint',
     lat: 11.4946,
@@ -49,7 +49,7 @@ export const BIT_CAMPUS_PLACES = [
   {
     id: 'principal_office',
     name: 'PRINCIPAL OFFICE',
-    shortCode: 'ADMIN',
+    shortCode: 'PRINCIPAL OFFICE',
     category: 'Administrative',
     tagline: 'Executive Headquarters & Central Administrative Block',
     lat: 11.4962,
@@ -139,7 +139,7 @@ export const BIT_CAMPUS_PLACES = [
   {
     id: 'cafeteria',
     name: 'CAFETERIA / MAIN CANTEEN',
-    shortCode: 'CANTEEN',
+    shortCode: 'CAFETERIA',
     category: 'Dining',
     tagline: 'Multi-Cuisine Food Court, Fresh Juices & Snacks',
     lat: 11.4957,
@@ -160,22 +160,28 @@ const BIT_CENTER = [11.4967, 77.2763];
 
 const MAP_LAYERS = [
   {
-    id: 'streets',
-    name: 'Default (Google Style)',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; CartoDB &copy; OpenStreetMap contributors'
+    id: 'google_streets',
+    name: 'Google Map',
+    url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps'
   },
   {
     id: 'satellite',
-    name: 'Satellite View',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: '&copy; Esri World Imagery'
+    name: 'Satellite',
+    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Satellite'
+  },
+  {
+    id: 'osm',
+    name: 'OpenStreetMap',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors'
   },
   {
     id: 'dark',
-    name: 'Night Dark View',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; CartoDB Dark'
+    name: 'Night Dark',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri World Street'
   }
 ];
 
@@ -186,17 +192,12 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
   const markersRef = useRef({});
   const routePolylineRef = useRef(null);
 
-  const [activeLayer, setActiveLayer] = useState(isDarkMode ? 'dark' : 'streets');
+  const [activeLayer, setActiveLayer] = useState('google_streets');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isDirectionsActive, setIsDirectionsActive] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
-
-  // Sync layer with dark mode if user hasn't explicitly overridden
-  useEffect(() => {
-    setActiveLayer(isDarkMode ? 'dark' : 'streets');
-  }, [isDarkMode]);
 
   // Categories
   const categories = useMemo(() => ['All', 'Academic', 'Administrative', 'Library', 'Dining', 'Entrance'], []);
@@ -227,7 +228,7 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
       center: BIT_CENTER,
       zoom: 17,
       minZoom: 15,
-      maxZoom: 19,
+      maxZoom: 20,
       zoomControl: false // custom controls
     });
 
@@ -237,7 +238,7 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
     const layerConfig = MAP_LAYERS.find(l => l.id === activeLayer) || MAP_LAYERS[0];
     const tileLayer = L.tileLayer(layerConfig.url, {
       attribution: layerConfig.attribution,
-      maxZoom: 19
+      maxZoom: 20
     }).addTo(map);
 
     tileLayerRef.current = tileLayer;
@@ -249,10 +250,10 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
     ];
     L.rectangle(campusBounds, {
       color: '#4f46e5',
-      weight: 1.5,
-      dashArray: '4, 8',
+      weight: 2,
+      dashArray: '5, 8',
       fillColor: '#6366f1',
-      fillOpacity: 0.03
+      fillOpacity: 0.04
     }).addTo(map);
 
     // Add Custom Markers
@@ -260,16 +261,16 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
       const customIcon = L.divIcon({
         className: 'custom-google-pin',
         html: `
-          <div class="gmap-pin-wrapper" id="pin-\${place.id}">
-            <div class="gmap-pin-pill" style="border-left: 3px solid \${place.color};">
-              <span class="gmap-pin-dot" style="background-color: \${place.color};"></span>
-              <span class="gmap-pin-label">\${place.shortCode}</span>
+          <div class="gmap-pin-wrapper" id="pin-${place.id}">
+            <div class="gmap-pin-pill" style="border-left: 4px solid ${place.color};">
+              <span class="gmap-pin-dot" style="background-color: ${place.color};"></span>
+              <span class="gmap-pin-label">${place.shortCode}</span>
             </div>
             <div class="gmap-pin-pointer"></div>
           </div>
         `,
-        iconSize: [80, 42],
-        iconAnchor: [40, 40]
+        iconSize: [110, 42],
+        iconAnchor: [55, 38]
       });
 
       const marker = L.marker([place.lat, place.lng], { icon: customIcon }).addTo(map);
@@ -294,7 +295,7 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
     mapInstanceRef.current.removeLayer(tileLayerRef.current);
     tileLayerRef.current = L.tileLayer(layerConfig.url, {
       attribution: layerConfig.attribution,
-      maxZoom: 19
+      maxZoom: 20
     }).addTo(mapInstanceRef.current);
   }, [activeLayer]);
 
@@ -336,7 +337,7 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
 
       // Intermediate point for natural campus walkway turn
       const midPoint = [
-        (startPoint[0] + endPoint[0]) / 2 + 0.0003,
+        (startPoint[0] + endPoint[0]) / 2 + 0.0002,
         (startPoint[1] + endPoint[1]) / 2 - 0.0001
       ];
 
@@ -365,7 +366,7 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
   // Share / Copy Link
   const handleShare = () => {
     if (!selectedPlace) return;
-    const shareText = `📍 \${selectedPlace.name} - Bannari Amman Institute of Technology (BIT Sathy)\nCoordinates: \${selectedPlace.lat}, \${selectedPlace.lng}\nhttps://maps.google.com/?q=\${selectedPlace.lat},\${selectedPlace.lng}`;
+    const shareText = "📍 " + selectedPlace.name + " - Bannari Amman Institute of Technology (BIT Sathy)\nCoordinates: " + selectedPlace.lat + ", " + selectedPlace.lng + "\nhttps://maps.google.com/?q=" + selectedPlace.lat + "," + selectedPlace.lng;
     navigator.clipboard.writeText(shareText);
     setCopiedToast(true);
     setTimeout(() => setCopiedToast(false), 2200);
@@ -505,7 +506,7 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">{layer.name.split(' ')[0]}</span>
+              <span className="hidden md:inline">{layer.name}</span>
             </button>
           ))}
         </div>
@@ -626,7 +627,7 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
             </button>
 
             <a
-              href={`https://maps.google.com/?q=\${selectedPlace.lat},\${selectedPlace.lng}`}
+              href={"https://maps.google.com/?q=" + selectedPlace.lat + "," + selectedPlace.lng}
               target="_blank"
               rel="noreferrer"
               className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center transition-colors cursor-pointer"
@@ -670,31 +671,31 @@ export default function GoogleMapsCampusView({ isDarkMode }) {
           z-index: 1000 !important;
         }
         .gmap-pin-pill {
-          background: rgba(15, 23, 42, 0.95);
+          background: #0f172a;
           color: #ffffff;
-          padding: 4px 8px;
+          padding: 4px 10px;
           border-radius: 9999px;
-          font-size: 10.5px;
+          font-size: 11px;
           font-weight: 800;
           letter-spacing: 0.02em;
           display: flex;
           align-items: center;
-          gap: 5px;
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-          border: 1px solid rgba(255, 255, 255, 0.15);
+          gap: 6px;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.2);
           white-space: nowrap;
         }
         .gmap-pin-dot {
-          width: 7px;
-          height: 7px;
+          width: 8px;
+          height: 8px;
           border-radius: 9999px;
         }
         .gmap-pin-pointer {
           width: 0;
           height: 0;
-          border-left: 5px solid transparent;
-          border-right: 5px solid transparent;
-          border-top: 5px solid #0f172a;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-top: 6px solid #0f172a;
           margin-top: -1px;
         }
         .gmap-walking-route {

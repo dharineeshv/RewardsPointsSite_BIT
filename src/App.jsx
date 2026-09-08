@@ -1464,7 +1464,7 @@ const BIT_PORTAL_SHORTCUTS = [
   {
     id: 'ps',
     name: 'PS Portal',
-    badge: 'Special Labs',
+    badge: 'Special Labs & Skills',
     url: 'https://ps.bitsathy.ac.in',
     icon: Code,
     color: 'from-blue-600 to-indigo-600',
@@ -1480,13 +1480,58 @@ const BIT_PORTAL_SHORTCUTS = [
     desc: 'Personality & Career Development Program for placements & skill tests'
   },
   {
+    id: 'library',
+    name: 'BIT Digital Library',
+    badge: 'E-Books & Journals',
+    url: 'https://library.bitsathy.ac.in',
+    icon: Library,
+    color: 'from-emerald-500 to-teal-600',
+    desc: 'Access IEEE Xplore, ScienceDirect, DELNET, e-books & research papers'
+  },
+  {
+    id: 'webmail',
+    name: 'BIT Webmail',
+    badge: 'Institutional Mail',
+    url: 'https://mail.google.com/a/bitsathy.ac.in',
+    icon: Mail,
+    color: 'from-red-500 to-rose-600',
+    desc: 'Official college Gmail inbox for academic circulars & notices'
+  },
+  {
+    id: 'moodle',
+    name: 'Moodle LMS',
+    badge: 'Courses & LMS',
+    url: 'https://moodle.bitsathy.ac.in',
+    icon: BookOpen,
+    color: 'from-orange-500 to-amber-600',
+    desc: 'Lecture notes, assignments, course syllabi & lab evaluations'
+  },
+  {
+    id: 'alumni',
+    name: 'Alumni Network',
+    badge: 'Connect & Mentorship',
+    url: 'https://alumni.bitsathy.ac.in',
+    icon: GraduationCap,
+    color: 'from-violet-600 to-purple-700',
+    desc: 'BIT Alumni community, mentorship connect & referral opportunities'
+  },
+  {
     id: 'wiki',
     name: 'BIT Wiki',
     badge: 'Campus Handbook',
     url: 'https://wiki.bitsathy.ac.in',
     icon: BookOpen,
-    color: 'from-emerald-500 to-teal-600',
+    color: 'from-teal-500 to-cyan-600',
     desc: 'Campus guidelines, curriculum, club details, and knowledge base'
+  },
+  {
+    id: 'geobits',
+    name: 'GeoBITS 3D Map',
+    badge: 'Campus Navigation',
+    url: 'https://geobits.onrender.com',
+    icon: Navigation,
+    color: 'from-blue-500 to-indigo-600',
+    desc: 'Interactive 3D campus navigation, buildings & landmarks map'
   },
   {
     id: 'website',
@@ -2605,6 +2650,42 @@ export default function App() {
 
   // Live Campus Weather State (Open-Meteo API)
   const [weatherData, setWeatherData] = useState(null);
+
+  // Live BIT PS Portal Token State
+  const [psToken, setPsToken] = useState(() => {
+    try {
+      return localStorage.getItem('bit_ps_token') || '';
+    } catch (e) {
+      return '';
+    }
+  });
+
+  // 1-Click Sync Bridge Receiver: Capture ?sync_token= from PS Portal or BroadcastChannel
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      
+      // 1. Check URL query parameters (e.g. ?sync_token=eyJ...)
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('sync_token') || params.get('ps_token') || params.get('token');
+      if (urlToken) {
+        localStorage.setItem('bit_ps_token', urlToken);
+        setPsToken(urlToken);
+        const cleanPath = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanPath);
+      }
+
+      // 2. Listen for cross-window message from 1-Click Sync Bridge
+      const handleWindowMessage = (e) => {
+        if (e.data && e.data.type === 'BIT_PS_SYNC_TOKEN' && e.data.token) {
+          localStorage.setItem('bit_ps_token', e.data.token);
+          setPsToken(e.data.token);
+        }
+      };
+      window.addEventListener('message', handleWindowMessage);
+      return () => window.removeEventListener('message', handleWindowMessage);
+    } catch (e) {}
+  }, []);
 
   // Campus Mess & Dining Menu State
   const [messHostel, setMessHostel] = useState('boys');
@@ -7321,6 +7402,13 @@ export default function App() {
                         Quick Shortcuts
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setActiveNav('Campus Circulars')}
+                          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-500 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                        >
+                          <FileCheck className="w-3.5 h-3.5" />
+                          <span>Campus Circulars & Media →</span>
+                        </button>
                         <button
                           onClick={() => setActiveNav('Leaderboard')}
                           className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-500 transition-all cursor-pointer"
