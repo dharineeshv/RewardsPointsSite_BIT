@@ -245,6 +245,41 @@ async function run() {
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(placementData, null, 2), 'utf-8');
   console.log('✅ Successfully updated placement data 100% dynamically:', OUTPUT_FILE);
   console.log(`Batch: ${targetBatch} | Placed: ${totalStudentsPlaced} | Companies: ${totalCompaniesVisited} | Edition: ${edition.dateStr}`);
+
+  // Broadcast Realtime Push Notification to Firebase for Web & Mobile clients
+  try {
+    const notificationPayload = {
+      id: `placement_${edition.dateStr.replace(/[^0-9]/g, '_')}`,
+      title: '🎉 Daily BIT Placement Update!',
+      body: `${totalStudentsPlaced} students placed across ${totalCompaniesVisited} companies as on ${edition.dateStr}!`,
+      placed: totalStudentsPlaced,
+      companies: totalCompaniesVisited,
+      batch: targetBatch,
+      editionDate: edition.dateStr,
+      timestamp: Date.now(),
+      type: 'placement_update'
+    };
+
+    const fbDataStr = JSON.stringify(notificationPayload);
+    const fbReq = https.request({
+      hostname: 'rewards-site-7a5a8-default-rtdb.firebaseio.com',
+      port: 443,
+      path: '/notifications/latest.json',
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(fbDataStr)
+      }
+    }, (res) => {
+      console.log(`📡 Broadcasted placement push notification to Firebase: [${res.statusCode}]`);
+    });
+    fbReq.on('error', (err) => console.warn('Firebase notification broadcast warning:', err.message));
+    fbReq.write(fbDataStr);
+    fbReq.end();
+  } catch (notifErr) {
+    console.warn('Notification broadcast error:', notifErr);
+  }
 }
 
 run().catch(console.error);
+

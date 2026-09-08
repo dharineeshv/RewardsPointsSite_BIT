@@ -2457,6 +2457,19 @@ export default function App() {
         } catch (e) {}
         return updated;
       });
+
+      // Trigger Native OS Push Notification if permitted
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(placementNotif.title, {
+            body: placementNotif.description,
+            icon: '/favicon.ico',
+            tag: `placement_${currentEdition}`
+          });
+        } catch (pushErr) {
+          console.warn('Native notification push error:', pushErr);
+        }
+      }
     } else {
       lastProcessedPlacementRef.current = `${userKey}_${currentEdition}`;
       try {
@@ -2464,6 +2477,31 @@ export default function App() {
       } catch (e) {}
     }
   }, [isLoggedIn, BIT_DAILY_PLACEMENT_DATA?.lastUpdated, BIT_DAILY_PLACEMENT_DATA?.editionDate, BIT_DAILY_PLACEMENT_DATA?.targetBatch, currentUser?.email]);
+
+  // Browser Push Notification State & Permission Handler
+  const [pushPermission, setPushPermission] = useState(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'default';
+  });
+
+  const requestPushPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const res = await Notification.requestPermission();
+        setPushPermission(res);
+        if (res === 'granted') {
+          new Notification('🔔 BIT Placement Alerts Enabled!', {
+            body: 'You will receive automatic alerts when daily placement records update at 5:00 PM!',
+            icon: '/favicon.ico'
+          });
+        }
+      } catch (err) {
+        console.warn('Push permission error:', err);
+      }
+    }
+  };
 
   // Notification Helper Actions
   const unreadNotificationCount = useMemo(() => {
@@ -3957,6 +3995,27 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+
+                    {/* Push Notification Opt-In Banner */}
+                    {pushPermission !== 'granted' && (
+                      <div className={`p-3 m-2 rounded-2xl border flex items-center justify-between gap-2.5 transition-all ${
+                        isDarkMode ? 'bg-indigo-950/40 border-indigo-800/50 text-indigo-200' : 'bg-indigo-50 border-indigo-200 text-indigo-900'
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          <BellRing className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                          <span className="text-xs font-bold">
+                            Enable Notifications
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={requestPushPermission}
+                          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex-shrink-0 cursor-pointer shadow-xs active:scale-95"
+                        >
+                          Enable
+                        </button>
+                      </div>
+                    )}
 
                     {/* Notifications List */}
                     <div className="max-h-[58vh] sm:max-h-[380px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 p-1">
