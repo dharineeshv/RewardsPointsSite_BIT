@@ -1523,15 +1523,6 @@ const BIT_PORTAL_SHORTCUTS = [
     desc: 'Personality & Career Development Program for placements & skill tests'
   },
   {
-    id: 'library',
-    name: 'BIT Digital Library',
-    badge: 'E-Books & Journals',
-    url: 'https://library.bitsathy.ac.in',
-    icon: Library,
-    color: 'from-emerald-500 to-teal-600',
-    desc: 'Access IEEE Xplore, ScienceDirect, DELNET, e-books & research papers'
-  },
-  {
     id: 'webmail',
     name: 'BIT Webmail',
     badge: 'Institutional Mail',
@@ -1541,24 +1532,6 @@ const BIT_PORTAL_SHORTCUTS = [
     desc: 'Official college Gmail inbox for academic circulars & notices'
   },
   {
-    id: 'moodle',
-    name: 'Moodle LMS',
-    badge: 'Courses & LMS',
-    url: 'https://moodle.bitsathy.ac.in',
-    icon: BookOpen,
-    color: 'from-orange-500 to-amber-600',
-    desc: 'Lecture notes, assignments, course syllabi & lab evaluations'
-  },
-  {
-    id: 'alumni',
-    name: 'Alumni Network',
-    badge: 'Connect & Mentorship',
-    url: 'https://alumni.bitsathy.ac.in',
-    icon: GraduationCap,
-    color: 'from-violet-600 to-purple-700',
-    desc: 'BIT Alumni community, mentorship connect & referral opportunities'
-  },
-  {
     id: 'wiki',
     name: 'BIT Wiki',
     badge: 'Campus Handbook',
@@ -1566,15 +1539,6 @@ const BIT_PORTAL_SHORTCUTS = [
     icon: BookOpen,
     color: 'from-teal-500 to-cyan-600',
     desc: 'Campus guidelines, curriculum, club details, and knowledge base'
-  },
-  {
-    id: 'geobits',
-    name: 'GeoBITS 3D Map',
-    badge: 'Campus Navigation',
-    url: 'https://geobits.onrender.com',
-    icon: Navigation,
-    color: 'from-blue-500 to-indigo-600',
-    desc: 'Interactive 3D campus navigation, buildings & landmarks map'
   },
   {
     id: 'website',
