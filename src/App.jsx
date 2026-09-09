@@ -1347,12 +1347,18 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
 // Transform API response item to standard student model
 function transformApiStudent(apiItem) {
   if (!apiItem) return null;
-  const name = (apiItem.student_name || 'STUDENT').toUpperCase();
+  const name = String(apiItem.student_name || 'STUDENT').toUpperCase();
   const initials = name.split(' ').map(w => w[0]).filter(Boolean).join('').slice(0, 2) || 'ST';
-  const balanceRaw = apiItem.balance_points ? apiItem.balance_points.replace(/,/g, '') : '0';
-  const balancePts = parseFloat(balanceRaw).toLocaleString();
-  const cumulativePts = apiItem.cumulative_reward_points ? parseFloat(apiItem.cumulative_reward_points.replace(/,/g, '')).toLocaleString() : balancePts;
-  const redeemedPts = apiItem.redeemed_points ? parseFloat(apiItem.redeemed_points.replace(/,/g, '')).toLocaleString() : '0';
+  const balanceRaw = apiItem.balance_points !== undefined && apiItem.balance_points !== null ? String(apiItem.balance_points).replace(/,/g, '') : '0';
+  const balancePts = (parseFloat(balanceRaw) || 0).toLocaleString();
+  const cumulativeRaw = apiItem.cumulative_reward_points !== undefined && apiItem.cumulative_reward_points !== null 
+    ? String(apiItem.cumulative_reward_points).replace(/,/g, '') 
+    : balanceRaw;
+  const cumulativePts = (parseFloat(cumulativeRaw) || 0).toLocaleString();
+  const redeemedRaw = apiItem.redeemed_points !== undefined && apiItem.redeemed_points !== null 
+    ? String(apiItem.redeemed_points).replace(/,/g, '') 
+    : '0';
+  const redeemedPts = (parseFloat(redeemedRaw) || 0).toLocaleString();
 
   return {
     id: apiItem.roll_no || "7376232CT108",
@@ -1360,8 +1366,8 @@ function transformApiStudent(apiItem) {
     initials: initials,
     department: apiItem.department || "COMPUTER TECHNOLOGY",
     course_code: apiItem.course_code || "B. Tech.",
-    year: apiItem.year ? (apiItem.year.startsWith('Year') ? apiItem.year : `Year ${apiItem.year}`) : "Year IV",
-    mentor_name: apiItem.mentor_name || "Dr. ANANDAKUMAR K ISE",
+    year: apiItem.year ? (String(apiItem.year).startsWith('Year') ? String(apiItem.year) : `Year ${apiItem.year}`) : "Year IV",
+    mentor_name: apiItem.mentor_name || "BIT Faculty",
     currentPoints: balancePts,
     cumulativePoints: cumulativePts,
     redeemedPoints: redeemedPts,
@@ -1376,8 +1382,8 @@ function transformApiStudent(apiItem) {
     ],
     breakdown: [
       { label: "Active Net Balance", pts: parseFloat(balanceRaw) || 0, percent: 65, color: "bg-[#4f46e5]" },
-      { label: "Cumulative Points", pts: parseFloat(apiItem.cumulative_reward_points?.replace(/,/g, '') || balanceRaw) || 0, percent: 100, color: "bg-[#22d3ee]" },
-      { label: "Redeemed Points", pts: parseFloat(apiItem.redeemed_points?.replace(/,/g, '') || 0), percent: 15, color: "bg-amber-500" },
+      { label: "Cumulative Points", pts: parseFloat(cumulativeRaw) || 0, percent: 100, color: "bg-[#22d3ee]" },
+      { label: "Redeemed Points", pts: parseFloat(redeemedRaw) || 0, percent: 15, color: "bg-amber-500" },
     ]
   };
 }
@@ -3216,10 +3222,11 @@ export default function App() {
               
               studentMap.set(item.roll_no, {
                 ...item,
-                numPoints: numCumulative,
+                numPoints: numBalance,
                 numBalance: numBalance,
+                numCumulative: numCumulative,
                 normalizedYear: normYear,
-                displayPoints: numCumulative.toLocaleString(),
+                displayPoints: numBalance.toLocaleString(),
                 displayBalance: numBalance.toLocaleString(),
                 displayCumulative: numCumulative.toLocaleString(),
                 displayRedeemed: item.redeemed_points !== undefined && item.redeemed_points !== null
@@ -3231,8 +3238,13 @@ export default function App() {
         }
       }
 
-      // Sort in descending order (highest cumulative RP points first)
-      const sorted = Array.from(studentMap.values()).sort((a, b) => b.numPoints - a.numPoints);
+      // Sort in descending order (highest active balance_points first, with cumulative points as tie-breaker)
+      const sorted = Array.from(studentMap.values()).sort((a, b) => {
+        if (b.numBalance !== a.numBalance) {
+          return b.numBalance - a.numBalance;
+        }
+        return b.numCumulative - a.numCumulative;
+      });
       setDeptLeaderboardList(sorted);
     } catch (err) {
       console.error('Error fetching department leaderboard:', err);
@@ -4974,80 +4986,83 @@ export default function App() {
                     {ALL_DEPARTMENTS
                       .filter(d => 
                         !deptFilterQuery || 
-                        d.name.toLowerCase().includes(deptFilterQuery.toLowerCase()) || 
-                        d.id.toLowerCase().includes(deptFilterQuery.toLowerCase())
+                        String(d.name || '').toLowerCase().includes(deptFilterQuery.toLowerCase().trim()) || 
+                        String(d.id || '').toLowerCase().includes(deptFilterQuery.toLowerCase().trim())
                       )
-                      .map((dept) => (
-                        <div
-                          key={dept.id}
-                          onClick={() => handleViewDepartmentLeaderboard(dept)}
-                          className={`rounded-3xl border p-5 sm:p-6 flex flex-col justify-between cursor-pointer transition-all duration-300 group hover:-translate-y-1.5 ${
-                            isDarkMode 
-                              ? 'border-slate-800 bg-slate-900/90 hover:border-indigo-500/50 hover:bg-slate-900 shadow-xl shadow-black/40 hover:shadow-indigo-950/30' 
-                              : 'border-slate-200/90 bg-white hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-100/60 shadow-sm'
-                          }`}
-                        >
-                          <div>
-                            {/* Card Top Header: 3D Glowing Vector Capsule & Badges */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="relative">
-                                {/* Ambient 3D Glow */}
-                                <div className={`absolute -inset-1 rounded-2xl bg-gradient-to-br ${dept.color} opacity-40 blur-sm group-hover:opacity-75 group-hover:blur-md transition-all duration-300`} />
-                                
-                                {/* 3D Glass Capsule */}
-                                <div className={`relative w-12 h-12 rounded-2xl bg-gradient-to-br ${dept.color} p-[1.5px] shadow-lg shadow-black/25 group-hover:scale-105 group-hover:-rotate-2 transition-all duration-300 flex items-center justify-center`}>
-                                  <div className="w-full h-full rounded-[14px] bg-white/15 backdrop-blur-xs flex items-center justify-center border-t border-l border-white/40 border-b border-r border-black/20">
-                                    <dept.Icon className="w-6 h-6 text-white drop-shadow-md" strokeWidth={2.2} />
+                      .map((dept) => {
+                        const DeptIcon = dept.Icon || Trophy;
+                        return (
+                          <div
+                            key={dept.id}
+                            onClick={() => handleViewDepartmentLeaderboard(dept)}
+                            className={`rounded-3xl border p-5 sm:p-6 flex flex-col justify-between cursor-pointer transition-all duration-300 group hover:-translate-y-1.5 ${
+                              isDarkMode 
+                                ? 'border-slate-800 bg-slate-900/90 hover:border-indigo-500/50 hover:bg-slate-900 shadow-xl shadow-black/40 hover:shadow-indigo-950/30' 
+                                : 'border-slate-200/90 bg-white hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-100/60 shadow-sm'
+                            }`}
+                          >
+                            <div>
+                              {/* Card Top Header: 3D Glowing Vector Capsule & Badges */}
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="relative">
+                                  {/* Ambient 3D Glow */}
+                                  <div className={`absolute -inset-1 rounded-2xl bg-gradient-to-br ${dept.color || 'from-indigo-600 to-blue-600'} opacity-40 blur-sm group-hover:opacity-75 group-hover:blur-md transition-all duration-300`} />
+                                  
+                                  {/* 3D Glass Capsule */}
+                                  <div className={`relative w-12 h-12 rounded-2xl bg-gradient-to-br ${dept.color || 'from-indigo-600 to-blue-600'} p-[1.5px] shadow-lg shadow-black/25 group-hover:scale-105 group-hover:-rotate-2 transition-all duration-300 flex items-center justify-center`}>
+                                    <div className="w-full h-full rounded-[14px] bg-white/15 backdrop-blur-xs flex items-center justify-center border-t border-l border-white/40 border-b border-r border-black/20">
+                                      <DeptIcon className="w-6 h-6 text-white drop-shadow-md" strokeWidth={2.2} />
+                                    </div>
                                   </div>
                                 </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border shadow-2xs ${dept.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700'}`}>
+                                    {dept.id}
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                                  }`}>
+                                    {dept.degree}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border shadow-2xs ${dept.badgeColor}`}>
-                                  {dept.id}
-                                </span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                  isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
-                                }`}>
-                                  {dept.degree}
-                                </span>
+
+                              {/* Department Title */}
+                              <h3 className={`text-base font-extrabold transition-colors leading-snug ${
+                                isDarkMode ? 'text-white group-hover:text-indigo-400' : 'text-slate-900 group-hover:text-indigo-600'
+                              }`}>
+                                {dept.name}
+                              </h3>
+
+                              {/* Live Rankings Metadata */}
+                              <div className={`flex items-center gap-1.5 mt-2.5 text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
+                                <span className="text-[11px] font-semibold">Live Rankings</span>
+                                <span className="opacity-40">•</span>
+                                <span className="text-[11px]">Year I – IV</span>
                               </div>
                             </div>
 
-                            {/* Department Title */}
-                            <h3 className={`text-base font-extrabold transition-colors leading-snug ${
-                              isDarkMode ? 'text-white group-hover:text-indigo-400' : 'text-slate-900 group-hover:text-indigo-600'
+                            {/* Card Interactive Footer */}
+                            <div className={`mt-5 pt-3.5 border-t flex items-center justify-between transition-colors ${
+                              isDarkMode ? 'border-slate-800/80 group-hover:border-slate-700' : 'border-slate-100 group-hover:border-slate-200'
                             }`}>
-                              {dept.name}
-                            </h3>
-
-                            {/* Live Rankings Metadata */}
-                            <div className={`flex items-center gap-1.5 mt-2.5 text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
-                              <span className="text-[11px] font-semibold">Live Rankings</span>
-                              <span className="opacity-40">•</span>
-                              <span className="text-[11px]">Year I – IV</span>
+                              <span className={`text-xs font-bold transition-colors ${
+                                isDarkMode ? 'text-slate-300 group-hover:text-indigo-400' : 'text-slate-700 group-hover:text-indigo-600'
+                              }`}>
+                                View Leaderboard
+                              </span>
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                                isDarkMode 
+                                  ? 'bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-indigo-500/30' 
+                                  : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-indigo-500/30'
+                              }`}>
+                                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                              </div>
                             </div>
                           </div>
-
-                          {/* Card Interactive Footer */}
-                          <div className={`mt-5 pt-3.5 border-t flex items-center justify-between transition-colors ${
-                            isDarkMode ? 'border-slate-800/80 group-hover:border-slate-700' : 'border-slate-100 group-hover:border-slate-200'
-                          }`}>
-                            <span className={`text-xs font-bold transition-colors ${
-                              isDarkMode ? 'text-slate-300 group-hover:text-indigo-400' : 'text-slate-700 group-hover:text-indigo-600'
-                            }`}>
-                              View Leaderboard
-                            </span>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              isDarkMode 
-                                ? 'bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-indigo-500/30' 
-                                : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-indigo-500/30'
-                            }`}>
-                              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               ) : (
@@ -5071,27 +5086,30 @@ export default function App() {
                       </button>
 
                       <div className="flex items-center gap-3">
-                        {selectedDeptLeaderboard.Icon && (
-                          <div className="relative flex-shrink-0">
-                            <div className={`absolute -inset-0.5 rounded-xl bg-gradient-to-br ${selectedDeptLeaderboard.color} opacity-50 blur-xs`} />
-                            <div className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${selectedDeptLeaderboard.color} p-[1.5px] flex items-center justify-center shadow-md`}>
-                              <div className="w-full h-full rounded-[10px] bg-white/15 backdrop-blur-xs flex items-center justify-center border-t border-l border-white/40">
-                                <selectedDeptLeaderboard.Icon className="w-5 h-5 text-white drop-shadow-sm" strokeWidth={2.2} />
+                        {selectedDeptLeaderboard && (() => {
+                          const SelectedIcon = selectedDeptLeaderboard.Icon || Trophy;
+                          return (
+                            <div className="relative flex-shrink-0">
+                              <div className={`absolute -inset-0.5 rounded-xl bg-gradient-to-br ${selectedDeptLeaderboard.color || 'from-indigo-600 to-blue-600'} opacity-50 blur-xs`} />
+                              <div className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${selectedDeptLeaderboard.color || 'from-indigo-600 to-blue-600'} p-[1.5px] flex items-center justify-center shadow-md`}>
+                                <div className="w-full h-full rounded-[10px] bg-white/15 backdrop-blur-xs flex items-center justify-center border-t border-l border-white/40">
+                                  <SelectedIcon className="w-5 h-5 text-white drop-shadow-sm" strokeWidth={2.2} />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <h1 className={`text-xl sm:text-2xl md:text-3xl font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                              {selectedDeptLeaderboard.name}
+                              {selectedDeptLeaderboard?.name}
                             </h1>
-                            <span className={`text-[10px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full border ${selectedDeptLeaderboard.badgeColor}`}>
-                              {selectedDeptLeaderboard.id}
+                            <span className={`text-[10px] sm:text-xs font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full border ${selectedDeptLeaderboard?.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700'}`}>
+                              {selectedDeptLeaderboard?.id}
                             </span>
                           </div>
                           <p className={`text-[11px] sm:text-xs mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Ranked in <span className="text-emerald-500 dark:text-emerald-400 font-bold">descending order</span> of Reward Points • {selectedDeptLeaderboard.degree}
+                            Ranked in <span className="text-emerald-500 dark:text-emerald-400 font-bold">descending order</span> of Active Balance Points • {selectedDeptLeaderboard?.degree}
                           </p>
                         </div>
                       </div>
@@ -5201,7 +5219,7 @@ export default function App() {
                         )}
 
                         {/* Top 3 Podium Cards for Selected Year / All Years */}
-                        {filteredList.length >= 3 && !deptStudentSearch && (
+                        {filteredList.length >= 3 && !deptStudentSearch && filteredList[0] && filteredList[1] && filteredList[2] && (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             {/* Rank 2 (Silver) */}
                             <div className={`rounded-3xl border p-5 shadow-lg relative flex flex-col justify-between order-2 md:order-1 ${
@@ -5213,20 +5231,25 @@ export default function App() {
                                 }`}>
                                   🥈 #2
                                 </div>
-                                <span className={`text-[11px] font-mono ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[1].roll_no}</span>
+                                <span className={`text-[11px] font-mono ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[1]?.roll_no}</span>
                               </div>
                               <div>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block mb-1 ${
                                   isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
                                 }`}>
-                                  {filteredList[1].normalizedYear}
+                                  {filteredList[1]?.normalizedYear}
                                 </span>
-                                <h4 className={`font-extrabold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[1].student_name}</h4>
-                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[1].mentor_name || 'BIT Faculty'}</p>
+                                <h4 className={`font-extrabold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[1]?.student_name}</h4>
+                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[1]?.mentor_name || 'BIT Faculty'}</p>
                               </div>
                               <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                                <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Points</span>
-                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[1].displayCumulative} RP</span>
+                                <div>
+                                  <span className={`text-[10px] uppercase font-bold block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Active Balance</span>
+                                  {filteredList[1]?.displayCumulative !== filteredList[1]?.displayBalance && (
+                                    <span className={`text-[9px] font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Earned: +{filteredList[1]?.displayCumulative} RP</span>
+                                  )}
+                                </div>
+                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[1]?.displayBalance || '0'} RP</span>
                               </div>
                             </div>
 
@@ -5240,7 +5263,7 @@ export default function App() {
                                 <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 dark:text-amber-300 flex items-center justify-center font-black text-base border border-amber-500/60 shadow-md shadow-amber-500/20">
                                   🥇 #1
                                 </div>
-                                <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-300">{filteredList[0].roll_no}</span>
+                                <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-300">{filteredList[0]?.roll_no}</span>
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 mb-1">
@@ -5248,15 +5271,20 @@ export default function App() {
                                     {selectedLeaderboardYear === 'ALL' ? 'Department Rank 1' : `${selectedLeaderboardYear} Rank 1`}
                                   </span>
                                   <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40">
-                                    {filteredList[0].normalizedYear}
+                                    {filteredList[0]?.normalizedYear}
                                   </span>
                                 </div>
-                                <h4 className={`font-black text-lg truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[0].student_name}</h4>
-                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{filteredList[0].mentor_name || 'BIT Faculty'}</p>
+                                <h4 className={`font-black text-lg truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[0]?.student_name}</h4>
+                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{filteredList[0]?.mentor_name || 'BIT Faculty'}</p>
                               </div>
                               <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                                <span className="text-xs text-amber-600 dark:text-amber-300 font-bold uppercase tracking-wider">Top Score</span>
-                                <span className="text-xl font-black text-emerald-500 dark:text-emerald-400">+{filteredList[0].displayCumulative} RP</span>
+                                <div>
+                                  <span className="text-[10px] text-amber-600 dark:text-amber-300 font-bold uppercase tracking-wider block">Top Active Balance</span>
+                                  {filteredList[0]?.displayCumulative !== filteredList[0]?.displayBalance && (
+                                    <span className={`text-[9px] font-medium ${isDarkMode ? 'text-amber-300/60' : 'text-amber-700/70'}`}>Earned: +{filteredList[0]?.displayCumulative} RP</span>
+                                  )}
+                                </div>
+                                <span className="text-xl font-black text-emerald-500 dark:text-emerald-400">+{filteredList[0]?.displayBalance || '0'} RP</span>
                               </div>
                             </div>
 
@@ -5270,20 +5298,25 @@ export default function App() {
                                 }`}>
                                   🥉 #3
                                 </div>
-                                <span className={`text-[11px] font-mono ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[2].roll_no}</span>
+                                <span className={`text-[11px] font-mono ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[2]?.roll_no}</span>
                               </div>
                               <div>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block mb-1 ${
                                   isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
                                 }`}>
-                                  {filteredList[2].normalizedYear}
+                                  {filteredList[2]?.normalizedYear}
                                 </span>
-                                <h4 className={`font-extrabold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[2].student_name}</h4>
-                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[2].mentor_name || 'BIT Faculty'}</p>
+                                <h4 className={`font-extrabold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{filteredList[2]?.student_name}</h4>
+                                <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{filteredList[2]?.mentor_name || 'BIT Faculty'}</p>
                               </div>
                               <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                                <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Points</span>
-                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[2].displayCumulative} RP</span>
+                                <div>
+                                  <span className={`text-[10px] uppercase font-bold block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Active Balance</span>
+                                  {filteredList[2]?.displayCumulative !== filteredList[2]?.displayBalance && (
+                                    <span className={`text-[9px] font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Earned: +{filteredList[2]?.displayCumulative} RP</span>
+                                  )}
+                                </div>
+                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[2]?.displayBalance || '0'} RP</span>
                               </div>
                             </div>
                           </div>
@@ -5307,7 +5340,7 @@ export default function App() {
                               </span>
                             </div>
                             <span className={`text-xs font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Sorted: Highest to Lowest RP
+                              Sorted: Highest to Lowest Active Balance
                             </span>
                           </div>
 
@@ -5371,17 +5404,22 @@ export default function App() {
                                       </div>
                                     </div>
 
-                                    <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0 pl-1">
+                                    <div className="flex flex-col items-end justify-center gap-1 flex-shrink-0 pl-1">
                                       <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
-                                        +{st.displayCumulative} RP
+                                        +{st.displayBalance} RP
                                       </span>
+                                      {st.displayCumulative !== st.displayBalance && (
+                                        <span className={`text-[9px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                          Earned: +{st.displayCumulative}
+                                        </span>
+                                      )}
                                       <button
                                         onClick={() => {
                                           const transformed = transformApiStudent(st);
                                           setSelectedStudent(transformed);
                                           setIsModalOpen(true);
                                         }}
-                                        className="px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] transition-all cursor-pointer shadow-xs whitespace-nowrap active:scale-95"
+                                        className="mt-0.5 px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] transition-all cursor-pointer shadow-xs whitespace-nowrap active:scale-95"
                                       >
                                         Inspect
                                       </button>
@@ -5404,7 +5442,7 @@ export default function App() {
                                   <th className="py-3.5 px-3">ROLL NO</th>
                                   <th className="py-3.5 px-2.5 text-center">YEAR</th>
                                   <th className="py-3.5 px-3 lg:px-4">FACULTY MENTOR</th>
-                                  <th className="py-3.5 px-3 lg:px-4 text-right">REWARD POINTS</th>
+                                  <th className="py-3.5 px-3 lg:px-4 text-right">ACTIVE BALANCE</th>
                                   <th className="py-3.5 px-3 text-center">ACTION</th>
                                 </tr>
                               </thead>
@@ -5469,11 +5507,11 @@ export default function App() {
                                         </td>
                                         <td className="py-3.5 px-3 lg:px-4 text-right whitespace-nowrap">
                                           <div className="font-black text-xs lg:text-sm text-emerald-500 dark:text-emerald-400">
-                                            +{st.displayCumulative} RP
+                                            +{st.displayBalance} RP
                                           </div>
                                           {st.displayBalance !== st.displayCumulative && (
                                             <div className={`text-[10px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                              Bal: {st.displayBalance} RP
+                                              Earned: +{st.displayCumulative} RP
                                             </div>
                                           )}
                                         </td>
