@@ -104,25 +104,25 @@ import {
 } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
-  { id: 'CT', name: 'Computer Technology', fullTitle: 'COMPUTER TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232CT', '7376242CT'], Icon: Terminal, color: 'from-blue-600 to-indigo-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
-  { id: 'CSE', name: 'Computer Science and Engineering', fullTitle: 'COMPUTER SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376231CS', '7376241CS', '7376251CS'], Icon: Cpu, color: 'from-indigo-600 to-violet-600', badgeColor: 'bg-indigo-950/80 text-indigo-300 border-indigo-800' },
-  { id: 'AI&DS', name: 'Artificial Intelligence & Data Science', fullTitle: 'ARTIFICIAL INTELLIGENCE AND DATA SCIENCE', degree: 'B.Tech.', prefixes: ['7376232AD', '7376242AD', '7376252AD'], Icon: Database, color: 'from-cyan-600 to-blue-600', badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-800' },
-  { id: 'AIML', name: 'AI & Machine Learning', fullTitle: 'ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING', degree: 'B.Tech.', prefixes: ['7376232AL', '7376242AL', '7376252AL'], Icon: Brain, color: 'from-purple-600 to-pink-600', badgeColor: 'bg-purple-950/80 text-purple-300 border-purple-800' },
-  { id: 'IT', name: 'Information Technology', fullTitle: 'INFORMATION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232IT', '7376242IT', '7376252IT'], Icon: Globe, color: 'from-sky-600 to-blue-600', badgeColor: 'bg-sky-950/80 text-sky-300 border-sky-800' },
-  { id: 'ECE', name: 'Electronics & Communication Engineering', fullTitle: 'ELECTRONICS AND COMMUNICATION ENGINEERING', degree: 'B.E.', prefixes: ['7376231EC', '7376241EC', '7376251EC'], Icon: Radio, color: 'from-teal-600 to-emerald-600', badgeColor: 'bg-teal-950/80 text-teal-300 border-teal-800' },
-  { id: 'EEE', name: 'Electrical & Electronics Engineering', fullTitle: 'ELECTRICAL AND ELECTRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376231EE', '7376241EE', '7376251EE'], Icon: Zap, color: 'from-amber-600 to-orange-600', badgeColor: 'bg-amber-950/80 text-amber-300 border-amber-800' },
-  { id: 'MECH', name: 'Mechanical Engineering', fullTitle: 'MECHANICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376231ME', '7376241ME', '7376251ME'], Icon: Cog, color: 'from-slate-600 to-zinc-600', badgeColor: 'bg-slate-800 text-slate-300 border-slate-700' },
-  { id: 'EIE', name: 'Electronics & Instrumentation Engineering', fullTitle: 'ELECTRONICS AND INSTRUMENTATION ENGINEERING', degree: 'B.E.', prefixes: ['7376231EI', '7376241EI', '7376251EI'], Icon: Gauge, color: 'from-orange-600 to-amber-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
-  { id: 'CSBS', name: 'Computer Science & Business Systems', fullTitle: 'COMPUTER SCIENCE AND BUSINESS SYSTEMS', degree: 'B.Tech.', prefixes: ['7376232CB', '7376242CB', '7376252CB'], Icon: LineChart, color: 'from-emerald-600 to-green-600', badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-800' },
-  { id: 'AGRI', name: 'Agricultural Engineering', fullTitle: 'AGRICULTURAL ENGINEERING', degree: 'B.E.', prefixes: ['7376232AG', '7376242AG', '7376252AG'], Icon: Sprout, color: 'from-lime-600 to-emerald-600', badgeColor: 'bg-lime-950/80 text-lime-300 border-lime-800' },
-  { id: 'BT', name: 'Biotechnology', fullTitle: 'BIOTECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232BT', '7376242BT', '7376252BT'], Icon: Dna, color: 'from-fuchsia-600 to-pink-600', badgeColor: 'bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-800' },
-  { id: 'CSD', name: 'Computer Science & Design', fullTitle: 'COMPUTER SCIENCE AND DESIGN', degree: 'B.E.', prefixes: ['7376231CD', '7376241CD'], Icon: Palette, color: 'from-violet-600 to-purple-600', badgeColor: 'bg-violet-950/80 text-violet-300 border-violet-800' },
-  { id: 'CIVIL', name: 'Civil Engineering', fullTitle: 'CIVIL ENGINEERING', degree: 'B.E.', prefixes: ['7376231CE', '7376241CE'], Icon: Building2, color: 'from-yellow-600 to-amber-600', badgeColor: 'bg-yellow-950/80 text-yellow-300 border-yellow-800' },
-  { id: 'BIOMEDICAL', name: 'Biomedical Engineering', fullTitle: 'BIOMEDICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376231BM'], Icon: HeartPulse, color: 'from-rose-600 to-pink-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' },
-  { id: 'FD', name: 'Food Technology', fullTitle: 'FOOD TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232FD'], Icon: Utensils, color: 'from-orange-600 to-yellow-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
-  { id: 'FT', name: 'Fashion Technology', fullTitle: 'FASHION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376232FT', '7376242FT'], Icon: Scissors, color: 'from-pink-600 to-rose-600', badgeColor: 'bg-pink-950/80 text-pink-300 border-pink-800' },
-  { id: 'ISE', name: 'Information Science & Engineering', fullTitle: 'INFORMATION SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376231SE', '7376241SE', '7376251SE', '7376231IS', '7376241IS'], Icon: Library, color: 'from-blue-600 to-cyan-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
-  { id: 'MTRS', name: 'Mechatronics Engineering', fullTitle: 'MECHATRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376231MZ', '7376241MZ', '7376251MZ', '7376231MT', '7376231MC'], Icon: Bot, color: 'from-rose-600 to-red-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' }
+  { id: 'CT', name: 'Computer Technology', fullTitle: 'COMPUTER TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376222CT', '7376232CT', '7376242CT', '7376252CT'], Icon: Terminal, color: 'from-blue-600 to-indigo-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
+  { id: 'CSE', name: 'Computer Science and Engineering', fullTitle: 'COMPUTER SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376221CS', '7376231CS', '7376241CS', '7376251CS'], Icon: Cpu, color: 'from-indigo-600 to-violet-600', badgeColor: 'bg-indigo-950/80 text-indigo-300 border-indigo-800' },
+  { id: 'AI&DS', name: 'Artificial Intelligence & Data Science', fullTitle: 'ARTIFICIAL INTELLIGENCE AND DATA SCIENCE', degree: 'B.Tech.', prefixes: ['7376222AD', '7376232AD', '7376242AD', '7376252AD'], Icon: Database, color: 'from-cyan-600 to-blue-600', badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-800' },
+  { id: 'AIML', name: 'AI & Machine Learning', fullTitle: 'ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING', degree: 'B.Tech.', prefixes: ['7376222AL', '7376232AL', '7376242AL', '7376252AL'], Icon: Brain, color: 'from-purple-600 to-pink-600', badgeColor: 'bg-purple-950/80 text-purple-300 border-purple-800' },
+  { id: 'IT', name: 'Information Technology', fullTitle: 'INFORMATION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376222IT', '7376232IT', '7376242IT', '7376252IT'], Icon: Globe, color: 'from-sky-600 to-blue-600', badgeColor: 'bg-sky-950/80 text-sky-300 border-sky-800' },
+  { id: 'ECE', name: 'Electronics & Communication Engineering', fullTitle: 'ELECTRONICS AND COMMUNICATION ENGINEERING', degree: 'B.E.', prefixes: ['7376221EC', '7376231EC', '7376241EC', '7376251EC'], Icon: Radio, color: 'from-teal-600 to-emerald-600', badgeColor: 'bg-teal-950/80 text-teal-300 border-teal-800' },
+  { id: 'EEE', name: 'Electrical & Electronics Engineering', fullTitle: 'ELECTRICAL AND ELECTRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376221EE', '7376231EE', '7376241EE', '7376251EE'], Icon: Zap, color: 'from-amber-600 to-orange-600', badgeColor: 'bg-amber-950/80 text-amber-300 border-amber-800' },
+  { id: 'MECH', name: 'Mechanical Engineering', fullTitle: 'MECHANICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376221ME', '7376231ME', '7376241ME', '7376251ME'], Icon: Cog, color: 'from-slate-600 to-zinc-600', badgeColor: 'bg-slate-800 text-slate-300 border-slate-700' },
+  { id: 'EIE', name: 'Electronics & Instrumentation Engineering', fullTitle: 'ELECTRONICS AND INSTRUMENTATION ENGINEERING', degree: 'B.E.', prefixes: ['7376221EI', '7376231EI', '7376241EI', '7376251EI'], Icon: Gauge, color: 'from-orange-600 to-amber-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
+  { id: 'CSBS', name: 'Computer Science & Business Systems', fullTitle: 'COMPUTER SCIENCE AND BUSINESS SYSTEMS', degree: 'B.Tech.', prefixes: ['7376222CB', '7376232CB', '7376242CB', '7376252CB'], Icon: LineChart, color: 'from-emerald-600 to-green-600', badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-800' },
+  { id: 'AGRI', name: 'Agricultural Engineering', fullTitle: 'AGRICULTURAL ENGINEERING', degree: 'B.E.', prefixes: ['7376222AG', '7376232AG', '7376242AG', '7376252AG'], Icon: Sprout, color: 'from-lime-600 to-emerald-600', badgeColor: 'bg-lime-950/80 text-lime-300 border-lime-800' },
+  { id: 'BT', name: 'Biotechnology', fullTitle: 'BIOTECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376222BT', '7376232BT', '7376242BT', '7376252BT'], Icon: Dna, color: 'from-fuchsia-600 to-pink-600', badgeColor: 'bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-800' },
+  { id: 'CSD', name: 'Computer Science & Design', fullTitle: 'COMPUTER SCIENCE AND DESIGN', degree: 'B.E.', prefixes: ['7376221CD', '7376231CD', '7376241CD', '7376251CD'], Icon: Palette, color: 'from-violet-600 to-purple-600', badgeColor: 'bg-violet-950/80 text-violet-300 border-violet-800' },
+  { id: 'CIVIL', name: 'Civil Engineering', fullTitle: 'CIVIL ENGINEERING', degree: 'B.E.', prefixes: ['7376221CE', '7376231CE', '7376241CE', '7376251CE'], Icon: Building2, color: 'from-yellow-600 to-amber-600', badgeColor: 'bg-yellow-950/80 text-yellow-300 border-yellow-800' },
+  { id: 'BIOMEDICAL', name: 'Biomedical Engineering', fullTitle: 'BIOMEDICAL ENGINEERING', degree: 'B.E.', prefixes: ['7376221BM', '7376231BM', '7376241BM', '7376251BM'], Icon: HeartPulse, color: 'from-rose-600 to-pink-600', badgeColor: 'bg-rose-950/80 text-rose-300 border-rose-800' },
+  { id: 'FD', name: 'Food Technology', fullTitle: 'FOOD TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376222FD', '7376232FD', '7376242FD', '7376252FD'], Icon: Utensils, color: 'from-orange-600 to-yellow-600', badgeColor: 'bg-orange-950/80 text-orange-300 border-orange-800' },
+  { id: 'FT', name: 'Fashion Technology', fullTitle: 'FASHION TECHNOLOGY', degree: 'B.Tech.', prefixes: ['7376222FT', '7376232FT', '7376242FT', '7376252FT'], Icon: Scissors, color: 'from-pink-600 to-rose-600', badgeColor: 'bg-pink-950/80 text-pink-300 border-pink-800' },
+  { id: 'ISE', name: 'Information Science & Engineering', fullTitle: 'INFORMATION SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376221SE', '7376231SE', '7376241SE', '7376251SE', '7376221IS', '7376231IS', '7376241IS', '7376251IS'], Icon: Library, color: 'from-blue-600 to-cyan-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
+  { id: 'MTRS', name: 'Mechatronics Engineering', fullTitle: 'MECHATRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376221MZ', '7376231MZ', '7376241MZ', '7376251MZ', '7376231MT', '7376241MT', '7376251MT', '7376231MC'] }
 ];
 
 export const BIT_DAILY_PLACEMENT_DATA = placementData;
@@ -3172,12 +3172,12 @@ export default function App() {
 
   const normalizeStudentYear = (yearStr, rollNo) => {
     const s = String(yearStr || '').trim().toUpperCase();
-    if (s === 'IV' || s === '4' || s.includes('IV') || s.includes('4')) return 'Year IV';
-    if (s === 'III' || s === '3' || s.includes('III') || s.includes('3')) return 'Year III';
-    if (s === 'II' || s === '2' || s.includes('II') || s.includes('2')) return 'Year II';
-    if (s === 'I' || s === '1' || s.includes('I') || s.includes('1')) return 'Year I';
+    if (s === 'IV' || s === '4' || s === 'YEAR IV' || s === '4TH' || s === 'IV YR' || s.startsWith('IV')) return 'Year IV';
+    if (s === 'III' || s === '3' || s === 'YEAR III' || s === '3RD' || s === 'III YR' || s.startsWith('III')) return 'Year III';
+    if (s === 'II' || s === '2' || s === 'YEAR II' || s === '2ND' || s === 'II YR' || s.startsWith('II')) return 'Year II';
+    if (s === 'I' || s === '1' || s === 'YEAR I' || s === '1ST' || s === 'I YR' || s === 'I') return 'Year I';
 
-    const roll = String(rollNo || '');
+    const roll = String(rollNo || '').trim();
     if (roll.startsWith('737623')) return 'Year IV';
     if (roll.startsWith('737624')) return 'Year III';
     if (roll.startsWith('737625')) return 'Year II';
@@ -3194,36 +3194,44 @@ export default function App() {
 
     try {
       const studentMap = new Map();
-      for (const prefix of dept.prefixes) {
-        const res = await bitcentralFetch(`/search?q=${prefix}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json && Array.isArray(json.data)) {
-            json.data.forEach(item => {
-              if (item.roll_no && !studentMap.has(item.roll_no)) {
-                const balanceRaw = item.balance_points ? String(item.balance_points).replace(/,/g, '') : '0';
-                const cumulativeRaw = item.cumulative_reward_points ? String(item.cumulative_reward_points).replace(/,/g, '') : balanceRaw;
-                const numCumulative = parseFloat(cumulativeRaw) || parseFloat(balanceRaw) || 0;
-                const numBalance = parseFloat(balanceRaw) || 0;
-                const normYear = normalizeStudentYear(item.year, item.roll_no);
-                
-                studentMap.set(item.roll_no, {
-                  ...item,
-                  numPoints: numCumulative,
-                  numBalance: numBalance,
-                  normalizedYear: normYear,
-                  displayPoints: numCumulative.toLocaleString(),
-                  displayBalance: parseFloat(balanceRaw).toLocaleString(),
-                  displayCumulative: numCumulative.toLocaleString(),
-                  displayRedeemed: item.redeemed_points ? parseFloat(String(item.redeemed_points).replace(/,/g, '')).toLocaleString() : '0'
-                });
-              }
-            });
-          }
+      const responses = await Promise.all(
+        (dept.prefixes || []).map(prefix =>
+          bitcentralFetch(`/search?q=${encodeURIComponent(prefix)}`)
+            .then(res => (res.ok ? res.json() : null))
+            .catch(() => null)
+        )
+      );
+
+      for (const json of responses) {
+        if (json && Array.isArray(json.data)) {
+          json.data.forEach(item => {
+            if (item.roll_no && !studentMap.has(item.roll_no)) {
+              const balanceRaw = item.balance_points !== undefined && item.balance_points !== null ? String(item.balance_points).replace(/,/g, '') : '0';
+              const cumulativeRaw = item.cumulative_reward_points !== undefined && item.cumulative_reward_points !== null
+                ? String(item.cumulative_reward_points).replace(/,/g, '')
+                : balanceRaw;
+              const numCumulative = parseFloat(cumulativeRaw) || parseFloat(balanceRaw) || 0;
+              const numBalance = parseFloat(balanceRaw) || 0;
+              const normYear = normalizeStudentYear(item.year, item.roll_no);
+              
+              studentMap.set(item.roll_no, {
+                ...item,
+                numPoints: numCumulative,
+                numBalance: numBalance,
+                normalizedYear: normYear,
+                displayPoints: numCumulative.toLocaleString(),
+                displayBalance: numBalance.toLocaleString(),
+                displayCumulative: numCumulative.toLocaleString(),
+                displayRedeemed: item.redeemed_points !== undefined && item.redeemed_points !== null
+                  ? parseFloat(String(item.redeemed_points).replace(/,/g, '')).toLocaleString()
+                  : '0'
+              });
+            }
+          });
         }
       }
 
-      // Sort in descending order (highest RP points first)
+      // Sort in descending order (highest cumulative RP points first)
       const sorted = Array.from(studentMap.values()).sort((a, b) => b.numPoints - a.numPoints);
       setDeptLeaderboardList(sorted);
     } catch (err) {
