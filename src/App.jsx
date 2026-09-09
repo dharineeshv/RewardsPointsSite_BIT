@@ -4510,7 +4510,7 @@ export default function App() {
             <span>Settings</span>
           </button>
 
-          {/* Admin & Developer Console (Only visible to Dharineesh) */}
+          {/* Admin & Developer Console (Only visible to Dharineesh & Kaushi) */}
           {isAdminUser && (
             <button
               onClick={() => { setActiveNav('Admin Console'); setIsSidebarOpen(false); }}
@@ -7579,7 +7579,7 @@ export default function App() {
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5 flex-wrap">
                     <span className="p-1.5 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
                       <ShieldCheck className="w-5 h-5" />
                     </span>
@@ -7587,7 +7587,13 @@ export default function App() {
                       Admin & Developer Console
                     </h1>
                   </div>
-                  <p className={`text-xs sm:text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/15 border border-purple-500/30 text-purple-400 dark:text-purple-300">
+                      <Lock className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Only Dharineesh and Kaushi can access the admin page</span>
+                    </div>
+                  </div>
+                  <p className={`text-xs sm:text-sm mt-1.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     Real-time student login monitoring, roll number searches, and Google Sheets cloud analytics.
                   </p>
                 </div>
