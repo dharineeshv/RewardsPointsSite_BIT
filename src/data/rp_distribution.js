@@ -102,6 +102,50 @@ export function parseStudentRows(rows) {
     const ip2Total = (r[colIdx['IP2M']] || '0.00').trim();
     const grandTotal = (r[colIdx['IPM']] || ip1Total || '0.00').trim();
 
+    const mentor = (r[colIdx['MENTOR']] || '').trim();
+    const email = (r[colIdx['E-Mail']] || '').trim();
+
+    // 8 Activity Breakdown Categories from Google Sheets
+    const pSkillPts = parseFloat((r[colIdx['P Skill Points']] || '0').replace(/,/g, '')) || 0;
+    const pSkillCount = parseInt(r[colIdx['P Skill Count']] || '0', 10) || 0;
+
+    const studentInitPts = parseFloat((r[colIdx['STUDENT INITIATIVES POINTS']] || '0').replace(/,/g, '')) || 0;
+    const studentInitCount = parseInt(r[colIdx['STUDENT INITIATIVES COUNT']] || '0', 10) || 0;
+
+    const tacPts = parseFloat((r[colIdx['TAC Points']] || '0').replace(/,/g, '')) || 0;
+    const tacCount = parseInt(r[colIdx['TAC Count']] || '0', 10) || 0;
+
+    const splLabPts = parseFloat((r[colIdx['Special Lab Initiatives Points']] || '0').replace(/,/g, '')) || 0;
+    const splLabCount = parseInt(r[colIdx['Special Lab Initiatives Count']] || '0', 10) || 0;
+
+    const techEventPts = parseFloat((r[colIdx['Technical Events Points']] || '0').replace(/,/g, '')) || 0;
+    const techEventCount = parseInt(r[colIdx['Technical Events Count']] || '0', 10) || 0;
+
+    const extEventPts = parseFloat((r[colIdx['EXTERNAL EVENTS POINTS']] || '0').replace(/,/g, '')) || 0;
+    const extEventCount = parseInt(r[colIdx['EXTERNAL EVENTS COUNT']] || '0', 10) || 0;
+
+    const techSocietyPts = parseFloat((r[colIdx['TECHNICAL SOCIETY ACTIVITIES Points']] || '0').replace(/,/g, '')) || 0;
+    const techSocietyCount = parseInt(r[colIdx['TECHNICAL SOCIETY ACTIVITIES Count']] || '0', 10) || 0;
+
+    const interviewPts = (parseFloat((r[colIdx['Interview Points']] || '0').replace(/,/g, '')) || 0) + (parseFloat((r[colIdx['EXTRA-CURRICULAR ACTIVITIES POINTS']] || '0').replace(/,/g, '')) || 0);
+    const interviewCount = (parseInt(r[colIdx['Interview Count']] || '0', 10) || 0) + (parseInt(r[colIdx['EXTRA-CURRICULAR ACTIVITIES COUNT']] || '0', 10) || 0);
+
+    const totalPoints = parseFloat((r[colIdx['Total Points']] || '0').replace(/,/g, '')) || 0;
+    const cumulativePoints = parseFloat((r[colIdx['Cumulative Points']] || '0').replace(/,/g, '')) || totalPoints;
+    const redeemedPoints = parseFloat((r[colIdx['Redeemed Points']] || '0').replace(/,/g, '')) || 0;
+    const balancePoints = parseFloat((r[colIdx['Balance Points']] || '0').replace(/,/g, '')) || (cumulativePoints - redeemedPoints);
+
+    const activityBreakdown = [
+      { id: 'pskill', label: 'P-Skill Certifications', count: pSkillCount, points: pSkillPts, iconType: 'Code', color: 'indigo', barColor: 'bg-indigo-600' },
+      { id: 'initiatives', label: 'Student Initiatives', count: studentInitCount, points: studentInitPts, iconType: 'Award', color: 'emerald', barColor: 'bg-emerald-600' },
+      { id: 'tac', label: 'Training & Assessment (TAC)', count: tacCount, points: tacPts, iconType: 'Cpu', color: 'blue', barColor: 'bg-blue-600' },
+      { id: 'spl_lab', label: 'Special Lab Initiatives', count: splLabCount, points: splLabPts, iconType: 'Sparkles', color: 'purple', barColor: 'bg-purple-600' },
+      { id: 'tech_events', label: 'Technical Events & Hackathons', count: techEventCount, points: techEventPts, iconType: 'Trophy', color: 'amber', barColor: 'bg-amber-500' },
+      { id: 'ext_events', label: 'External Events & Symposia', count: extEventCount, points: extEventPts, iconType: 'Globe', color: 'sky', barColor: 'bg-sky-500' },
+      { id: 'tech_soc', label: 'Technical Societies (IEEE/ACM)', count: techSocietyCount, points: techSocietyPts, iconType: 'Users', color: 'violet', barColor: 'bg-violet-600' },
+      { id: 'interview_extra', label: 'Interviews & Extra-Curricular', count: interviewCount, points: interviewPts, iconType: 'Briefcase', color: 'rose', barColor: 'bg-rose-500' }
+    ];
+
     return {
       id: idx + 1,
       rollNo,
@@ -110,6 +154,13 @@ export function parseStudentRows(rows) {
       year,
       department,
       courseCode,
+      mentor,
+      email,
+      activityBreakdown,
+      totalPoints,
+      cumulativePoints,
+      redeemedPoints,
+      balancePoints,
       theoryCourses,
       addonCourses,
       labCourses,

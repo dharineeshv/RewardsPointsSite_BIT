@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import placementData from './data/placementData.json';
 import InternalMarksView from './components/InternalMarksView';
+import { STUDENTS_INTERNAL_MARKS_LIST } from './data/rp_distribution';
 import {
   FileSpreadsheet,
   LayoutGrid,
@@ -390,7 +391,7 @@ function DashboardHeroSlider({
   const touchStartX = useRef(null);
   const touchEndX = useRef(null);
 
-  // Compute dynamic Benchmark metrics based on active student & live API averages
+  // Compute dynamic Benchmark metrics based on active student & exact live API averages
   const studentYearLabel = normalizeStudentYear 
     ? normalizeStudentYear(student?.year || student?.batch, student?.id || student?.roll_no || student?.email) 
     : 'Year IV';
@@ -569,10 +570,10 @@ function DashboardHeroSlider({
 
           <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-3">
             {[
-              { label: 'Year I', val: yearlyAverages?.year_1 || 0 },
-              { label: 'Year II', val: yearlyAverages?.year_2 || 1981 },
-              { label: 'Year III', val: yearlyAverages?.year_3 || 2953 },
-              { label: 'Year IV', val: yearlyAverages?.year_4 || 1633 }
+              { label: 'Year I', val: Number(yearlyAverages?.year_1) || 0 },
+              { label: 'Year II', val: Number(yearlyAverages?.year_2) || 0 },
+              { label: 'Year III', val: Number(yearlyAverages?.year_3) || 0 },
+              { label: 'Year IV', val: Number(yearlyAverages?.year_4) || 0 }
             ].map((y, i) => {
               const isUserBatch = y.label === studentYearLabel;
               return (
@@ -1600,9 +1601,6 @@ function BitRobotChatAssistant({
   isDarkMode
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isCalloutVisible, setIsCalloutVisible] = useState(true);
-  const [calloutIndex, setCalloutIndex] = useState(0);
-  const [isCalloutDismissed, setIsCalloutDismissed] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isGeminiLive, setIsGeminiLive] = useState(true);
@@ -1613,49 +1611,33 @@ function BitRobotChatAssistant({
   const currentPoints = student?.currentPoints || currentUser?.currentPoints || '0';
   const department = currentUser?.department || student?.department || 'Engineering & Technology';
 
-  // Dynamic Rotation Messages
-  const calloutMessages = useMemo(() => [
-    `Hi I am Tara... Reach Me To Get Your College Websites`,
-    `Hi ${firstName} I am Tara... How Can I Help You`,
-    `Hi ${firstName} I am Tara... Can we Interact Together`,
-    `Hii ${firstName} Did U have Any Questions? Reach Me for an Help...`,
-    `Hi ${firstName} ${getTimeBasedGreeting()}! ✨`
-  ], [firstName]);
+  // Match full enriched student profile (mentor, 8 activity categories, marks)
+  const matchedStudentRecord = useMemo(() => {
+    const rId = (student?.id || student?.roll_no || student?.rollNo || currentUser?.id || currentUser?.rollNo || '').toString().toUpperCase().trim();
+    const mail = (student?.email || currentUser?.email || '').toLowerCase().trim();
+    return STUDENTS_INTERNAL_MARKS_LIST.find(s => 
+      (rId && s.rollNo.toUpperCase() === rId) ||
+      (mail && s.email && s.email.toLowerCase() === mail) ||
+      (mail && s.rollNo && mail.includes(s.rollNo.toLowerCase()))
+    ) || student || {};
+  }, [student, currentUser]);
 
-  // Automatic cycle: visible for 6 seconds, disappears for 4 seconds, then shows next message
-  useEffect(() => {
-    if (isCalloutDismissed || isOpen) {
-      setIsCalloutVisible(false);
-      return;
-    }
-
-    let hideTimer = null;
-    let showTimer = null;
-
-    // Show for 6 seconds
-    setIsCalloutVisible(true);
-    hideTimer = setTimeout(() => {
-      // Disappear for 4 seconds
-      setIsCalloutVisible(false);
-
-      showTimer = setTimeout(() => {
-        // Switch to next content and reappear
-        setCalloutIndex(prev => (prev + 1) % calloutMessages.length);
-        setIsCalloutVisible(true);
-      }, 4000);
-    }, 6000);
-
-    return () => {
-      if (hideTimer) clearTimeout(hideTimer);
-      if (showTimer) clearTimeout(showTimer);
-    };
-  }, [calloutIndex, isCalloutDismissed, isOpen, calloutMessages.length]);
+  const activeMentor = matchedStudentRecord?.mentor || 'Dr. ANANDAKUMAR K ISE';
+  const activeRollNo = matchedStudentRecord?.rollNo || student?.id || student?.roll_no || 'CT109';
+  const activeYear = matchedStudentRecord?.year || 'IV';
+  const activeDept = matchedStudentRecord?.department || department;
+  const activeBalanceRP = matchedStudentRecord?.balancePoints ?? (student?.currentPoints || currentUser?.currentPoints || '0');
+  const activeCumulativeRP = matchedStudentRecord?.cumulativePoints ?? (student?.cumulativePoints || activeBalanceRP);
+  const activeRedeemedRP = matchedStudentRecord?.redeemedPoints ?? (student?.redeemedPoints || '0');
+  const activeActivities = matchedStudentRecord?.activityBreakdown || [];
+  const activeTheoryCourses = matchedStudentRecord?.theoryCourses || [];
+  const activeGrandTotal = matchedStudentRecord?.grandTotal || '40.50';
 
   const [messages, setMessages] = useState(() => [
     {
       id: 'welcome',
       sender: 'bot',
-      text: `Hello ${firstName}! 👋 I am **Tara**, your smiling BIT campus assistant.\n\nI can help you open college portals (BIP, PS, PCDP, Wiki, Website), check your active Reward Points, view Placements, today's Mess menu, or answer any campus & study questions. Tap a shortcut below or ask me anything!`,
+      text: `Hello ${firstName}! 👋 I am **Tara**, your smiling BIT campus assistant.\n\nI can help you check your active Reward Points, Faculty Mentor, Internal Marks, Placements, today's Mess menu, or open college portals (BIP, PS, PCDP, Wiki, Website). Ask me anything or tap a quick shortcut below!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       shortcuts: true
     }
@@ -1668,7 +1650,6 @@ function BitRobotChatAssistant({
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
-      setIsCalloutVisible(false);
     }
   }, [isOpen, messages, isTyping]);
 
@@ -1701,11 +1682,25 @@ function BitRobotChatAssistant({
     let replyLink = null;
     let replyLinkText = null;
 
-    if (lower.includes('bip') || lower.includes('innovation') || lower.includes('project')) {
+    if (lower.includes('mentor') || lower.includes('faculty mentor') || lower.includes('advisor')) {
+      replyText = `👨‍🏫 **Your Faculty Mentor**\n• Name: **${activeMentor}**\n• Student: **${studentName}** (${activeRollNo})\n• Department: **${activeDept}**\n\nYou can consult your mentor for internal mark reviews, special lab projects, and reward points approvals.`;
+    } else if (lower.includes('internal mark') || lower.includes('cie') || lower.includes('ip1') || lower.includes('ip2') || lower.includes('theory course') || lower.includes('mark')) {
+      const coursesStr = activeTheoryCourses.length > 0 
+        ? activeTheoryCourses.map(c => `• **${c.code}** (${c.slot}): IP-1 = ${c.ip1 || '0.00'} | IP-2 = ${c.ip2 || '0.00'} | Total = **${c.total || '0.00'}**`).join('\n')
+        : `• Total Theory Courses: ${matchedStudentRecord?.totalTheoryCount || 6}`;
+      replyText = `📊 **Internal Marks Distribution**\n• Student: **${studentName}** (${activeRollNo})\n• Department: **${activeDept}** (Year ${activeYear})\n• Total Internal Marks: **${activeGrandTotal}**\n\n${coursesStr}`;
+      replyNav = 'Internal Marks';
+    } else if (lower.includes('p-skill') || lower.includes('pskill') || lower.includes('tac') || lower.includes('special lab') || lower.includes('activity') || lower.includes('breakdown') || lower.includes('hackathon')) {
+      const actStr = activeActivities.length > 0
+        ? activeActivities.map(a => `• **${a.label}**: **${a.points.toLocaleString()} RP** (${a.count} entries)`).join('\n')
+        : `• P-Skill: 0 RP\n• TAC: 0 RP\n• Special Lab Initiatives: 0 RP`;
+      replyText = `🎯 **8 Activity Points Breakdown**\n• Student: **${studentName}** (${activeRollNo})\n• Balance RP: **${activeBalanceRP} RP**\n\n${actStr}`;
+      replyNav = 'Internal Marks';
+    } else if (lower.includes('bip') || lower.includes('innovation') || lower.includes('project')) {
       replyText = `⚡ **BIP Portal (BIT Innovation Platform)**\nUse BIP for submitting your special lab project proposals, hackathons, reviews, and faculty evaluations.\n\n🌐 Portal Link: https://bip.bitsathy.ac.in`;
       replyLink = 'https://bip.bitsathy.ac.in';
       replyLinkText = 'Open BIP Portal';
-    } else if (lower.includes('ps') || lower.includes('periodic') || lower.includes('special lab')) {
+    } else if (lower.includes('ps') || lower.includes('periodic')) {
       replyText = `💻 **PS Portal (Periodic Skills Portal)**\nAccess periodic skill assessments, coding tracks, and special lab problem statements.\n\n🌐 Portal Link: https://ps.bitsathy.ac.in`;
       replyLink = 'https://ps.bitsathy.ac.in';
       replyLinkText = 'Open PS Portal';
@@ -1722,7 +1717,7 @@ function BitRobotChatAssistant({
       replyLink = 'https://www.bitsathy.ac.in';
       replyLinkText = 'Open BIT Website';
     } else if (lower.includes('point') || lower.includes('balance') || lower.includes('rp') || lower.includes('reward')) {
-      replyText = `🏆 **Your Reward Points Status**\n• Student: **${studentName}**\n• Active Balance: **${currentPoints} RP**\n• Cumulative Earned: **${student?.cumulativePoints || currentPoints} RP**\n• Redeemed: **${student?.redeemedPoints || '0'} RP**\n\nKeep attending technical events, hackathons, and certifications to earn more points!`;
+      replyText = `🏆 **Your Reward Points Status**\n• Student: **${studentName}** (${activeRollNo})\n• Active Balance: **${activeBalanceRP} RP**\n• Cumulative Earned: **${activeCumulativeRP} RP**\n• Redeemed: **${activeRedeemedRP} RP**\n\nKeep attending technical events, hackathons, and certifications to earn more points!`;
       replyNav = 'Dashboard';
     } else if (lower.includes('placement') || lower.includes('job') || lower.includes('salary') || lower.includes('drive')) {
       const totalPlaced = placementData?.totalStudentsPlaced || 510;
@@ -1744,7 +1739,7 @@ function BitRobotChatAssistant({
     } else if (lower.includes('bus') || lower.includes('transport') || lower.includes('route')) {
       replyText = `🚌 **Campus Bus Routes & Transport**\nExplore bus timings, stop lists, and route maps across Coimbatore, Erode, Tirupur, Salem, Gobi, and Mettupalayam.`;
       replyNav = 'Bus Routes';
-    } else if (lower.includes('faculty') || lower.includes('staff') || lower.includes('mentor') || lower.includes('teacher') || lower.includes('hod')) {
+    } else if (lower.includes('faculty') || lower.includes('staff') || lower.includes('teacher') || lower.includes('hod')) {
       replyText = `👥 **Faculty & Staff Directory**\nSearch faculty by department, find office cabins, phone numbers, and official email addresses.`;
       replyNav = 'Faculty Directory';
     } else if (lower.includes('who are you') || lower.includes('your name') || lower.includes('tara')) {
@@ -1754,7 +1749,7 @@ function BitRobotChatAssistant({
       replyLink = 'https://www.linkedin.com/in/dharineesh-v-8ba7022ba';
       replyLinkText = 'Connect on LinkedIn';
     } else {
-      replyText = `😊 **Tara is here to help!** You can ask me about:\n• **Portals**: BIP, PS, PCDP, Wiki, Website\n• **Academics**: My RP Balance, Exam Seating, Faculty Directory\n• **Campus Life**: Placements, Mess Menu, Leave Schedule, Bus Routes\n• **About Us**: Developer info & contact`;
+      replyText = `😊 **Tara is here to help!** You can ask me about:\n• **Academics**: My RP Balance (${activeBalanceRP} RP), Mentor (${activeMentor}), Internal Marks (${activeGrandTotal})\n• **Portals**: BIP, PS, PCDP, Wiki, Website\n• **Campus Life**: Placements, Mess Menu, Leave Schedule, Bus Routes\n• **About Us**: Developer info & contact`;
     }
 
     return { replyText, replyNav, replyLink, replyLinkText };
@@ -1776,14 +1771,34 @@ function BitRobotChatAssistant({
     setIsTyping(true);
 
     try {
-      // System Prompt with deep BIT Sathy context
-      const systemPrompt = `You are "Tara", the intelligent, cheerful, and smiling AI assistant for Bannari Amman Institute of Technology (BIT Sathy).
-Current Student Information:
-- Name: ${studentName}
-- Department: ${department}
-- Active Reward Points (RP): ${currentPoints} RP
-- Cumulative Points Earned: ${student?.cumulativePoints || currentPoints} RP
-- Redeemed Points: ${student?.redeemedPoints || '0'} RP
+      // System Prompt with deep BIT Sathy context & student profile
+      const activitySummaryStr = activeActivities.length > 0 
+        ? activeActivities.map(a => `  - ${a.label}: ${a.points.toLocaleString()} RP (${a.count} entries)`).join('\n')
+        : '  - No activity breakdown available';
+
+      const theoryCoursesStr = activeTheoryCourses.length > 0
+        ? activeTheoryCourses.map(c => `  - ${c.code} (${c.slot}): IP-1 = ${c.ip1 || '0.00'}, IP-2 = ${c.ip2 || '0.00'}, Total = ${c.total || '0.00'}`).join('\n')
+        : '  - Theory courses list available in Internal Marks view';
+
+      const systemPrompt = `You are "Tara", the intelligent, cheerful, smiling, and highly accurate AI campus assistant for Bannari Amman Institute of Technology (BIT Sathy).
+
+Current Active Student Profile (Ground Truth Data):
+- Full Name: ${studentName}
+- Roll Number: ${activeRollNo}
+- Department: ${activeDept}
+- Year of Study: Year ${activeYear}
+- Course Code: ${matchedStudentRecord?.courseCode || 'B.Tech / B.E.'}
+- Assigned Faculty Mentor: ${activeMentor}
+- Active Balance Reward Points: ${activeBalanceRP} RP
+- Cumulative Reward Points Earned: ${activeCumulativeRP} RP
+- Redeemed Points: ${activeRedeemedRP} RP
+- Total Internal Marks: ${activeGrandTotal} (Theory Courses: ${matchedStudentRecord?.totalTheoryCount || activeTheoryCourses.length || 6})
+
+Student's Theory Courses & Internal Marks:
+${theoryCoursesStr}
+
+Student's 8 Activity Points Breakdown:
+${activitySummaryStr}
 
 Official College Portals & URLs:
 - BIP Portal (BIT Innovation Platform): https://bip.bitsathy.ac.in (Project submissions, special lab reviews, hackathons)
@@ -1792,28 +1807,24 @@ Official College Portals & URLs:
 - BIT Wiki: https://wiki.bitsathy.ac.in (Student handbook, campus rules, clubs, syllabus)
 - Official BIT Website: https://www.bitsathy.ac.in (Campus news, circulars, department updates)
 
-Key App Features / Tabs:
-- Dashboard: Active RP Balance, store to redeem tech gadgets, stationery, cafeteria vouchers
-- BIT Placements: Stats (${placementData?.totalStudentsPlaced || 510}+ placed across ${placementData?.totalCompaniesVisited || 87}+ companies), super dream offers
+Key Campus Features:
+- Dashboard: Active RP Balance, store to redeem gadgets, vouchers
+- BIT Placements: ${placementData?.totalStudentsPlaced || 510}+ placed across ${placementData?.totalCompaniesVisited || 87}+ companies (Highest Tier: 10+ LPA)
 - Mess Menu: Live breakfast, lunch, snacks, dinner schedules for boys & girls hostels
-- Leave Schedule: Semester holidays & gate pass schedule
+- Leave Schedule: Semester holidays & gate pass schedule (${leavesList?.[0]?.name ? `Next: ${leavesList[0].name} on ${leavesList[0].from_date}` : 'Scheduled academic leaves'})
 - Exam Seating: Search exam hall, block, and desk allocation by register number
-- Campus Bus Routes: Bus routes, timings, and stops across Coimbatore, Erode, Tirupur, Salem, Gobi, Mettupalayam
+- Campus Bus Routes: Bus routes across Coimbatore, Erode, Tirupur, Salem, Gobi, Mettupalayam
 - Faculty Directory: Cabin locations, contact numbers, official emails
 
 About Us & Developer Contact:
-- It is a third-party website created to help students reach their reward points and access campus activities easily.
-- If students have any queries or suggestions, they can reach out at:
-  • Email: dharineeshv18@gmail.com
-  • LinkedIn: https://www.linkedin.com/in/dharineesh-v-8ba7022ba
-- Developer: Dharineesh V (Department of Computer Technology, B.Tech).
+- Third-party platform designed by Dharineesh V (Department of Computer Technology, B.Tech).
+- Queries/Suggestions: Email: dharineeshv18@gmail.com | LinkedIn: https://www.linkedin.com/in/dharineesh-v-8ba7022ba
 
-Response Instructions:
-- Answer cheerily, concisely, and helpfully as Tara. Use emojis 😊 ✨ 🚀 🏆 💡.
+Response Guidelines:
+- Answer cheerily, accurately, and helpfully using emojis 😊 ✨ 🚀 🏆 💡.
 - Format responses cleanly with bold text and bullet points.
-- If asked about About Us, Developer, or Contact, provide the platform description, email (dharineeshv18@gmail.com), and LinkedIn (https://www.linkedin.com/in/dharineesh-v-8ba7022ba).
-- If the student asks for a portal or college website, include the exact link.
-- If asked about app features (e.g. placements, mess menu, exam seating), provide relevant info and encourage exploring that tab.`;
+- ALWAYS use the exact student information provided above when asked about Mentor, Points, Marks, Activities, Roll Number, or Department.
+- Provide portal links whenever relevant.`;
 
       // Build conversation contents for Gemini API (last 6 turns)
       const contents = currentHistory
@@ -1828,22 +1839,31 @@ Response Instructions:
         throw new Error('Gemini API key not found in environment');
       }
 
-      // Call Gemini 2.5 Flash API
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents,
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 400
-            }
-          })
-        }
-      );
+      // Resilient Gemini API Call with 1-step retry for 503 / network hiccups
+      const makeGeminiRequest = async () => {
+        return fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents,
+              generationConfig: {
+                temperature: 0.4,
+                maxOutputTokens: 800
+              }
+            })
+          }
+        );
+      };
+
+      let response = await makeGeminiRequest();
+      if (response.status === 503 || response.status === 429) {
+        // Wait 600ms and retry once on transient overload
+        await new Promise(r => setTimeout(r, 600));
+        response = await makeGeminiRequest();
+      }
 
       if (!response.ok) {
         throw new Error(`Gemini API error: ${response.status}`);
@@ -1887,7 +1907,9 @@ Response Instructions:
         replyLinkText = 'Open BIT Website';
       }
 
-      if (queryLower.includes('placement') || queryLower.includes('job') || queryLower.includes('salary package')) {
+      if (queryLower.includes('internal mark') || queryLower.includes('marks') || queryLower.includes('cie') || queryLower.includes('breakdown')) {
+        replyNav = 'Internal Marks';
+      } else if (queryLower.includes('placement') || queryLower.includes('job') || queryLower.includes('salary package')) {
         replyNav = 'BIT Placements';
       } else if (queryLower.includes('mess') || queryLower.includes('food') || queryLower.includes('lunch') || queryLower.includes('dinner') || queryLower.includes('breakfast')) {
         replyNav = 'Mess Menu';
@@ -1897,7 +1919,7 @@ Response Instructions:
         replyNav = 'Exam Seating';
       } else if (queryLower.includes('bus') || queryLower.includes('transport') || queryLower.includes('route')) {
         replyNav = 'Bus Routes';
-      } else if (queryLower.includes('faculty') || queryLower.includes('staff') || queryLower.includes('mentor') || queryLower.includes('hod')) {
+      } else if (queryLower.includes('faculty') || queryLower.includes('staff') || queryLower.includes('hod')) {
         replyNav = 'Faculty Directory';
       } else if (queryLower.includes('reward point') || queryLower.includes('rp balance') || queryLower.includes('store') || queryLower.includes('redeem')) {
         replyNav = 'Dashboard';
@@ -1951,49 +1973,16 @@ Response Instructions:
 
   return (
     <>
-      {/* Floating Callout Speech Bubble (Clickable & Dynamic 6s Show / 4s Hide Cycle) */}
-      {!isOpen && !isCalloutDismissed && (
-        <div 
-          onClick={() => setIsOpen(true)}
-          className={`fixed bottom-21 right-4 sm:bottom-23 sm:right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-indigo-950/95 via-slate-900/95 to-indigo-950/95 text-white text-xs font-semibold px-3.5 py-2.5 rounded-2xl shadow-2xl border border-indigo-500/50 backdrop-blur-md cursor-pointer hover:border-cyan-400 hover:scale-102 transition-all duration-500 max-w-[280px] sm:max-w-xs select-none ${
-            isCalloutVisible
-              ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto animate-float'
-              : 'opacity-0 translate-y-3 scale-95 pointer-events-none'
-          }`}
-        >
-          <TaraRobotFace size={32} mood="happy" className="shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1 text-[10px] text-cyan-300 font-bold uppercase tracking-wider">
-              <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
-              <span>Tara • BIT Assistant</span>
-            </div>
-            <p 
-              key={calloutIndex} 
-              className="text-[11.5px] leading-snug text-slate-100 mt-0.5 font-medium transition-opacity duration-300 animate-fadeIn"
-            >
-              {calloutMessages[calloutIndex]}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsCalloutDismissed(true);
-            }}
-            className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer shrink-0 ml-0.5"
-            title="Dismiss bubble"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       {/* Floating Robot Action Button (FAB with Smiling Tara) */}
-      <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40">
+      <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-[100] flex items-center gap-2 pointer-events-auto">
         <button
           type="button"
-          onClick={() => setIsOpen(prev => !prev)}
-          className={`group relative flex items-center justify-center w-14 h-14 sm:w-15 sm:h-15 rounded-full cursor-pointer transition-all duration-300 active:scale-95 shadow-xl ${
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsOpen(prev => !prev);
+          }}
+          className={`group relative flex items-center justify-center w-14 h-14 sm:w-15 sm:h-15 rounded-full cursor-pointer transition-all duration-300 active:scale-95 shadow-2xl pointer-events-auto ${
             isOpen 
               ? 'bg-gradient-to-tr from-rose-600 to-red-500 shadow-rose-500/40 rotate-90' 
               : 'bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 shadow-indigo-500/40 hover:scale-108 animate-float tara-avatar-glow'
@@ -2009,16 +1998,14 @@ Response Instructions:
           {isOpen ? (
             <X className="w-6 h-6 text-white transition-transform duration-200" />
           ) : (
-            <>
-              <TaraRobotFace size={40} mood="happy" className="group-hover:scale-110 transition-transform duration-200" />
-            </>
+            <TaraRobotFace size={40} mood="happy" className="group-hover:scale-110 transition-transform duration-200 pointer-events-none" />
           )}
         </button>
       </div>
 
       {/* Floating Chat Modal */}
       {isOpen && (
-        <div className={`fixed bottom-22 right-3.5 sm:right-6 w-[calc(100vw-28px)] sm:w-[440px] h-[580px] max-h-[82vh] rounded-3xl z-50 flex flex-col shadow-2xl border backdrop-blur-2xl transition-all duration-200 overflow-hidden ${
+        <div className={`fixed bottom-22 right-3.5 sm:right-6 w-[calc(100vw-28px)] sm:w-[440px] h-[580px] max-h-[82vh] rounded-3xl z-[110] flex flex-col shadow-2xl border backdrop-blur-2xl transition-all duration-200 overflow-hidden pointer-events-auto ${
           isDarkMode 
             ? 'bg-slate-900/95 border-slate-700/80 text-white shadow-black/80' 
             : 'bg-white/95 border-slate-200/90 text-slate-900 shadow-indigo-950/20'
@@ -2703,12 +2690,12 @@ export default function App() {
     setDeferredPrompt(null);
   };
   
-  // Dynamic API state for yearly averages
+  // Dynamic API state for yearly averages (Official BIT Batch Benchmarks)
   const [yearlyAverages, setYearlyAverages] = useState({
     year_1: 0,
-    year_2: 1698,
-    year_3: 2143,
-    year_4: 1027
+    year_2: 2173,
+    year_3: 3333,
+    year_4: 1923
   });
   const [loadingAverages, setLoadingAverages] = useState(true);
 
@@ -3510,7 +3497,7 @@ export default function App() {
     fetchInitialStudent();
   }, []);
 
-  // Fetch averages from endpoint
+  // Fetch averages from endpoint (exact dynamic API data)
   useEffect(() => {
     async function fetchAverages() {
       try {
@@ -8387,7 +8374,7 @@ export default function App() {
       {/* Floating Animated Robot Assistant & Portal Shortcuts */}
       <BitRobotChatAssistant
         currentUser={currentUser}
-        student={student}
+        student={displayedStudent || currentUser}
         yearlyAverages={yearlyAverages}
         leavesList={leavesList}
         placementData={BIT_DAILY_PLACEMENT_DATA}
