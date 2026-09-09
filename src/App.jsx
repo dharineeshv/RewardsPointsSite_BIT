@@ -2770,12 +2770,16 @@ export default function App() {
   const [logFilterAction, setLogFilterAction] = useState('ALL');
   const [logFilterDept, setLogFilterDept] = useState('ALL');
 
-  // Restricted Admin Permission: Only Dharineesh V (dharineesh.ct23@bitsathy.ac.in / 7376232CT109)
+  // Restricted Admin Permission: Only Dharineesh and Kaushi
   const isAdminUser = useMemo(() => {
     if (!currentUser) return false;
     const email = (currentUser.email || '').toLowerCase().trim();
     const id = (currentUser.id || '').toUpperCase().trim();
-    return email === 'dharineesh.ct23@bitsathy.ac.in' || id === '7376232CT109';
+    const ADMIN_EMAILS = [
+      'dharineesh.ct23@bitsathy.ac.in',
+      'kaushi.ct23@bitsathy.ac.in'
+    ];
+    return ADMIN_EMAILS.includes(email) || id === '7376232CT109';
   }, [currentUser]);
 
   const [cloudProvider, setCloudProvider] = useState(() => {
