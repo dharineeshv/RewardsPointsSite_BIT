@@ -3201,18 +3201,21 @@ export default function App() {
           if (json && Array.isArray(json.data)) {
             json.data.forEach(item => {
               if (item.roll_no && !studentMap.has(item.roll_no)) {
-                const balanceRaw = item.balance_points ? item.balance_points.replace(/,/g, '') : '0';
-                const cumulativeRaw = item.cumulative_reward_points ? item.cumulative_reward_points.replace(/,/g, '') : balanceRaw;
-                const numericPts = parseFloat(balanceRaw) || parseFloat(cumulativeRaw) || 0;
+                const balanceRaw = item.balance_points ? String(item.balance_points).replace(/,/g, '') : '0';
+                const cumulativeRaw = item.cumulative_reward_points ? String(item.cumulative_reward_points).replace(/,/g, '') : balanceRaw;
+                const numCumulative = parseFloat(cumulativeRaw) || parseFloat(balanceRaw) || 0;
+                const numBalance = parseFloat(balanceRaw) || 0;
                 const normYear = normalizeStudentYear(item.year, item.roll_no);
                 
                 studentMap.set(item.roll_no, {
                   ...item,
-                  numPoints: numericPts,
+                  numPoints: numCumulative,
+                  numBalance: numBalance,
                   normalizedYear: normYear,
+                  displayPoints: numCumulative.toLocaleString(),
                   displayBalance: parseFloat(balanceRaw).toLocaleString(),
-                  displayCumulative: parseFloat(cumulativeRaw).toLocaleString(),
-                  displayRedeemed: item.redeemed_points ? parseFloat(item.redeemed_points.replace(/,/g, '')).toLocaleString() : '0'
+                  displayCumulative: numCumulative.toLocaleString(),
+                  displayRedeemed: item.redeemed_points ? parseFloat(String(item.redeemed_points).replace(/,/g, '')).toLocaleString() : '0'
                 });
               }
             });
@@ -5215,7 +5218,7 @@ export default function App() {
                               </div>
                               <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                 <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Points</span>
-                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[1].displayBalance} RP</span>
+                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[1].displayCumulative} RP</span>
                               </div>
                             </div>
 
@@ -5245,7 +5248,7 @@ export default function App() {
                               </div>
                               <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                 <span className="text-xs text-amber-600 dark:text-amber-300 font-bold uppercase tracking-wider">Top Score</span>
-                                <span className="text-xl font-black text-emerald-500 dark:text-emerald-400">+{filteredList[0].displayBalance} RP</span>
+                                <span className="text-xl font-black text-emerald-500 dark:text-emerald-400">+{filteredList[0].displayCumulative} RP</span>
                               </div>
                             </div>
 
@@ -5272,7 +5275,7 @@ export default function App() {
                               </div>
                               <div className={`mt-4 pt-3 border-t flex items-center justify-between ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                                 <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Points</span>
-                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[2].displayBalance} RP</span>
+                                <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">+{filteredList[2].displayCumulative} RP</span>
                               </div>
                             </div>
                           </div>
@@ -5362,7 +5365,7 @@ export default function App() {
 
                                     <div className="flex flex-col items-end justify-center gap-1.5 flex-shrink-0 pl-1">
                                       <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
-                                        +{st.displayBalance} RP
+                                        +{st.displayCumulative} RP
                                       </span>
                                       <button
                                         onClick={() => {
@@ -5456,8 +5459,15 @@ export default function App() {
                                             {st.mentor_name || 'N/A'}
                                           </div>
                                         </td>
-                                        <td className="py-3.5 px-3 lg:px-4 text-right font-black text-xs lg:text-sm text-emerald-500 dark:text-emerald-400 whitespace-nowrap">
-                                          +{st.displayBalance} RP
+                                        <td className="py-3.5 px-3 lg:px-4 text-right whitespace-nowrap">
+                                          <div className="font-black text-xs lg:text-sm text-emerald-500 dark:text-emerald-400">
+                                            +{st.displayCumulative} RP
+                                          </div>
+                                          {st.displayBalance !== st.displayCumulative && (
+                                            <div className={`text-[10px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                              Bal: {st.displayBalance} RP
+                                            </div>
+                                          )}
                                         </td>
                                         <td className="py-3.5 px-3 text-center whitespace-nowrap">
                                           <button
