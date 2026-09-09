@@ -2,7 +2,9 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import placementData from './data/placementData.json';
+import InternalMarksView from './components/InternalMarksView';
 import {
+  FileSpreadsheet,
   LayoutGrid,
   BarChart2,
   History,
@@ -44,7 +46,6 @@ import {
   Monitor,
   Menu,
   ShieldCheck,
-  FileSpreadsheet,
   Copy,
   Share2,
   Filter,
@@ -408,7 +409,7 @@ function DashboardHeroSlider({
   const todayStr = new Date().toISOString().slice(0, 10);
   const nextLeave = (leavesList || []).find(l => (l.to_date || l.from_date) >= todayStr) || (leavesList && leavesList[0]);
 
-  const totalSlides = 6;
+  const totalSlides = 7;
 
   const nextSlide = useCallback(() => {
     setCurrentSlide(prev => (prev + 1) % totalSlides);
@@ -699,6 +700,41 @@ function DashboardHeroSlider({
             <span className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-purple-400" />
               <span>{facultyList.length || 331} Faculty Members</span>
+            </span>
+          </div>
+        </div>
+
+        {/* SLIDE 7: OFFICIAL INTERNAL MARKS DISTRIBUTION */}
+        <div className="w-full flex-shrink-0 min-h-[200px] sm:min-h-[220px] p-6 sm:p-8 bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white relative overflow-hidden flex flex-col justify-between border-l-4 border-emerald-500">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Internal Marks</span>
+              </span>
+              <span className="text-xs text-emerald-200 font-medium">
+                Odd Semester Statement
+              </span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
+              Internal Marks Distribution
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
+              Explore 7,500+ student internal mark evaluations, theory courses, lab courses, add-on courses, and live marks sync.
+            </p>
+          </div>
+
+          <div className="relative z-10 mt-3 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setActiveNav && setActiveNav('Internal Marks')}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all cursor-pointer shadow-md inline-flex items-center gap-2"
+            >
+              <span>View Internal Marks</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-emerald-300 flex items-center gap-1.5 font-mono">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>7,500+ Students • Live Sync</span>
             </span>
           </div>
         </div>
@@ -4385,6 +4421,20 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => { setActiveNav('Internal Marks'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Internal Marks'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <FileSpreadsheet className="w-5 h-5" strokeWidth={activeNav === 'Internal Marks' ? 2.2 : 1.8} />
+            <span>Internal Mark</span>
+          </button>
+
+          <button
             onClick={() => { setActiveNav('Menu Details'); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
               activeNav === 'Menu Details'
@@ -5448,6 +5498,11 @@ export default function App() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* VIEW: REWARD POINTS & INTERNAL MARKS DISTRIBUTION (AWESOME TABLE & DATABASE) */}
+          {activeNav === 'Internal Marks' && (
+            <InternalMarksView currentUser={currentUser} isDarkMode={isDarkMode} />
           )}
 
           {/* VIEW 3: MENU DETAILS (CAMPUS MESS & DINING) */}
@@ -7294,7 +7349,7 @@ export default function App() {
                 <div className={`text-xs font-semibold px-3 py-1.5 rounded-full border self-start sm:self-auto ${
                   isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
                 }`}>
-                  Student ID: <span className="font-mono font-bold text-indigo-500 dark:text-indigo-400">{currentUser.id || '7376232CT109'}</span>
+                  Student ID: <span className="font-mono font-bold text-indigo-500 dark:text-indigo-400">{currentUser?.id || currentUser?.roll_no || displayedStudent?.id || '7376232CT109'}</span>
                 </div>
               </div>
 
@@ -7318,15 +7373,15 @@ export default function App() {
                         isDarkMode ? 'border-slate-700' : 'border-slate-300'
                       }`}>
                         <AvatarImage
-                          src={currentUser.picture || currentUser.photo_url}
-                          alt={currentUser.name}
-                          initials={currentUser.initials}
-                          fallbackBg={currentUser.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
+                          src={currentUser?.picture || currentUser?.photo_url || displayedStudent?.picture}
+                          alt={currentUser?.name || displayedStudent?.name || 'Student'}
+                          initials={currentUser?.initials || displayedStudent?.initials}
+                          fallbackBg={currentUser?.avatarBg || displayedStudent?.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className={`font-bold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{currentUser.name}</h4>
-                        <p className={`text-xs font-mono truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{currentUser.email || currentUser.id}</p>
+                        <h4 className={`font-bold text-base truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{currentUser?.name || displayedStudent?.name || 'DHARINEESH V'}</h4>
+                        <p className={`text-xs font-mono truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{currentUser?.email || currentUser?.id || displayedStudent?.id || 'dharineesh.ct23@bitsathy.ac.in'}</p>
                         <span className={`inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                           isDarkMode ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                         }`}>
@@ -7343,7 +7398,7 @@ export default function App() {
                         <input
                           type="text"
                           disabled
-                          value={currentUser.department || 'COMPUTER TECHNOLOGY'}
+                          value={currentUser?.department || displayedStudent?.department || 'COMPUTER TECHNOLOGY'}
                           className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-semibold cursor-not-allowed ${
                             isDarkMode ? 'bg-slate-800/70 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-700'
                           }`}
@@ -7465,7 +7520,7 @@ export default function App() {
                           onClick={() => setActiveNav('Campus Circulars')}
                           className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-500 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                         >
-                          <FileCheck className="w-3.5 h-3.5" />
+                          <FileText className="w-3.5 h-3.5" />
                           <span>Campus Circulars & Media →</span>
                         </button>
                         <button
