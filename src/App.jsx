@@ -1264,10 +1264,6 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
             WebkitMaskImage: 'radial-gradient(ellipse at center, black 35%, transparent 75%)' 
           }} 
         />
-
-        {/* Concentric Modern Tech Orbital Rings */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] sm:w-[680px] sm:h-[680px] rounded-full border border-indigo-500/10 dark:border-indigo-400/10" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[780px] h-[780px] sm:w-[960px] sm:h-[960px] rounded-full border border-dashed border-indigo-500/10 dark:border-indigo-400/10" />
       </div>
 
       {/* Main Login Card Container */}
