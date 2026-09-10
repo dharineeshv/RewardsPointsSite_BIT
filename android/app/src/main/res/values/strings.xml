@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">BIT Rewards</string>
-    <string name="title_activity_main">BIT Rewards</string>
+    <string name="app_name">Rewards BIT</string>
+    <string name="title_activity_main">Rewards BIT</string>
     <string name="package_name">in.bitsathy.rewardspoints</string>
     <string name="custom_url_scheme">in.bitsathy.rewardspoints</string>
     <string name="server_client_id">97840517761-anoolsallpime9vpmnrg7uo9stu2qqol.apps.googleusercontent.com</string>

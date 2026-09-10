@@ -265,7 +265,7 @@ export default function InternalMarksView({ currentUser, isDarkMode }) {
               <div className={`p-3 rounded-2xl border ${
                 isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
               }`}>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Redeemed for CIE</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Redeemed RP</span>
                 <span className="text-lg font-black font-mono text-amber-500 mt-0.5 block">
                   {activeStudent.redeemedPoints ? activeStudent.redeemedPoints.toLocaleString() : '0'} <span className="text-xs">RP</span>
                 </span>
@@ -379,7 +379,7 @@ export default function InternalMarksView({ currentUser, isDarkMode }) {
           type="button"
           onClick={() => fetchLiveGoogleSheetData(true)}
           disabled={syncStatus === 'syncing'}
-          title="Click to refresh latest marks from Google Sheet"
+          title="Click to refresh latest marks"
           className={`w-full sm:w-auto px-4 py-2.5 rounded-2xl border text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer flex-shrink-0 ${
             syncStatus === 'syncing'
               ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 animate-pulse'
@@ -390,7 +390,7 @@ export default function InternalMarksView({ currentUser, isDarkMode }) {
         >
           <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin text-blue-500' : 'text-blue-500'}`} />
           <span>
-            {syncStatus === 'syncing' ? 'Refreshing Sheet...' : 'Refresh'}
+            {syncStatus === 'syncing' ? 'Refreshing...' : 'Refresh'}
           </span>
         </button>
       </div>

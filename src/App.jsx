@@ -1228,74 +1228,114 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
   };
 
   return (
-    <div className={`h-screen max-h-screen overflow-y-auto sm:overflow-hidden flex flex-col justify-between transition-colors duration-200 ${
-      isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+    <div className={`fixed inset-0 h-screen max-h-screen w-screen overflow-hidden flex items-center justify-center p-4 transition-colors duration-300 font-sans select-none relative ${
+      isDarkMode 
+        ? 'bg-slate-950 text-slate-100 selection:bg-indigo-500/30' 
+        : 'bg-slate-50 text-slate-900 selection:bg-indigo-500/20'
     }`}>
       
-      {/* Top Navbar */}
-      <header className={`w-full px-5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between border-b flex-shrink-0 transition-colors duration-200 ${
-        isDarkMode ? 'border-slate-800/60 bg-slate-900/40 text-slate-100' : 'border-slate-200 bg-white/80 text-slate-900 shadow-xs'
-      }`}>
-        <div className="flex items-center gap-3">
-          <img 
-            src="/bit-logo.png" 
-            alt="Bannari Amman Institute of Technology" 
-            className="h-9 sm:h-10 object-contain rounded-md bg-white p-1 shadow-xs"
-          />
-          <div>
-            <span className="text-sm sm:text-base font-black tracking-tight text-indigo-600 dark:text-indigo-400">
-              Reward Points Site
-            </span>
-            <span className={`block text-[10px] font-semibold tracking-wide ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Bannari Amman Institute of Technology
-            </span>
-          </div>
-        </div>
+      {/* Dynamic Ambient Background Glows & Aura */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {/* Top-left vibrant Indigo/Blue blob */}
+        <div className={`absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full blur-[100px] opacity-40 transition-all duration-700 ${
+          isDarkMode ? 'bg-indigo-600/35' : 'bg-indigo-400/25'
+        }`} />
+        
+        {/* Bottom-right Violet/Fuchsia blob */}
+        <div className={`absolute -bottom-32 -right-32 w-[440px] h-[440px] rounded-full blur-[110px] opacity-35 transition-all duration-700 ${
+          isDarkMode ? 'bg-violet-600/30' : 'bg-purple-400/25'
+        }`} />
+        
+        {/* Bottom-left Cyan glow */}
+        <div className={`absolute -bottom-24 left-1/4 w-[360px] h-[360px] rounded-full blur-[90px] opacity-30 transition-all duration-700 ${
+          isDarkMode ? 'bg-cyan-500/20' : 'bg-sky-400/20'
+        }`} />
 
-        {/* Top Right Developer Credit */}
-        <div className={`text-right text-xs hidden sm:block ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          <div>Developed by <span className="font-bold text-indigo-600 dark:text-indigo-400">Dharineesh V</span></div>
-          <div className={`text-[10px] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>(Dept. of Computer Technology)</div>
-        </div>
-      </header>
+        {/* Central Card Backlight Glow */}
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] rounded-full blur-[120px] opacity-25 ${
+          isDarkMode ? 'bg-indigo-500/25' : 'bg-indigo-300/40'
+        }`} />
+
+        {/* Subtle Tech Grid / Dot Matrix with Radial Mask */}
+        <div 
+          className="absolute inset-0 bg-[radial-gradient(#6366f1_1.2px,transparent_1.2px)] [background-size:24px_24px] opacity-20 dark:opacity-25"
+          style={{ 
+            maskImage: 'radial-gradient(ellipse at center, black 35%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, black 35%, transparent 75%)' 
+          }} 
+        />
+
+        {/* Concentric Modern Tech Orbital Rings */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] sm:w-[680px] sm:h-[680px] rounded-full border border-indigo-500/10 dark:border-indigo-400/10" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[780px] h-[780px] sm:w-[960px] sm:h-[960px] rounded-full border border-dashed border-indigo-500/10 dark:border-indigo-400/10" />
+      </div>
 
       {/* Main Login Card Container */}
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 my-auto">
-        <div className={`w-full max-w-md rounded-3xl p-6 sm:p-8 border backdrop-blur-md transition-all duration-200 ${
+      <main className="relative z-10 w-full flex items-center justify-center">
+        <div className={`w-full max-w-[420px] rounded-3xl p-5 sm:p-7 border backdrop-blur-xl transition-all duration-300 relative shadow-2xl flex-shrink-0 ${
           isDarkMode 
-            ? 'shadow-2xl shadow-black/60 border-slate-800 bg-slate-900 text-slate-100' 
-            : 'shadow-2xl shadow-slate-300/60 border-slate-200 bg-white text-slate-900'
+            ? 'shadow-black/70 border-slate-800/90 bg-slate-900/80 text-slate-100' 
+            : 'shadow-indigo-950/10 border-slate-200/90 bg-white/90 text-slate-900'
         }`}>
           
-          {/* Logo & Header Title */}
-          <div className="flex flex-col items-center text-center mb-6">
-            <div className="relative mb-3 p-2 rounded-2xl bg-white shadow-md border border-slate-200">
+          {/* Top subtle highlight line inside card */}
+          <div className="absolute top-0 left-8 right-8 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+
+          {/* Logo Badge & Header */}
+          <div className="flex flex-col items-center text-center mb-4">
+            <div className="relative mb-3 p-2.5 rounded-2xl bg-white shadow-md border border-slate-200/80 ring-4 ring-indigo-500/10 flex items-center justify-center">
               <img 
                 src="/bit-logo.png" 
-                alt="BIT Logo" 
-                className="h-12 sm:h-14 object-contain"
+                alt="Reward Points Site" 
+                className="h-10 sm:h-12 w-auto object-contain"
               />
             </div>
             
-            <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+            <h1 className={`text-xl sm:text-2xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-950'}`}>
               Reward Points Site
             </h1>
-            <p className={`text-[11px] sm:text-xs mt-0.5 font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Bannari Amman Institute of Technology
-            </p>
-            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 text-[10px] sm:text-[11px] font-bold border border-indigo-200 dark:border-indigo-800/60">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+            
+            <div className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold border border-indigo-500/20">
+              <Sparkles className="w-3 h-3" />
               <span>Student RP Portal</span>
             </div>
 
-            <p className={`text-xs mt-3 leading-relaxed max-w-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Sign in with your official BIT Google account to access your reward points, activities, and achievements.
+            <p className={`text-xs mt-2.5 leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              Sign in with your institutional Google account to explore your real-time reward points, activities, and achievements.
             </p>
           </div>
 
+          {/* Feature Highlights Mini Pills */}
+          <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+            <div className={`py-1.5 px-2 rounded-xl border flex items-center justify-center gap-1.5 transition-colors ${
+              isDarkMode 
+                ? 'bg-slate-800/70 border-slate-700/70 text-slate-200' 
+                : 'bg-slate-50/90 border-slate-200 text-slate-700 shadow-2xs'
+            }`}>
+              <Zap className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+              <span className="text-[11px] font-bold tracking-tight">Live RP</span>
+            </div>
+            <div className={`py-1.5 px-2 rounded-xl border flex items-center justify-center gap-1.5 transition-colors ${
+              isDarkMode 
+                ? 'bg-slate-800/70 border-slate-700/70 text-slate-200' 
+                : 'bg-slate-50/90 border-slate-200 text-slate-700 shadow-2xs'
+            }`}>
+              <Trophy className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
+              <span className="text-[11px] font-bold tracking-tight">Rankings</span>
+            </div>
+            <div className={`py-1.5 px-2 rounded-xl border flex items-center justify-center gap-1.5 transition-colors ${
+              isDarkMode 
+                ? 'bg-slate-800/70 border-slate-700/70 text-slate-200' 
+                : 'bg-slate-50/90 border-slate-200 text-slate-700 shadow-2xs'
+            }`}>
+              <GraduationCap className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+              <span className="text-[11px] font-bold tracking-tight">Marks</span>
+            </div>
+          </div>
+
           {authError && (
-            <div className="mb-4 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
-              <div className="font-semibold mb-1">Notice:</div>
+            <div className="mb-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-300 text-xs">
+              <div className="font-bold mb-0.5">Notice:</div>
               <div>{authError}</div>
             </div>
           )}
@@ -1305,41 +1345,31 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
             type="button"
             onClick={handleLoginClick}
             disabled={googleLoading}
-            className={`w-full py-3 px-5 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 border transition-all duration-150 cursor-pointer active:scale-98 ${
+            className={`w-full py-3 px-5 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 border transition-all duration-200 cursor-pointer active:scale-98 shadow-sm hover:shadow-md ${
               isDarkMode 
-                ? 'border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700/90 hover:border-slate-600 shadow-lg shadow-black/40' 
-                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400 shadow-md'
+                ? 'border-slate-700 bg-slate-800/90 text-slate-100 hover:bg-slate-700 hover:border-slate-600' 
+                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400'
             }`}
           >
             {googleLoading ? (
-              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
             ) : (
-              <GoogleIcon className="w-5 h-5" />
+              <GoogleIcon className="w-5 h-5 flex-shrink-0" />
             )}
-            <span className="text-sm font-semibold">{googleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
+            <span className="text-sm font-bold tracking-tight">
+              {googleLoading ? 'Connecting to Google...' : 'Continue with Google'}
+            </span>
           </button>
 
-          {/* Security / Help hint */}
-          <div className={`mt-5 pt-4 border-t text-center ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+          {/* Security & Authentication Notice */}
+          <div className={`mt-4 pt-3 border-t text-center ${isDarkMode ? 'border-slate-800/80' : 'border-slate-200/80'}`}>
             <p className={`text-[11px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Use your <span className={`font-semibold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>@bitsathy.ac.in</span> institutional email
+              Use your <span className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>@bitsathy.ac.in</span> student email
             </p>
           </div>
 
         </div>
-      </div>
-
-      {/* Login Footer */}
-      <footer className={`w-full py-2.5 sm:py-3 px-6 text-center text-xs border-t flex-shrink-0 transition-colors duration-200 ${
-        isDarkMode ? 'border-slate-800/60 bg-slate-900/40 text-slate-400' : 'border-slate-200 bg-white text-slate-500'
-      }`}>
-        <div className={`font-semibold text-[11px] sm:text-xs ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-          © 2026 Rewards Points Site
-        </div>
-        <div className={`mt-0.5 text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-          Developed by <span className="font-bold text-indigo-600 dark:text-indigo-400">Dharineesh V</span> (Dept. of Computer Technology)
-        </div>
-      </footer>
+      </main>
     </div>
   );
 }
@@ -3756,9 +3786,6 @@ export default function App() {
               <span className="text-sm sm:text-base md:text-lg font-black text-indigo-600 dark:text-indigo-400 tracking-tight block leading-tight">
                 Reward Points Site
               </span>
-              <span className={`text-[10px] font-semibold hidden sm:block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                BIT Sathy
-              </span>
             </div>
           </div>
 
@@ -4312,7 +4339,7 @@ export default function App() {
             />
             <div>
               <span className="text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-400 block leading-tight">
-                BIT Rewards
+                Rewards BIT
               </span>
               <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 Navigation Menu
@@ -5076,9 +5103,6 @@ export default function App() {
                               {selectedDeptLeaderboard?.id}
                             </span>
                           </div>
-                          <p className={`text-[11px] sm:text-xs mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Ranked in <span className="text-emerald-500 dark:text-emerald-400 font-bold">descending order</span> of Active Balance Points • {selectedDeptLeaderboard?.degree}
-                          </p>
                         </div>
                       </div>
                     </div>

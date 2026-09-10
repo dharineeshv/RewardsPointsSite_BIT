@@ -1,7 +1,7 @@
-﻿{
-  "name": "BIT Rewards Points Portal",
-  "short_name": "BIT Rewards",
-  "description": "Official Academic and Extracurricular Reward Points Management Platform for BIT Sathy",
+{
+  "name": "Rewards BIT Points Portal",
+  "short_name": "Rewards BIT",
+  "description": "Official Academic and Extracurricular Reward Points Management Platform",
   "start_url": "/",
   "id": "/",
   "display": "standalone",
