@@ -82,6 +82,25 @@ async function findLatestEdition() {
   return null;
 }
 
+function formatEditionDate(dateStr) {
+  if (!dateStr) return dateStr;
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    const year = parts[2];
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    if (monthNames[monthIndex]) {
+      const paddedDay = String(day).padStart(2, '0');
+      return `${monthNames[monthIndex]} ${paddedDay}, ${year}`;
+    }
+  }
+  return dateStr;
+}
+
 function cleanCompanies(raw) {
   if (!raw) return [];
   return raw
@@ -202,11 +221,9 @@ async function run() {
   // Extract Total Placed & Companies
   const placedMatch = secondToLastPage.match(/Total No\. of\s+Students\s+Placed\s+([0-9]+)/i) || fullText.match(/Total No\. of\s+Students\s+Placed\s+([0-9]+)/i);
   const companiesMatch = secondToLastPage.match(/No\. of Companies\s+visited\s+([0-9]+)/i) || fullText.match(/No\. of Companies\s+visited\s+([0-9]+)/i);
-  const dateMatch = secondToLastPage.match(/As on\s+([A-Za-z0-9,\s]+?)(?:\n|$)/i);
-
   const totalStudentsPlaced = placedMatch ? parseInt(placedMatch[1], 10) : 498;
   const totalCompaniesVisited = companiesMatch ? parseInt(companiesMatch[1], 10) : 86;
-  const lastUpdated = dateMatch ? dateMatch[1].trim() : edition.dateStr;
+  const lastUpdated = formatEditionDate(edition.dateStr);
 
   // Extract Dynamic Salary Tiers & Companies
   const salaryTiers = parseSalaryTiersDynamic(secondToLastPage);
