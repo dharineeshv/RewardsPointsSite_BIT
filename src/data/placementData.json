@@ -1,13 +1,13 @@
 {
-  "lastUpdated": "September 10, 2026",
+  "lastUpdated": "September 11, 2026",
   "targetBatch": "2023-2027 Batch",
   "totalStudentsPlaced": 511,
-  "totalCompaniesVisited": 90,
-  "editionDate": "10-09-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v2/d72b9198a36e10c93d15f15ba07dfcb2bc87eaab.pdf",
-  "totalPages": 7,
-  "placementPageNumber": 6,
-  "drivesPageNumber": 7,
+  "totalCompaniesVisited": 91,
+  "editionDate": "11-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v2/65ecdedc894a7496beb50095dc69ebf63f406cea.pdf",
+  "totalPages": 9,
+  "placementPageNumber": 8,
+  "drivesPageNumber": 9,
   "upcomingDrives": [
     {
       "company": "Tiger Analytics",
@@ -40,6 +40,7 @@
         "Caterpillar",
         "EXL Service",
         "Integra Connect",
+        "JUSPAY",
         "Multicoreware",
         "NETGEAR",
         "Presidio",
