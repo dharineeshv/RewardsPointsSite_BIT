@@ -48,6 +48,17 @@ function getISTDate(offsetDays = 0) {
   return { dd, mm, yyyy, full: `${dd}_${mm}_${yyyy}` };
 }
 
+function extractPdfUrl(body) {
+  if (!body) return null;
+  const directPdf = body.match(/https:\/\/cdnm\.heyzine\.com\/files\/uploaded\/((?:v\d+\/)?[a-f0-9]+)\.pdf/i);
+  if (directPdf) return directPdf[0];
+  const thumbMatch = body.match(/"thumbnail":\s*"([^"]+?\.pdf)-thumb\.jpg"/i) || body.match(/https:\/\/cdnm\.heyzine\.com\/files\/uploaded\/([^"]+?\.pdf)-thumb\.jpg/i);
+  if (thumbMatch) {
+    return thumbMatch[1].startsWith('http') ? thumbMatch[1] : `https://cdnm.heyzine.com/files/uploaded/${thumbMatch[1]}`;
+  }
+  return null;
+}
+
 async function findLatestEdition() {
   for (let i = 0; i < 7; i++) {
     const { dd, mm, yyyy, full } = getISTDate(i);
@@ -56,14 +67,14 @@ async function findLatestEdition() {
     console.log(`Checking edition for ${dd}-${mm}-${yyyy}...`);
     const res = await fetchUrl(url);
     
-    if (res.statusCode === 200 && res.body.includes('cdnm.heyzine.com')) {
-      const match = res.body.match(/https:\/\/cdnm\.heyzine\.com\/files\/uploaded\/([a-f0-9]+)\.pdf/);
-      if (match) {
+    if (res.statusCode === 200) {
+      const pdfUrl = extractPdfUrl(res.body);
+      if (pdfUrl) {
         console.log(`Found active edition for ${dd}-${mm}-${yyyy}:`, url);
         return {
           dateStr: `${dd}-${mm}-${yyyy}`,
           url,
-          pdfUrl: match[0]
+          pdfUrl
         };
       }
     }
@@ -201,13 +212,14 @@ async function run() {
   const salaryTiers = parseSalaryTiersDynamic(secondToLastPage);
 
   // Extract Dynamic Upcoming Drive from Last Page
-  const driveCompanyMatch = lastPage.match(/Placement Drive[\s\S]*?([A-Za-z0-9\s.,&'-]+(?:Pvt\.?\s*Ltd\.?|Corporation|Inc|Limited))/i);
+  const driveCompanyMatch = lastPage.match(/Placement Drive\s*(?:\(\d{4}\s*-\s*\d{4}\))?\s*[\r\n]+([A-Za-z0-9\s.,&'-]+?)(?=\s*\d{1,2}\s*[A-Za-z]{3}|\s*\n\s*\d|\s*$)/i)
+    || lastPage.match(/Placement Drive[\s\S]*?([A-Za-z0-9\s.,&'-]+(?:Pvt\.?\s*Ltd\.?|Corporation|Inc|Limited|Analytics|Technologies))/i);
   const driveBatchMatch = lastPage.match(/Placement Drive[\s\S]*?\((\d{4}\s*-\s*\d{4})\)/i);
   const driveDatesMatch = lastPage.match(/(\d{1,2})\s*([A-Za-z]{3}’?\s*\d{4})\s*(\d{1,2})\s*([A-Za-z]{3}’?\s*\d{4})/i);
 
-  const upcomingDriveCompany = driveCompanyMatch ? driveCompanyMatch[1].replace(/\r?\n/g, ' ').trim() : 'Cytrusst Intelligence Pvt. Ltd.';
+  const upcomingDriveCompany = driveCompanyMatch ? driveCompanyMatch[1].replace(/\r?\n/g, ' ').trim() : 'Tiger Analytics';
   const upcomingDriveBatch = driveBatchMatch ? `${driveBatchMatch[1]} Batch` : targetBatch;
-  const upcomingDriveDates = driveDatesMatch ? `${driveDatesMatch[1]} ${driveDatesMatch[2]} – ${driveDatesMatch[3]} ${driveDatesMatch[4]}` : '07 Sep 2026 – 26 Sep 2026';
+  const upcomingDriveDates = driveDatesMatch ? `${driveDatesMatch[1]} ${driveDatesMatch[2]} – ${driveDatesMatch[3]} ${driveDatesMatch[4]}` : '12 Sep’ 2026 – 26 Sep’ 2026';
 
   const placementData = {
     lastUpdated,

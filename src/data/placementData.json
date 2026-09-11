@@ -1,16 +1,16 @@
 {
-  "lastUpdated": "September 08, 2026",
+  "lastUpdated": "September 09, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 510,
-  "totalCompaniesVisited": 89,
-  "editionDate": "09-09-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/e02a2f9f4cd666dc476fd727c6feb18e3431d449.pdf",
-  "totalPages": 8,
-  "placementPageNumber": 7,
-  "drivesPageNumber": 8,
+  "totalStudentsPlaced": 511,
+  "totalCompaniesVisited": 90,
+  "editionDate": "10-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v2/d72b9198a36e10c93d15f15ba07dfcb2bc87eaab.pdf",
+  "totalPages": 7,
+  "placementPageNumber": 6,
+  "drivesPageNumber": 7,
   "upcomingDrives": [
     {
-      "company": "VST Tillers Tractors Pvt. Ltd",
+      "company": "Tiger Analytics",
       "role": "Software & AI Engineering Roles",
       "targetBatch": "2023-2027 Batch",
       "startDate": "07 Sep 2026",
@@ -50,7 +50,7 @@
       "tier": "7 - 10 LPA",
       "tierCategory": "Dream Tier",
       "range": "7.00 - 10.00 LPA",
-      "offerCount": 86,
+      "offerCount": 87,
       "color": "from-purple-500 to-indigo-500",
       "badgeColor": "bg-purple-500/10 text-purple-400 border-purple-500/20",
       "companies": [
@@ -60,6 +60,7 @@
         "Rocket India (Mr. Cooper)",
         "SurveySparrow",
         "TCS",
+        "VISTEON",
         "Zohocorp"
       ]
     },
