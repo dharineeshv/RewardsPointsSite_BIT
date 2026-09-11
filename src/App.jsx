@@ -68,6 +68,7 @@ import {
   Cog,
   Gauge,
   LineChart,
+  Server,
   Sprout,
   Dna,
   Palette,
@@ -2844,6 +2845,89 @@ export default function App() {
     } catch (e) {}
     return [];
   });
+
+  // Master PS Session & Proxy Gateway State
+  const [psMasterTokenInput, setPsMasterTokenInput] = useState('');
+  const [psSessionInfo, setPsSessionInfo] = useState(null);
+  const [psTokenSaveStatus, setPsTokenSaveStatus] = useState('idle'); // idle | saving | success | error
+  const [proxyTestRoll, setProxyTestRoll] = useState('7376232CT109');
+  const [proxyTestStatus, setProxyTestStatus] = useState('idle'); // idle | testing | success | error
+  const [proxyTestResult, setProxyTestResult] = useState(null);
+  const [proxyTestLatency, setProxyTestLatency] = useState(null);
+
+  // Load existing PS Session from Firebase
+  const fetchPsSessionInfo = useCallback(async () => {
+    try {
+      const fbUrl = (firebaseDbUrl || DEFAULT_FIREBASE_DB_URL).replace(/\/$/, '');
+      const res = await fetch(`${fbUrl}/ps_session.json`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data) {
+          setPsSessionInfo(data);
+          if (data.active_token && !psMasterTokenInput) {
+            setPsMasterTokenInput(data.active_token);
+          }
+        }
+      }
+    } catch (e) {}
+  }, [firebaseDbUrl, psMasterTokenInput]);
+
+  useEffect(() => {
+    if (activeNav === 'Admin Console' && isAdminUser) {
+      fetchPsSessionInfo();
+    }
+  }, [activeNav, isAdminUser, fetchPsSessionInfo]);
+
+  // Save / Sync Master PS Token to Firebase
+  const handleSaveMasterPsToken = async () => {
+    if (!psMasterTokenInput.trim()) return;
+    setPsTokenSaveStatus('saving');
+    try {
+      const fbUrl = (firebaseDbUrl || DEFAULT_FIREBASE_DB_URL).replace(/\/$/, '');
+      const sessionPayload = {
+        active_token: psMasterTokenInput.trim(),
+        updated_at: Date.now(),
+        updated_by: currentUser?.email || 'admin'
+      };
+      await fetch(`${fbUrl}/ps_session.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionPayload)
+      });
+      setPsSessionInfo(sessionPayload);
+      setPsTokenSaveStatus('success');
+      setTimeout(() => setPsTokenSaveStatus('idle'), 3000);
+    } catch (e) {
+      setPsTokenSaveStatus('error');
+      setTimeout(() => setPsTokenSaveStatus('idle'), 4000);
+    }
+  };
+
+  // Test live proxy search query
+  const handleTestProxyQuery = async () => {
+    const query = (proxyTestRoll || '7376232CT109').trim().toUpperCase();
+    setProxyTestStatus('testing');
+    setProxyTestResult(null);
+    const start = performance.now();
+    try {
+      const res = await bitcentralFetch(`/search?q=${encodeURIComponent(query)}`);
+      const latency = Math.round(performance.now() - start);
+      setProxyTestLatency(latency);
+      if (res.ok) {
+        const data = await res.json();
+        setProxyTestResult(data);
+        setProxyTestStatus('success');
+      } else {
+        setProxyTestStatus('error');
+        setProxyTestResult({ error: `HTTP ${res.status}: ${res.statusText}` });
+      }
+    } catch (err) {
+      const latency = Math.round(performance.now() - start);
+      setProxyTestLatency(latency);
+      setProxyTestStatus('error');
+      setProxyTestResult({ error: err.message });
+    }
+  };
 
   // Fetch real-time logs from Firebase Database with student overriding/deduplication
   const fetchFirebaseLogs = async (urlOverride) => {
@@ -7933,6 +8017,163 @@ export default function App() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* BIT Central & PS Master Proxy Gateway Controller */}
+              <div className={`rounded-3xl border p-5 sm:p-6 shadow-xl space-y-5 ${
+                isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 dark:border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-indigo-500/20 text-indigo-400">
+                      <Server className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className={`text-base font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                          BIT Central & PS Master Proxy Gateway
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          LIVE PROXY
+                        </span>
+                      </div>
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Bypasses CORS and automatically authenticates all students to fetch Reward Points, Profiles & Attendance with 0 friction.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                      psSessionInfo?.active_token
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                        : isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-100 border-slate-300 text-slate-600'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${psSessionInfo?.active_token ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
+                      <span>{psSessionInfo?.active_token ? 'Master Token Active' : 'BIT Central Default'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Left Column: Master Token Synchronizer */}
+                  <div className={`p-4 rounded-2xl border space-y-3 ${
+                    isDarkMode ? 'border-slate-800 bg-slate-950/60' : 'border-slate-200 bg-slate-50/70'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-bold flex items-center gap-1.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <Lock className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Master PS Session Token (Firebase Synced)</span>
+                      </label>
+                      {psSessionInfo?.updated_at && (
+                        <span className="text-[10px] font-mono text-slate-400">
+                          Updated: {new Date(psSessionInfo.updated_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={psMasterTokenInput}
+                        onChange={(e) => setPsMasterTokenInput(e.target.value)}
+                        placeholder="Paste Bearer JWT token or PHPSESSID cookie value..."
+                        className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-mono border transition-all ${
+                          isDarkMode
+                            ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                            : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500 shadow-2xs'
+                        }`}
+                      />
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-slate-400">
+                          Stored securely at <code className="text-indigo-400">/ps_session/active_token</code>
+                        </span>
+                        <button
+                          onClick={handleSaveMasterPsToken}
+                          disabled={psTokenSaveStatus === 'saving'}
+                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          {psTokenSaveStatus === 'saving' ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Saving...</span>
+                            </>
+                          ) : psTokenSaveStatus === 'success' ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Saved to Cloud!</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Sync Token</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Live Proxy Tester */}
+                  <div className={`p-4 rounded-2xl border space-y-3 ${
+                    isDarkMode ? 'border-slate-800 bg-slate-950/60' : 'border-slate-200 bg-slate-50/70'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs font-bold flex items-center gap-1.5 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Live Proxy Tester</span>
+                      </label>
+                      {proxyTestLatency !== null && (
+                        <span className="text-[10px] font-bold text-emerald-400">
+                          ⚡ {proxyTestLatency}ms latency
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={proxyTestRoll}
+                        onChange={(e) => setProxyTestRoll(e.target.value)}
+                        placeholder="Enter roll (e.g. 7376232CT109)"
+                        className={`flex-1 px-3.5 py-2.5 rounded-xl text-xs font-mono uppercase border transition-all ${
+                          isDarkMode
+                            ? 'bg-slate-900 border-slate-700 text-white focus:border-indigo-500'
+                            : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500 shadow-2xs'
+                        }`}
+                      />
+                      <button
+                        onClick={handleTestProxyQuery}
+                        disabled={proxyTestStatus === 'testing'}
+                        className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {proxyTestStatus === 'testing' ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Search className="w-3.5 h-3.5" />
+                        )}
+                        <span>Test Proxy</span>
+                      </button>
+                    </div>
+
+                    {/* Result Preview */}
+                    {proxyTestResult && (
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-emerald-400 max-h-24 overflow-y-auto">
+                        {proxyTestResult.error ? (
+                          <span className="text-rose-400">❌ {proxyTestResult.error}</span>
+                        ) : (
+                          <div>
+                            <span className="text-indigo-300 font-bold">✅ Proxy OK:</span>{' '}
+                            {proxyTestResult.data?.[0]?.name || proxyTestResult.name || 'Record found'} —{' '}
+                            <span className="text-amber-300">
+                              {proxyTestResult.data?.[0]?.balance_points ?? proxyTestResult.data?.[0]?.points ?? 'Points verified'} RP
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* 2-Column Section: Department Distribution & Live Activity Logs */}

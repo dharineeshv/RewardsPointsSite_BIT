@@ -5,6 +5,18 @@
       "destination": "/api/bitcentral?path=$1"
     },
     {
+      "source": "/api/ps-portal/(.*)",
+      "destination": "/api/ps-portal?path=$1"
+    },
+    {
+      "source": "/api/bit-media/(.*)",
+      "destination": "/api/bit-media?path=$1"
+    },
+    {
+      "source": "/api/sync-attendance",
+      "destination": "/api/sync-attendance"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
