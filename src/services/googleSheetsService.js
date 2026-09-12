@@ -43,7 +43,7 @@ function cleanPointValue(raw) {
   if (raw === null || raw === undefined) return 0;
   const str = String(raw).replace(/,/g, '').trim();
   const val = parseFloat(str);
-  return isNaN(val) ? 0 : val;
+  return isNaN(val) ? 0 : Math.round(val);
 }
 
 /**
@@ -64,9 +64,9 @@ export async function fetchInstitutionalAveragesFromSheet() {
   // Official Institutional Chart Benchmark Values (from oid=1492100559)
   const defaultAverages = {
     year_1: 0,
-    year_2: 216.08,
-    year_3: 331.62,
-    year_4: 192.30
+    year_2: 216,
+    year_3: 332,
+    year_4: 192
   };
 
   try {
@@ -96,10 +96,10 @@ export async function fetchInstitutionalAveragesFromSheet() {
         });
 
         const computed = {
-          year_1: y1Count > 0 ? parseFloat((y1Sum / y1Count).toFixed(2)) : defaultAverages.year_1,
-          year_2: y2Count > 0 ? parseFloat((y2Sum / y2Count).toFixed(2)) : defaultAverages.year_2,
-          year_3: y3Count > 0 ? parseFloat((y3Sum / y3Count).toFixed(2)) : defaultAverages.year_3,
-          year_4: y4Count > 0 ? parseFloat((y4Sum / y4Count).toFixed(2)) : defaultAverages.year_4,
+          year_1: y1Count > 0 ? Math.round(y1Sum / y1Count) : defaultAverages.year_1,
+          year_2: y2Count > 0 ? Math.round(y2Sum / y2Count) : defaultAverages.year_2,
+          year_3: y3Count > 0 ? Math.round(y3Sum / y3Count) : defaultAverages.year_3,
+          year_4: y4Count > 0 ? Math.round(y4Sum / y4Count) : defaultAverages.year_4,
         };
 
         try {

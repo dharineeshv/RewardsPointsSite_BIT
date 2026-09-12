@@ -10,7 +10,7 @@ import { savePdfDocumentToDB, loadAllPdfDocumentsFromDB, removePdfDocumentFromDB
 import { getCampusMessMenu } from './data/messMenuData';
 import FACULTY_DIRECTORY_DATA from './data/facultyDirectory.json';
 import EXAM_HALL_INDEX_DATA from './data/examHallIndex.json';
-import { STUDENTS_INTERNAL_MARKS_LIST, STUDENT_EVENT_LOGS_MAP } from './data/rp_distribution';
+import { STUDENTS_INTERNAL_MARKS_LIST, STUDENT_EVENT_LOGS_MAP, ALL_REWARD_POINTS_ENTRIES, TOTAL_PS_COMPLETIONS_COUNT } from './data/rp_distribution';
 import {
   FileSpreadsheet,
   LayoutGrid,
@@ -584,7 +584,7 @@ function DashboardHeroSlider({
                 {isAboveAvg ? `+${diffAbs} RP Above Average` : `${diffAbs} RP Below Average`}
               </h3>
               <span className="text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-lg bg-black/25 border border-white/20">
-                {percentOfAvg}% of Batch Avg
+                {Math.min(100, percentOfAvg)}% of Batch Avg
               </span>
             </div>
 
@@ -598,12 +598,12 @@ function DashboardHeroSlider({
           <div className="relative z-10 mt-3 max-w-md w-full">
             <div className="flex justify-between text-[11px] font-bold mb-1 text-white/90">
               <span>Benchmark Progress</span>
-              <span>{percentOfAvg}%</span>
+              <span>{Math.min(100, Math.max(0, percentOfAvg))}%</span>
             </div>
             <div className="w-full h-2.5 rounded-full bg-black/35 overflow-hidden">
               <div 
                 className="h-full bg-white rounded-full transition-all duration-700"
-                style={{ width: `${Math.min(100, Math.max(8, percentOfAvg))}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, percentOfAvg))}%` }}
               />
             </div>
           </div>
@@ -2840,15 +2840,21 @@ export default function App() {
   });
   const [loadingAverages, setLoadingAverages] = useState(true);
 
-  // Dynamic API state for rewards overview
+  // Dynamic API state for rewards overview & Transaction Ledger
   const [rewardsData, setRewardsData] = useState([]);
   const [loadingRewards, setLoadingRewards] = useState(false);
   const [rewardsTotal, setRewardsTotal] = useState(0);
   const [rewardsPage, setRewardsPage] = useState(1);
+  const [overviewLedgerScope, setOverviewLedgerScope] = useState('my'); // 'my' | 'all'
+  const [overviewCategoryFilter, setOverviewCategoryFilter] = useState('ALL');
+  const [overviewSearchQuery, setOverviewSearchQuery] = useState('');
+  const [overviewVisibleCount, setOverviewVisibleCount] = useState(25);
 
-  // Dynamic API state for Student Detail Modal
+  // Dynamic API state for Student Detail Modal & Inspect Ledger
   const [modalRewardsData, setModalRewardsData] = useState([]);
   const [loadingModalRewards, setLoadingModalRewards] = useState(false);
+  const [modalCategoryFilter, setModalCategoryFilter] = useState('ALL');
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
 
   // Live Campus Weather State (Open-Meteo API)
   const [weatherData, setWeatherData] = useState(null);
@@ -3820,14 +3826,22 @@ export default function App() {
         // 2. Add granular individual event participation & penalty logs from sheets
         if (Array.isArray(eventLogs) && eventLogs.length > 0) {
           eventLogs.forEach(ev => {
+            const isPS = ev.isPS !== undefined ? ev.isPS : ((ev.activity_type || '').toUpperCase().includes('P SKILL') || (ev.activity_name || '').toUpperCase().includes('LEVEL'));
             activities.push({
+              id: ev.id,
+              sl_no: ev.sl_no || '',
+              code: ev.code || ev.activity_code || '',
+              activity_code: ev.code || ev.activity_code || '',
               activity_name: ev.activity_name || ev.name,
               course_name: ev.course_name || ev.name,
               date: ev.date || "Academic Year 2024-2025",
-              activity_type: ev.activity_type || (ev.points < 0 ? "Penalty" : "P Skill"),
+              activity_type: ev.activity_type || (ev.points < 0 ? "Penalty" : (isPS ? "P Skill" : "Event")),
               reward_points: Math.abs(ev.points).toLocaleString(),
+              points: ev.points,
               type: ev.points < 0 ? "negative" : "positive",
-              organizer: ev.organizer || ""
+              organizer: ev.organizer || "",
+              email: ev.email || "",
+              isPS
             });
           });
         }
@@ -3951,14 +3965,22 @@ export default function App() {
         // 2. Individual Event Participation & Penalty Logs
         if (Array.isArray(eventLogs) && eventLogs.length > 0) {
           eventLogs.forEach(ev => {
+            const isPS = ev.isPS !== undefined ? ev.isPS : ((ev.activity_type || '').toUpperCase().includes('P SKILL') || (ev.activity_name || '').toUpperCase().includes('LEVEL'));
             activities.push({
+              id: ev.id,
+              sl_no: ev.sl_no || '',
+              code: ev.code || ev.activity_code || '',
+              activity_code: ev.code || ev.activity_code || '',
               activity_name: ev.activity_name || ev.name,
               course_name: ev.course_name || ev.name,
               date: ev.date || "Academic Year 2024-2025",
-              activity_type: ev.activity_type || (ev.points < 0 ? "Penalty" : "P Skill"),
+              activity_type: ev.activity_type || (ev.points < 0 ? "Penalty" : (isPS ? "P Skill" : "Event")),
               reward_points: Math.abs(ev.points).toLocaleString(),
+              points: ev.points,
               type: ev.points < 0 ? "negative" : "positive",
-              organizer: ev.organizer || ""
+              organizer: ev.organizer || "",
+              email: ev.email || "",
+              isPS
             });
           });
         }
@@ -5322,8 +5344,8 @@ export default function App() {
                       </div>
                     ) : (
                       rewardsData.map((act, index) => {
-                        const rawPts = act.reward_points ? parseFloat(act.reward_points.replace(/,/g, '')) : 0;
-                        const isPositive = act.type !== 'negative' && rawPts >= 0;
+                        const rawPts = act.reward_points ? parseFloat(String(act.reward_points).replace(/,/g, '')) : (act.points ? Math.abs(act.points) : 0);
+                        const isPositive = act.type !== 'negative' && (act.points === undefined || act.points >= 0);
                         const t = (act.activity_type || '').toUpperCase();
                         let badgeStyle = isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-slate-100 text-slate-800 border-slate-300';
                         if (t.includes('TECHNICAL') || t.includes('EVENT')) {
@@ -5396,8 +5418,8 @@ export default function App() {
                           </tr>
                         ) : (
                           rewardsData.map((act, index) => {
-                            const rawPts = act.reward_points ? parseFloat(act.reward_points.replace(/,/g, '')) : 0;
-                            const isPositive = act.type !== 'negative' && rawPts >= 0;
+                            const rawPts = act.reward_points ? parseFloat(String(act.reward_points).replace(/,/g, '')) : (act.points ? Math.abs(act.points) : 0);
+                            const isPositive = act.type !== 'negative' && (act.points === undefined || act.points >= 0);
                             
                             // Badge color styles
                             const t = (act.activity_type || '').toUpperCase();
@@ -9044,61 +9066,196 @@ export default function App() {
 
 
 
-            {/* Recent RP Activities History */}
+            {/* Reward Points Entry Sheet (Transaction-Level Log) */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Recent Activity History</h4>
-                {loadingModalRewards && (
-                  <span className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1 animate-pulse">
-                    <RefreshCw className="w-3 h-3 animate-spin" /> Fetching live RP logs...
-                  </span>
-                )}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <h4 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Reward Points Entry Sheet (Transaction Log)
+                  </h4>
+                  {loadingModalRewards && (
+                    <span className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1 animate-pulse">
+                      <RefreshCw className="w-3 h-3 animate-spin" /> Fetching live logs...
+                    </span>
+                  )}
+                </div>
+                {/* PS Count Tag if available */}
+                {(() => {
+                  const studentLogs = modalRewardsData.length > 0 ? modalRewardsData : (selectedStudent.history || []);
+                  const psEntries = studentLogs.filter(e => e.isPS || (e.activity_type || '').toUpperCase().includes('P SKILL') || (e.category || '').toUpperCase().includes('P SKILL'));
+                  const psPoints = psEntries.reduce((sum, e) => sum + (parseFloat(String(e.reward_points || e.points || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+                  if (psEntries.length > 0) {
+                    return (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                        🎯 {psEntries.length} PS Modules • +{psPoints.toLocaleString()} RP
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
+
+              {/* Modal Category Filter & Search Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+                  {[
+                    { id: 'ALL', label: 'All' },
+                    { id: 'PS', label: '🎯 PS Skill' },
+                    { id: 'INITIATIVE', label: 'Initiatives' },
+                    { id: 'TECHNICAL', label: 'Technical' },
+                    { id: 'PENALTY', label: 'Penalties' }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setModalCategoryFilter(tab.id)}
+                      className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full transition-all border cursor-pointer ${
+                        modalCategoryFilter === tab.id
+                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
+                          : isDarkMode
+                            ? 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-300 hover:text-slate-900'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative w-full sm:w-48">
+                  <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={modalSearchQuery}
+                    onChange={(e) => setModalSearchQuery(e.target.value)}
+                    placeholder="Search logs..."
+                    className={`w-full pl-7 pr-6 py-1 text-[11px] rounded-lg border transition-all focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                      isDarkMode 
+                        ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500' 
+                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                  {modalSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setModalSearchQuery('')}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-200 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Transaction Items List */}
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
                 {loadingModalRewards ? (
                   <div className={`p-6 text-center text-xs flex flex-col items-center justify-center gap-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                     <span>Loading student's authentic reward logs...</span>
                   </div>
-                ) : (modalRewardsData.length > 0 || (selectedStudent.history && selectedStudent.history.length > 0)) ? (
-                  (modalRewardsData.length > 0 ? modalRewardsData : (selectedStudent.history || [])).slice(0, 8).map((act, index) => {
-                    const rawPts = act.reward_points ? parseFloat(String(act.reward_points).replace(/,/g, '')) : (act.points ? parseFloat(String(act.points).replace(/[^0-9.]/g, '')) : 0);
-                    const isPositive = act.type !== 'negative' && rawPts >= 0;
+                ) : (() => {
+                  const studentLogs = modalRewardsData.length > 0 ? modalRewardsData : (selectedStudent.history || []);
+                  const q = modalSearchQuery.trim().toLowerCase();
+                  
+                  const filtered = studentLogs.filter(act => {
+                    const t = (act.activity_type || act.category || '').toUpperCase();
+                    const isPS = act.isPS || t.includes('P SKILL') || t.includes('PSKILL');
+                    
+                    if (modalCategoryFilter === 'PS' && !isPS) return false;
+                    if (modalCategoryFilter === 'INITIATIVE' && !t.includes('INITIATIVE')) return false;
+                    if (modalCategoryFilter === 'TECHNICAL' && !t.includes('TECHNICAL')) return false;
+                    if (modalCategoryFilter === 'PENALTY' && act.type !== 'negative' && !t.includes('PENALTY')) return false;
+
+                    if (q) {
+                      const matchName = (act.activity_name || act.title || act.course_name || '').toLowerCase().includes(q);
+                      const matchCode = (act.code || act.activity_code || '').toLowerCase().includes(q);
+                      const matchOrg = (act.organizer || '').toLowerCase().includes(q);
+                      if (!matchName && !matchCode && !matchOrg) return false;
+                    }
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className={`p-4 text-center text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        No matching transaction logs found for this student.
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((act, index) => {
+                    const rawPts = act.reward_points ? parseFloat(String(act.reward_points).replace(/,/g, '')) : (act.points ? Math.abs(parseFloat(String(act.points).replace(/[^0-9.-]/g, ''))) : 0);
+                    const isPositive = act.type !== 'negative' && (act.points === undefined || act.points >= 0);
+                    const t = (act.activity_type || act.category || '').toUpperCase();
+                    const isPS = act.isPS || t.includes('P SKILL') || t.includes('PSKILL');
+                    
+                    let badgeStyle = isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-slate-100 text-slate-800 border-slate-300';
+                    if (isPS) {
+                      badgeStyle = isDarkMode ? 'bg-indigo-950/90 text-indigo-300 border-indigo-700' : 'bg-indigo-50 text-indigo-800 border-indigo-300';
+                    } else if (t.includes('TECHNICAL') || t.includes('EVENT')) {
+                      badgeStyle = isDarkMode ? 'bg-cyan-950/80 text-cyan-300 border-cyan-800/80' : 'bg-cyan-50 text-cyan-800 border-cyan-300';
+                    } else if (t.includes('INITIATIVE') || t.includes('CHALLENGE')) {
+                      badgeStyle = isDarkMode ? 'bg-amber-950/80 text-amber-300 border-amber-800/80' : 'bg-amber-50 text-amber-800 border-amber-300';
+                    } else if (t.includes('PENALTY')) {
+                      badgeStyle = isDarkMode ? 'bg-rose-950/80 text-rose-300 border-rose-800/80' : 'bg-rose-50 text-rose-800 border-rose-300';
+                    }
+
                     return (
                       <div
                         key={index}
-                        className={`flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all gap-2 ${
+                        className={`p-3 rounded-2xl border transition-all space-y-1.5 ${
                           isDarkMode 
                             ? 'border-slate-800 bg-slate-800/40 hover:border-slate-700' 
                             : 'border-slate-200 bg-slate-50 hover:border-slate-300'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center border flex-shrink-0 ${
-                            isDarkMode ? 'bg-indigo-950/70 text-indigo-400 border-indigo-800/40' : 'bg-indigo-100 text-indigo-600 border-indigo-200'
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 mt-0.5 ${
+                              isPS
+                                ? (isDarkMode ? 'bg-indigo-950 text-indigo-400 border-indigo-800' : 'bg-indigo-100 text-indigo-600 border-indigo-200')
+                                : (isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200')
+                            }`}>
+                              {isPS ? <GraduationCap className="w-4 h-4" /> : <Trophy className="w-4 h-4" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              {(act.code || act.activity_code) && (
+                                <span className="inline-block font-mono text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-800/60 text-slate-300 border border-slate-700 mr-1.5 mb-1">
+                                  {act.code || act.activity_code}
+                                </span>
+                              )}
+                              <div className={`text-xs font-bold leading-snug ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                                {act.activity_name || act.title || act.course_name}
+                              </div>
+                              {act.organizer && (
+                                <div className={`text-[10px] font-medium mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  Faculty: {act.organizer}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 ${
+                            isPositive 
+                              ? 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/60' 
+                              : 'text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800/60'
                           }`}>
-                            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className={`text-xs font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{act.activity_name || act.title || act.course_name}</div>
-                            <div className={`text-[10px] sm:text-[11px] truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{act.date} • {act.activity_type || act.category || 'Event'}</div>
-                          </div>
+                            {isPositive ? `+${rawPts.toLocaleString()}` : `-${rawPts.toLocaleString()}`} RP
+                          </span>
                         </div>
-                        <span className={`text-[10px] sm:text-xs font-black px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full whitespace-nowrap flex-shrink-0 ${
-                          isPositive 
-                            ? 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/60' 
-                            : 'text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800/60'
-                        }`}>
-                          {isPositive ? `+${rawPts.toLocaleString()}` : `-${rawPts.toLocaleString()}`} RP
-                        </span>
+
+                        <div className={`flex flex-wrap items-center justify-between gap-2 text-[10px] pt-1 border-t ${isDarkMode ? 'border-slate-800/80 text-slate-400' : 'border-slate-200/80 text-slate-500'}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold border ${badgeStyle}`}>
+                            {isPS ? '🎯 P-Skill' : (act.activity_type || act.category || 'Event')}
+                          </span>
+                          <span className="font-medium">
+                            {act.date || 'Academic Year'}
+                          </span>
+                        </div>
                       </div>
                     );
-                  })
-                ) : (
-                  <div className={`p-4 text-center text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    No activity logs recorded yet for this student.
-                  </div>
-                )}
+                  });
+                })()}
               </div>
             </div>
 

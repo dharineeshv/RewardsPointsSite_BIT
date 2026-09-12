@@ -123,45 +123,67 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
       }`}>
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-400 dark:text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
+            <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md flex items-center gap-1.5 border ${
+              isDarkMode 
+                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' 
+                : 'bg-indigo-100 text-indigo-800 border-indigo-200 font-extrabold'
+            }`}>
               <UserCheck className="w-3.5 h-3.5" />
               <span>Academic Allocation</span>
             </span>
-            <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <span className={`text-[11px] sm:text-xs font-semibold ${
+              isDarkMode ? 'text-slate-400' : 'text-slate-600'
+            }`}>
               Student-to-Mentor Registry
             </span>
           </div>
 
-          <h2 className="text-xl sm:text-3xl font-black tracking-tight leading-tight">
+          <h2 className={`text-xl sm:text-3xl font-black tracking-tight leading-tight ${
+            isDarkMode ? 'text-white' : 'text-slate-900'
+          }`}>
             Student & Faculty Mentor Directory
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-2xl leading-relaxed">
+          <p className={`text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed font-medium ${
+            isDarkMode ? 'text-slate-300' : 'text-slate-700'
+          }`}>
             Every enrolled student is officially mapped with their designated faculty mentor and institutional email.
           </p>
 
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 mt-4 sm:mt-5 max-w-xl">
             <div className={`p-2.5 sm:p-3 rounded-2xl border ${
-              isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white/80 border-slate-200'
+              isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white/90 border-slate-200 shadow-xs'
             }`}>
-              <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Total Mappings</span>
-              <span className="text-base sm:text-xl font-black text-indigo-500 dark:text-indigo-400">
+              <span className={`text-[9px] sm:text-[10px] uppercase font-bold block ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-600'
+              }`}>Total Mappings</span>
+              <span className={`text-base sm:text-xl font-black ${
+                isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
+              }`}>
                 {studentMentorData.length.toLocaleString()} Students
               </span>
             </div>
             <div className={`p-2.5 sm:p-3 rounded-2xl border ${
-              isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white/80 border-slate-200'
+              isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white/90 border-slate-200 shadow-xs'
             }`}>
-              <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Filtered Results</span>
-              <span className="text-base sm:text-xl font-black text-emerald-500 dark:text-emerald-400">
+              <span className={`text-[9px] sm:text-[10px] uppercase font-bold block ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-600'
+              }`}>Filtered Results</span>
+              <span className={`text-base sm:text-xl font-black ${
+                isDarkMode ? 'text-emerald-400' : 'text-emerald-600'
+              }`}>
                 {filteredList.length.toLocaleString()}
               </span>
             </div>
             <div className={`col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border ${
-              isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white/80 border-slate-200'
+              isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white/90 border-slate-200 shadow-xs'
             }`}>
-              <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Departments</span>
-              <span className="text-base sm:text-xl font-black text-purple-500 dark:text-purple-400">
+              <span className={`text-[9px] sm:text-[10px] uppercase font-bold block ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-600'
+              }`}>Departments</span>
+              <span className={`text-base sm:text-xl font-black ${
+                isDarkMode ? 'text-purple-400' : 'text-purple-600'
+              }`}>
                 {ALL_DEPARTMENTS.length - 1} Branches
               </span>
             </div>
@@ -176,30 +198,46 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
         }`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center border border-emerald-500/25 flex-shrink-0">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center border flex-shrink-0 ${
+                isDarkMode 
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25' 
+                  : 'bg-emerald-100 text-emerald-700 border-emerald-300'
+              }`}>
                 <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                  <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                  <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                    isDarkMode 
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25' 
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-300 font-extrabold'
+                  }`}>
                     Your Assigned Mentor
                   </span>
-                  <span className="text-[11px] sm:text-xs font-mono text-slate-400">
+                  <span className={`text-[11px] sm:text-xs font-mono font-semibold ${
+                    isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                  }`}>
                     {myMentorRecord.rollNo} • {myMentorRecord.deptCode}
                   </span>
                 </div>
-                <h3 className="text-base sm:text-xl font-black mt-1 text-slate-900 dark:text-white truncate">
+                <h3 className={`text-base sm:text-xl font-black mt-1 truncate ${
+                  isDarkMode ? 'text-white' : 'text-slate-900'
+                }`}>
                   {myMentorRecord.mentorName}
                 </h3>
-                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                  Designated advisor for <strong className="text-slate-700 dark:text-slate-200">{myMentorRecord.studentName}</strong>
+                <p className={`text-[11px] sm:text-xs mt-0.5 truncate font-medium ${
+                  isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                }`}>
+                  Designated advisor for <strong className={isDarkMode ? 'text-slate-200 font-bold' : 'text-slate-900 font-extrabold'}>{myMentorRecord.studentName}</strong>
                 </p>
               </div>
             </div>
 
             {/* Email Actions */}
             {myMentorRecord.mentorEmail && (
-              <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
+              <div className={`flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 ${
+                isDarkMode ? 'border-slate-800/60' : 'border-slate-200'
+              }`}>
                 <a
                   href={`mailto:${myMentorRecord.mentorEmail}`}
                   className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
@@ -279,16 +317,22 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
         </div>
 
         {/* Complete Department Quick Filter Chips */}
-        <div className="mt-3 pt-2.5 border-t border-slate-800/60 dark:border-slate-800/60">
+        <div className={`mt-3 pt-2.5 border-t ${
+          isDarkMode ? 'border-slate-800/60' : 'border-slate-200'
+        }`}>
           <div className="flex items-center justify-between mb-1.5 px-0.5">
-            <span className="text-[10px] uppercase font-bold text-slate-400">
+            <span className={`text-[10px] uppercase font-bold ${
+              isDarkMode ? 'text-slate-400' : 'text-slate-600'
+            }`}>
               Department Quick Filters:
             </span>
             {selectedDept !== 'ALL' && (
               <button
                 type="button"
                 onClick={() => handleDeptChange('ALL')}
-                className="text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer"
+                className={`text-[10px] font-bold hover:underline cursor-pointer ${
+                  isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
+                }`}
               >
                 Reset
               </button>
@@ -331,15 +375,15 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                         ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
                         : isDarkMode
                           ? 'bg-slate-800/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
                     }`}
                     title={dept.label}
                   >
                     <span>{dept.code}</span>
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono font-bold ${
                       isSelected 
                         ? 'bg-white/25 text-white font-black' 
-                        : isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'
+                        : isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'
                     }`}>
                       {count}
                     </span>
@@ -370,11 +414,11 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
       <div className="block md:hidden space-y-3">
         {paginatedList.length === 0 ? (
           <div className={`p-8 text-center rounded-3xl border ${
-            isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
+            isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
           }`}>
-            <Users className="w-8 h-8 mx-auto mb-2 opacity-50 text-indigo-400" />
+            <Users className="w-8 h-8 mx-auto mb-2 opacity-50 text-indigo-500" />
             <p className="font-bold text-sm">No mappings found</p>
-            <p className="text-xs text-slate-500 mt-1">Try another roll number or department filter.</p>
+            <p className={`text-xs mt-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-600'}`}>Try another roll number or department filter.</p>
             <button
               type="button"
               onClick={() => { setSelectedDept('ALL'); setSearchQuery(''); }}
@@ -398,7 +442,7 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                 <div className="flex items-center gap-1.5">
                   <span className={`font-mono text-xs font-black px-2 py-0.5 rounded-lg border ${
                     item.rollNo === userRoll
-                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                      ? isDarkMode ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-emerald-100 text-emerald-800 border-emerald-300 font-extrabold'
                       : isDarkMode ? 'bg-slate-800 text-indigo-300 border-slate-700' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   }`}>
                     {item.rollNo}
@@ -406,19 +450,27 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                   <button
                     type="button"
                     onClick={() => handleCopy(item.rollNo, 'roll', item.rollNo)}
-                    className="p-1 rounded-md text-slate-400 hover:text-slate-200 cursor-pointer"
+                    className={`p-1 rounded-md cursor-pointer ${
+                      isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                    }`}
                     title="Copy Roll"
                   >
-                    {copiedRoll === item.rollNo ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedRoll === item.rollNo ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                    isDarkMode 
+                      ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/20' 
+                      : 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                  }`}>
                     {item.deptCode}
                   </span>
                   {item.year && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md border font-semibold ${
+                      isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200'
+                    }`}>
                       Yr {item.year}
                     </span>
                   )}
@@ -429,7 +481,9 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
               <h4 className={`font-black text-sm mb-1 leading-snug ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                 {item.studentName}
               </h4>
-              <p className="text-[11px] text-slate-400 mb-2.5 truncate">
+              <p className={`text-[11px] mb-2.5 truncate font-medium ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-600'
+              }`}>
                 {item.department}
               </p>
 
@@ -438,17 +492,21 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                 isDarkMode ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200/80'
               }`}>
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Assigned Mentor</span>
+                  <span className={`text-[10px] uppercase font-bold ${
+                    isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                  }`}>Assigned Mentor</span>
                   <span className={`text-xs font-black truncate ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
                     {item.mentorName}
                   </span>
                 </div>
 
                 {item.mentorEmail && (
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/50">
+                  <div className={`flex items-center justify-between gap-2 pt-1 border-t ${
+                    isDarkMode ? 'border-slate-800/50' : 'border-slate-200'
+                  }`}>
                     <a
                       href={`mailto:${item.mentorEmail}`}
-                      className={`font-mono text-[11px] flex items-center gap-1 truncate hover:underline ${
+                      className={`font-mono text-[11px] font-semibold flex items-center gap-1 truncate hover:underline ${
                         isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
                       }`}
                     >
@@ -459,10 +517,12 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                     <button
                       type="button"
                       onClick={() => handleCopy(item.mentorEmail, 'email', item.rollNo)}
-                      className="p-1 rounded-md text-slate-400 hover:text-slate-200 cursor-pointer shrink-0"
+                      className={`p-1 rounded-md cursor-pointer shrink-0 ${
+                        isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                      }`}
                       title="Copy Email"
                     >
-                      {copiedEmail === item.rollNo ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedEmail === item.rollNo ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 )}
@@ -480,7 +540,7 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className={`border-b text-[11px] font-black uppercase tracking-wider ${
-                isDarkMode ? 'border-slate-800 bg-slate-950/60 text-slate-400' : 'border-slate-100 bg-slate-50 text-slate-500'
+                isDarkMode ? 'border-slate-800 bg-slate-950/60 text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-700 font-extrabold'
               }`}>
                 <th className="py-3.5 px-4 sm:px-6">ROLL NO.</th>
                 <th className="py-3.5 px-4 sm:px-6">STUDENT NAME</th>
@@ -489,13 +549,13 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                 <th className="py-3.5 px-4 sm:px-6">MAIL ID</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+            <tbody className={`divide-y text-xs ${isDarkMode ? 'divide-slate-800/60' : 'divide-slate-100'}`}>
               {paginatedList.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
+                  <td colSpan={5} className={`py-12 text-center ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                     <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p className="font-bold text-sm">No student-mentor mappings found for this filter</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Try searching with a different roll number, keyword, or select All Departments.</p>
+                    <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-500' : 'text-slate-600'}`}>Try searching with a different roll number, keyword, or select All Departments.</p>
                   </td>
                 </tr>
               ) : (
@@ -513,7 +573,7 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                       <div className="flex items-center gap-1.5">
                         <span className={`px-2.5 py-1 rounded-lg border text-[11px] ${
                           item.rollNo === userRoll
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 font-black'
+                            ? isDarkMode ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 font-black' : 'bg-emerald-100 text-emerald-800 border-emerald-300 font-extrabold'
                             : isDarkMode ? 'bg-slate-800/90 text-indigo-300 border-slate-700' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                         }`}>
                           {item.rollNo}
@@ -521,7 +581,9 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                         <button
                           type="button"
                           onClick={() => handleCopy(item.rollNo, 'roll', item.rollNo)}
-                          className="p-1 rounded-md text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                          }`}
                           title="Copy Roll Number"
                         >
                           {copiedRoll === item.rollNo ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -536,7 +598,9 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                           {item.studentName}
                         </span>
                         {item.year && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800/60 text-slate-400 border border-slate-700/60">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${
+                            isDarkMode ? 'bg-slate-800/60 text-slate-400 border-slate-700/60' : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
                             Yr {item.year}
                           </span>
                         )}
@@ -546,10 +610,14 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                     {/* Department */}
                     <td className="py-3.5 px-4 sm:px-6">
                       <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${
+                          isDarkMode 
+                            ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/20' 
+                            : 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                        }`}>
                           {item.deptCode}
                         </span>
-                        <span className={`text-[11px] font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                        <span className={`text-[11px] font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                           {item.department}
                         </span>
                       </div>
@@ -572,7 +640,7 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                         <div className="flex items-center gap-2">
                           <a
                             href={`mailto:${item.mentorEmail}`}
-                            className={`font-mono text-[11px] hover:underline flex items-center gap-1 ${
+                            className={`font-mono text-[11px] font-medium hover:underline flex items-center gap-1 ${
                               isDarkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'
                             }`}
                           >
@@ -582,14 +650,16 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
                           <button
                             type="button"
                             onClick={() => handleCopy(item.mentorEmail, 'email', item.rollNo)}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                            className={`p-1 rounded-md transition-colors cursor-pointer ${
+                              isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                            }`}
                             title="Copy Mentor Email"
                           >
                             {copiedEmail === item.rollNo ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       ) : (
-                        <span className="text-slate-500 text-[11px]">N/A</span>
+                        <span className={`text-[11px] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>N/A</span>
                       )}
                     </td>
                   </tr>
@@ -605,8 +675,8 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
         <div className={`p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs ${
           isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'
         }`}>
-          <span className="text-slate-400 font-medium text-center sm:text-left text-[11px] sm:text-xs">
-            Showing <strong className="text-slate-200">{(currentPage - 1) * pageSize + 1}</strong> to <strong className="text-slate-200">{Math.min(currentPage * pageSize, filteredList.length)}</strong> of <strong className="text-slate-200">{filteredList.length.toLocaleString()}</strong> mappings
+          <span className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600'} font-medium text-center sm:text-left text-[11px] sm:text-xs`}>
+            Showing <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-900'}>{(currentPage - 1) * pageSize + 1}</strong> to <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-900'}>{Math.min(currentPage * pageSize, filteredList.length)}</strong> of <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-900'}>{filteredList.length.toLocaleString()}</strong> mappings
           </span>
 
           <div className="flex items-center gap-1.5">
@@ -622,7 +692,7 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <span className="px-3 py-1 font-bold text-slate-300 text-xs">
+            <span className={`px-3 py-1 font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'} text-xs`}>
               Page {currentPage} of {totalPages}
             </span>
 

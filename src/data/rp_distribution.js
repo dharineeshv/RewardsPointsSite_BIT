@@ -23,22 +23,34 @@ export function parseEventLogs(raw) {
     if (roll && /^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) {
       if (!logsMap[roll]) logsMap[roll] = [];
       const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
-      let actType = (row[8] || 'P SKILL').trim();
-      if (actType.toUpperCase().includes('P SKILL') || actType.toUpperCase().includes('PSKILL')) actType = 'P Skill';
-      else if (actType.toUpperCase().includes('INITIATIVE')) actType = 'Initiative';
-      else if (actType.toUpperCase().includes('TECHNICAL')) actType = 'Technical';
+      const rawType = (row[8] || 'P SKILL').trim();
+      let actType = rawType;
+      const isPS = rawType.toUpperCase().includes('P SKILL') || rawType.toUpperCase().includes('PSKILL') || rawType.toUpperCase().includes('SKILL');
+      if (isPS) actType = 'P Skill';
+      else if (rawType.toUpperCase().includes('INITIATIVE')) actType = 'Initiative';
+      else if (rawType.toUpperCase().includes('TECHNICAL')) actType = 'Technical';
+      else if (rawType.toUpperCase().includes('INTERVIEW')) actType = 'Interview';
       
       logsMap[roll].push({
         id: `pos-${i}`,
+        sl_no: row[0] || String(i - 1),
         date: row[1] || 'Academic Year 2024-2025',
         code: row[2] || '',
+        activity_code: row[2] || '',
+        roll_no: roll,
+        student_name: (row[4] || '').trim(),
+        year: row[5] || '',
+        department: row[6] || '',
         points: pts,
         activity_name: row[9] || 'P-Skill Activity',
         course_name: row[9] || 'P-Skill Activity',
         activity_type: actType,
+        raw_type: rawType,
         reward_points: pts.toLocaleString(),
         organizer: row[10] || '',
-        type: 'positive'
+        email: row[11] || '',
+        type: 'positive',
+        isPS
       });
     }
   }
@@ -53,15 +65,23 @@ export function parseEventLogs(raw) {
       const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
       logsMap[roll].push({
         id: `neg-${i}`,
+        sl_no: row[0] || String(i),
         date: row[1] || 'Academic Year 2024-2025',
         code: row[2] || '',
+        activity_code: row[2] || '',
+        roll_no: roll,
+        student_name: (row[4] || '').trim(),
+        year: row[5] || '',
+        department: row[6] || '',
         points: -Math.abs(pts),
         activity_name: row[9] || 'Penalty / Absent',
         course_name: row[9] || 'Penalty / Absent',
         activity_type: 'Penalty',
+        raw_type: 'PENALTY',
         reward_points: (-Math.abs(pts)).toLocaleString(),
         organizer: row[10] || '',
-        type: 'negative'
+        type: 'negative',
+        isPS: false
       });
     }
   }
@@ -69,7 +89,73 @@ export function parseEventLogs(raw) {
   return logsMap;
 }
 
+export function parseAllTransactions(raw) {
+  const posEntries = raw?.sheets?.['Reward Points Entry'] || [];
+  const negEntries = raw?.sheets?.['Negative Reward Points'] || [];
+  const list = [];
+
+  for (let i = 2; i < posEntries.length; i++) {
+    const row = posEntries[i];
+    if (!row || !row[3]) continue;
+    const roll = (row[3] || '').trim().toUpperCase();
+    const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
+    const rawType = (row[8] || 'P SKILL').trim();
+    const isPS = rawType.toUpperCase().includes('P SKILL') || rawType.toUpperCase().includes('PSKILL') || rawType.toUpperCase().includes('SKILL');
+    list.push({
+      id: `pos-${i}`,
+      slNo: row[0] || String(i - 1),
+      date: row[1] || '',
+      code: row[2] || '',
+      rollNo: roll,
+      name: (row[4] || '').trim(),
+      year: row[5] || '',
+      department: row[6] || '',
+      points: pts,
+      reward_points: pts.toLocaleString(),
+      activity_type: isPS ? 'P Skill' : (rawType.includes('INITIATIVE') ? 'Initiative' : (rawType.includes('TECHNICAL') ? 'Technical' : rawType)),
+      raw_type: rawType,
+      activity_name: row[9] || 'Activity',
+      course_name: row[9] || 'Activity',
+      organizer: row[10] || '',
+      email: row[11] || '',
+      type: 'positive',
+      isPS
+    });
+  }
+
+  for (let i = 1; i < negEntries.length; i++) {
+    const row = negEntries[i];
+    if (!row || !row[3]) continue;
+    const roll = (row[3] || '').trim().toUpperCase();
+    const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
+    list.push({
+      id: `neg-${i}`,
+      slNo: row[0] || String(i),
+      date: row[1] || '',
+      code: row[2] || '',
+      rollNo: roll,
+      name: (row[4] || '').trim(),
+      year: row[5] || '',
+      department: row[6] || '',
+      points: -Math.abs(pts),
+      reward_points: (-Math.abs(pts)).toLocaleString(),
+      activity_type: 'Penalty',
+      raw_type: 'PENALTY',
+      activity_name: row[9] || 'Penalty',
+      course_name: row[9] || 'Penalty',
+      organizer: row[10] || '',
+      email: '',
+      type: 'negative',
+      isPS: false
+    });
+  }
+
+  return list;
+}
+
 export const STUDENT_EVENT_LOGS_MAP = parseEventLogs(rawData);
+export const ALL_REWARD_POINTS_ENTRIES = parseAllTransactions(rawData);
+export const TOTAL_PS_COMPLETIONS_COUNT = ALL_REWARD_POINTS_ENTRIES.filter(e => e.isPS).length;
 
 // Reusable parser for 2D array of rows from Google Sheets API
 export function parseStudentRows(rows) {
@@ -168,36 +254,36 @@ export function parseStudentRows(rows) {
     const email = (r[colIdx['E-Mail']] || '').trim();
 
     // 8 Activity Breakdown Categories from Google Sheets
-    const pSkillPts = parseFloat((r[colIdx['P Skill Points']] || '0').replace(/,/g, '')) || 0;
+    const pSkillPts = Math.round(parseFloat((r[colIdx['P Skill Points']] || '0').replace(/,/g, ''))) || 0;
     const pSkillCount = parseInt(r[colIdx['P Skill Count']] || '0', 10) || 0;
 
-    const studentInitPts = parseFloat((r[colIdx['STUDENT INITIATIVES POINTS']] || '0').replace(/,/g, '')) || 0;
+    const studentInitPts = Math.round(parseFloat((r[colIdx['STUDENT INITIATIVES POINTS']] || '0').replace(/,/g, ''))) || 0;
     const studentInitCount = parseInt(r[colIdx['STUDENT INITIATIVES COUNT']] || '0', 10) || 0;
 
-    const tacPts = parseFloat((r[colIdx['TAC Points']] || '0').replace(/,/g, '')) || 0;
+    const tacPts = Math.round(parseFloat((r[colIdx['TAC Points']] || '0').replace(/,/g, ''))) || 0;
     const tacCount = parseInt(r[colIdx['TAC Count']] || '0', 10) || 0;
 
-    const splLabPts = parseFloat((r[colIdx['Special Lab Initiatives Points']] || '0').replace(/,/g, '')) || 0;
+    const splLabPts = Math.round(parseFloat((r[colIdx['Special Lab Initiatives Points']] || '0').replace(/,/g, ''))) || 0;
     const splLabCount = parseInt(r[colIdx['Special Lab Initiatives Count']] || '0', 10) || 0;
 
-    const techEventPts = parseFloat((r[colIdx['Technical Events Points']] || '0').replace(/,/g, '')) || 0;
+    const techEventPts = Math.round(parseFloat((r[colIdx['Technical Events Points']] || '0').replace(/,/g, ''))) || 0;
     const techEventCount = parseInt(r[colIdx['Technical Events Count']] || '0', 10) || 0;
 
-    const extEventPts = parseFloat((r[colIdx['EXTERNAL EVENTS POINTS']] || '0').replace(/,/g, '')) || 0;
+    const extEventPts = Math.round(parseFloat((r[colIdx['EXTERNAL EVENTS POINTS']] || '0').replace(/,/g, ''))) || 0;
     const extEventCount = parseInt(r[colIdx['EXTERNAL EVENTS COUNT']] || '0', 10) || 0;
 
-    const techSocietyPts = parseFloat((r[colIdx['TECHNICAL SOCIETY ACTIVITIES Points']] || '0').replace(/,/g, '')) || 0;
+    const techSocietyPts = Math.round(parseFloat((r[colIdx['TECHNICAL SOCIETY ACTIVITIES Points']] || '0').replace(/,/g, ''))) || 0;
     const techSocietyCount = parseInt(r[colIdx['TECHNICAL SOCIETY ACTIVITIES Count']] || '0', 10) || 0;
 
-    const interviewPts = (parseFloat((r[colIdx['Interview Points']] || '0').replace(/,/g, '')) || 0) + (parseFloat((r[colIdx['EXTRA-CURRICULAR ACTIVITIES POINTS']] || '0').replace(/,/g, '')) || 0);
+    const interviewPts = Math.round((parseFloat((r[colIdx['Interview Points']] || '0').replace(/,/g, '')) || 0) + (parseFloat((r[colIdx['EXTRA-CURRICULAR ACTIVITIES POINTS']] || '0').replace(/,/g, '')) || 0));
     const interviewCount = (parseInt(r[colIdx['Interview Count']] || '0', 10) || 0) + (parseInt(r[colIdx['EXTRA-CURRICULAR ACTIVITIES COUNT']] || '0', 10) || 0);
 
-    const totalPoints = parseFloat((r[colIdx['Total Points']] || '0').replace(/,/g, '')) || 0;
-    const cumulativePoints = parseFloat((r[colIdx['Cumulative Points']] || '0').replace(/,/g, '')) || totalPoints;
-    const redeemedPoints = parseFloat((r[colIdx['Redeemed Points']] || '0').replace(/,/g, '')) || 0;
-    const balancePoints = parseFloat((r[colIdx['Balance Points']] || '0').replace(/,/g, '')) || (cumulativePoints - redeemedPoints);
+    const totalPoints = Math.round(parseFloat((r[colIdx['Total Points']] || '0').replace(/,/g, ''))) || 0;
+    const cumulativePoints = Math.round(parseFloat((r[colIdx['Cumulative Points']] || '0').replace(/,/g, ''))) || totalPoints;
+    const redeemedPoints = Math.round(parseFloat((r[colIdx['Redeemed Points']] || '0').replace(/,/g, ''))) || 0;
+    const balancePoints = Math.round(parseFloat((r[colIdx['Balance Points']] || '0').replace(/,/g, ''))) || (cumulativePoints - redeemedPoints);
 
-    const initialPoints = parseFloat((r[colIdx['Initial Points']] || '0').replace(/,/g, '')) || 0;
+    const initialPoints = Math.round(parseFloat((r[colIdx['Initial Points']] || '0').replace(/,/g, ''))) || 0;
 
     const activityBreakdown = [
       ...(initialPoints > 0 ? [{ id: 'carry_in', label: 'Carry-In / Initial Balance', count: 1, points: initialPoints, iconType: 'Award', color: 'cyan', barColor: 'bg-cyan-600' }] : []),
