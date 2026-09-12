@@ -1,13 +1,13 @@
 {
-  "lastUpdated": "September 11, 2026",
+  "lastUpdated": "September 12, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 511,
-  "totalCompaniesVisited": 91,
-  "editionDate": "11-09-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v2/65ecdedc894a7496beb50095dc69ebf63f406cea.pdf",
-  "totalPages": 9,
-  "placementPageNumber": 8,
-  "drivesPageNumber": 9,
+  "totalStudentsPlaced": 512,
+  "totalCompaniesVisited": 93,
+  "editionDate": "12-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v2/b9664576ed9c0f12b858aba6fc550eead464b07f.pdf",
+  "totalPages": 7,
+  "placementPageNumber": 6,
+  "drivesPageNumber": 7,
   "upcomingDrives": [
     {
       "company": "Tiger Analytics",
@@ -130,7 +130,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 232,
+      "offerCount": 233,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [

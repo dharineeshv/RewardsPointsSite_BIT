@@ -3,8 +3,10 @@ run-name: Sync Daily BIT Newspaper Placement Data
 
 on:
   schedule:
-    # Runs every 15 minutes between 4:30 PM and 7:30 PM IST (11:00 AM - 2:00 PM UTC)
-    - cron: '*/15 11,12,13 * * *'
+    # Runs every 15 minutes between 4:30 PM and 10:30 PM IST (11:00 AM - 5:00 PM UTC)
+    # Plus morning catchup runs at 8:30 AM and 9:30 AM IST (3:00 AM - 4:00 AM UTC)
+    - cron: '*/15 11,12,13,14,15,16 * * *'
+    - cron: '0 3,4 * * *'
   workflow_dispatch: # Allows manual one-click trigger from GitHub Actions tab
 
 permissions:
