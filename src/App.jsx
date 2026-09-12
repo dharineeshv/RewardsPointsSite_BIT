@@ -638,11 +638,19 @@ function DashboardHeroSlider({
               { label: 'Year III', val: Number(yearlyAverages?.year_3) || 0 },
               { label: 'Year IV', val: Number(yearlyAverages?.year_4) || 0 }
             ].map((y, i) => {
+              const maxAvgVal = Math.max(
+                Number(yearlyAverages?.year_1) || 0,
+                Number(yearlyAverages?.year_2) || 0,
+                Number(yearlyAverages?.year_3) || 0,
+                Number(yearlyAverages?.year_4) || 0,
+                1
+              );
+              const yearPct = Math.min(100, Math.round((y.val / maxAvgVal) * 100));
               const isUserBatch = y.label === studentYearLabel;
               return (
                 <div 
                   key={i} 
-                  className={`px-3 py-2 rounded-2xl border flex flex-col justify-between backdrop-blur-md transition-all ${
+                  className={`px-3 py-2.5 rounded-2xl border flex flex-col justify-between backdrop-blur-md transition-all ${
                     isUserBatch 
                       ? 'bg-white/25 border-emerald-400/80 shadow-md ring-2 ring-emerald-400/50' 
                       : 'bg-white/10 border-white/20'
@@ -654,6 +662,14 @@ function DashboardHeroSlider({
                   </div>
                   <div className="text-base sm:text-lg font-black text-white font-mono mt-0.5">
                     {Number(y.val).toLocaleString()} <span className="text-[10px] font-normal text-purple-200">RP</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-black/30 overflow-hidden mt-1.5">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        isUserBatch ? 'bg-emerald-400' : 'bg-white/80'
+                      }`}
+                      style={{ width: `${Math.max(y.val > 0 ? 5 : 0, yearPct)}%` }}
+                    />
                   </div>
                 </div>
               );
@@ -5483,6 +5499,14 @@ export default function App() {
                   ].map(card => {
                     const userYear = normalizeStudentYear(currentUser?.year, currentUser?.id);
                     const isHighlighted = userYear === card.label;
+                    const maxVal = Math.max(
+                      Number(yearlyAverages.year_1) || 0,
+                      Number(yearlyAverages.year_2) || 0,
+                      Number(yearlyAverages.year_3) || 0,
+                      Number(yearlyAverages.year_4) || 0,
+                      1
+                    );
+                    const percent = Math.min(100, Math.round((Number(card.value) / maxVal) * 100));
 
                     if (isHighlighted) {
                       return (
@@ -5490,17 +5514,33 @@ export default function App() {
                           key={card.key}
                           className="rounded-2xl p-5 sm:p-6 shadow-lg shadow-indigo-600/25 bg-[#4f46e5] text-white overflow-hidden flex flex-col justify-between transition-all duration-200 ring-2 ring-indigo-400/50"
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-indigo-100">{card.label}</span>
-                            <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white">
-                              Your Year
-                            </span>
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-bold text-indigo-100">{card.label}</span>
+                              <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                Your Year
+                              </span>
+                            </div>
+                            <div className="flex items-baseline gap-1.5 mt-1">
+                              <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                                {loadingAverages ? '...' : Number(card.value).toLocaleString()}
+                              </span>
+                              <span className="text-xs sm:text-sm font-bold text-indigo-200">RP</span>
+                            </div>
                           </div>
-                          <div className="flex items-baseline gap-1.5 mt-1">
-                            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                              {loadingAverages ? '...' : Number(card.value).toLocaleString()}
-                            </span>
-                            <span className="text-xs sm:text-sm font-bold text-indigo-200">RP</span>
+
+                          {/* Progress Bar */}
+                          <div className="mt-3.5 pt-2.5 border-t border-white/15">
+                            <div className="flex items-center justify-between text-[10px] font-bold text-indigo-200 mb-1">
+                              <span>Benchmark</span>
+                              <span>{percent}%</span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-black/25 overflow-hidden">
+                              <div 
+                                className="h-full rounded-full bg-white transition-all duration-700"
+                                style={{ width: `${Math.max(card.value > 0 ? 6 : 0, percent)}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
                       );
@@ -5513,14 +5553,30 @@ export default function App() {
                           isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900 shadow-sm'
                         }`}
                       >
-                        <div className="mb-2">
-                          <span className={`text-xs font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{card.label}</span>
+                        <div>
+                          <div className="mb-2">
+                            <span className={`text-xs font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{card.label}</span>
+                          </div>
+                          <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className={`text-2xl sm:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {loadingAverages ? '...' : Number(card.value).toLocaleString()}
+                            </span>
+                            <span className={`text-xs sm:text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>RP</span>
+                          </div>
                         </div>
-                        <div className="flex items-baseline gap-1.5 mt-1">
-                          <span className={`text-2xl sm:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                            {loadingAverages ? '...' : Number(card.value).toLocaleString()}
-                          </span>
-                          <span className={`text-xs sm:text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>RP</span>
+
+                        {/* Progress Bar */}
+                        <div className={`mt-3.5 pt-2.5 border-t ${isDarkMode ? 'border-slate-800/80' : 'border-slate-100'}`}>
+                          <div className={`flex items-center justify-between text-[10px] font-bold mb-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <span>Benchmark</span>
+                            <span>{percent}%</span>
+                          </div>
+                          <div className={`w-full h-2 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                            <div 
+                              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700"
+                              style={{ width: `${Math.max(card.value > 0 ? 6 : 0, percent)}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     );
@@ -5585,6 +5641,14 @@ export default function App() {
                       ].map(card => {
                         const userYear = normalizeStudentYear(currentUser?.year, currentUser?.id);
                         const isHighlighted = userYear === card.label;
+                        const maxVal = Math.max(
+                          Number(yearlyAverages.year_1) || 0,
+                          Number(yearlyAverages.year_2) || 0,
+                          Number(yearlyAverages.year_3) || 0,
+                          Number(yearlyAverages.year_4) || 0,
+                          1
+                        );
+                        const percent = Math.min(100, Math.round((Number(card.value) / maxVal) * 100));
 
                         if (isHighlighted) {
                           return (
@@ -5592,17 +5656,33 @@ export default function App() {
                               key={card.key}
                               className="rounded-2xl p-5 sm:p-6 shadow-xl shadow-indigo-600/25 bg-gradient-to-r from-indigo-600 to-violet-600 text-white overflow-hidden flex flex-col justify-between transition-all duration-200 ring-2 ring-indigo-400/50"
                             >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-indigo-100">{card.label}</span>
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-xs">
-                                  YOUR YEAR
-                                </span>
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-bold text-indigo-100">{card.label}</span>
+                                  <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-xs">
+                                    YOUR YEAR
+                                  </span>
+                                </div>
+                                <div className="flex items-baseline gap-1.5 mt-2">
+                                  <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                                    {Number(card.value).toLocaleString()}
+                                  </span>
+                                  <span className="text-xs sm:text-sm font-bold text-indigo-200">RP</span>
+                                </div>
                               </div>
-                              <div className="flex items-baseline gap-1.5 mt-2">
-                                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                                  {Number(card.value).toLocaleString()}
-                                </span>
-                                <span className="text-xs sm:text-sm font-bold text-indigo-200">RP</span>
+
+                              {/* Progress Bar */}
+                              <div className="mt-3.5 pt-2.5 border-t border-white/15">
+                                <div className="flex items-center justify-between text-[10px] font-bold text-indigo-200 mb-1">
+                                  <span>Benchmark</span>
+                                  <span>{percent}%</span>
+                                </div>
+                                <div className="w-full h-2 rounded-full bg-black/25 overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full bg-white transition-all duration-700"
+                                    style={{ width: `${Math.max(card.value > 0 ? 6 : 0, percent)}%` }}
+                                  />
+                                </div>
                               </div>
                             </div>
                           );
@@ -5615,14 +5695,30 @@ export default function App() {
                               isDarkMode ? 'border-slate-800 bg-slate-900/90 text-slate-100' : 'border-slate-200 bg-white text-slate-900 shadow-sm'
                             }`}
                           >
-                            <div className="mb-2">
-                              <span className={`text-xs font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{card.label}</span>
+                            <div>
+                              <div className="mb-2">
+                                <span className={`text-xs font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{card.label}</span>
+                              </div>
+                              <div className="flex items-baseline gap-1.5 mt-2">
+                                <span className={`text-2xl sm:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                  {Number(card.value).toLocaleString()}
+                                </span>
+                                <span className={`text-xs sm:text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>RP</span>
+                              </div>
                             </div>
-                            <div className="flex items-baseline gap-1.5 mt-2">
-                              <span className={`text-2xl sm:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                {Number(card.value).toLocaleString()}
-                              </span>
-                              <span className={`text-xs sm:text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>RP</span>
+
+                            {/* Progress Bar */}
+                            <div className={`mt-3.5 pt-2.5 border-t ${isDarkMode ? 'border-slate-800/80' : 'border-slate-100'}`}>
+                              <div className={`flex items-center justify-between text-[10px] font-bold mb-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                <span>Benchmark</span>
+                                <span>{percent}%</span>
+                              </div>
+                              <div className={`w-full h-2 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                <div 
+                                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700"
+                                  style={{ width: `${Math.max(card.value > 0 ? 6 : 0, percent)}%` }}
+                                />
+                              </div>
                             </div>
                           </div>
                         );
