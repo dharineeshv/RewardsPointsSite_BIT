@@ -1,9 +1,16 @@
+import StudentMentorMappingView from './components/StudentMentorMappingView';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import placementData from './data/placementData.json';
 import InternalMarksView from './components/InternalMarksView';
-import { STUDENTS_INTERNAL_MARKS_LIST } from './data/rp_distribution';
+import { fetchDepartmentSheetData, fetchStudentRewardPointsFromSheet, fetchInstitutionalAveragesFromSheet, fetchLiveStudentEventLogs, fetchLiveMasterSpreadsheet, AVERAGE_CHART_URL, SPREADSHEET_ID } from './services/googleSheetsService';
+import { COLLEGE_HOLIDAYS_AND_LEAVES } from './data/collegeLeaves';
+import { savePdfDocumentToDB, loadAllPdfDocumentsFromDB, removePdfDocumentFromDB } from './services/pdfStorageService';
+import { getCampusMessMenu } from './data/messMenuData';
+import FACULTY_DIRECTORY_DATA from './data/facultyDirectory.json';
+import EXAM_HALL_INDEX_DATA from './data/examHallIndex.json';
+import { STUDENTS_INTERNAL_MARKS_LIST, STUDENT_EVENT_LOGS_MAP } from './data/rp_distribution';
 import {
   FileSpreadsheet,
   LayoutGrid,
@@ -16,6 +23,7 @@ import {
   Sun,
   User,
   Users,
+  UserCheck,
   BarChart3,
   CircleDot,
   Gift,
@@ -101,7 +109,9 @@ import {
   Send,
   MessageSquare,
   MessageCircle,
-  HelpCircle
+  HelpCircle,
+  FileUp,
+  Upload
 } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
@@ -283,100 +293,143 @@ async function bitcentralFetch(pathAndQuery) {
 }
 
 // Robust student roll & profile resolver from email or query
+// Robust student roll & profile resolver for all BIT students
 async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
   const cleanInput = (emailOrRoll || '').toLowerCase().trim();
+  const cleanUpper = cleanInput.toUpperCase();
   const isEmail = cleanInput.includes('@');
   const emailPrefix = isEmail ? cleanInput.split('@')[0] : cleanInput;
+  const cleanName = (googleName || '').trim().toLowerCase();
 
-  // 1. Try v2/profile if email
-  let profileApiData = null;
-  if (isEmail) {
-    try {
-      const v2Res = await bitcentralFetch(`/v2/profile?email=${encodeURIComponent(cleanInput)}`);
-      if (v2Res && v2Res.ok) {
-        const v2Json = await v2Res.json();
-        if (v2Json && v2Json.data) profileApiData = v2Json.data;
-      }
-    } catch (e) {}
+  let rollId = '';
+  let studentRecord = null;
+
+  // 1. Check if input is directly a valid roll number format
+  if (/^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(cleanUpper) || /^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(emailPrefix)) {
+    rollId = (/^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(cleanUpper) ? cleanUpper : emailPrefix.toUpperCase());
   }
 
-  let rollId = profileApiData?.roll_no || profileApiData?.register_no;
-
-  // 2. If already a standard roll number format (e.g. 7376232CT109, 7376231EE150)
-  if (!rollId && /^7376\d{2,3}[A-Z]{2,3}\d{2,3}$/i.test(emailPrefix)) {
-    rollId = emailPrefix.toUpperCase();
-  }
-
-  // 3. If rollId is still not resolved, query /search with name or prefix parts
-  let searchApiData = null;
-  if (!rollId) {
-    const dotParts = emailPrefix.split('.');
-    const namePart = dotParts[0] || '';
-    const deptYrPart = dotParts[1] || '';
-    const deptMatch = deptYrPart.match(/^([a-z]+)(\d{2})$/i);
-    const deptCode = deptMatch ? deptMatch[1].toUpperCase() : '';
-    const batchYr = deptMatch ? deptMatch[2] : '';
-
-    let candidates = [];
-    if (googleName) {
-      try {
-        const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(googleName)}`);
-        if (sRes && sRes.ok) {
-          const sJson = await sRes.json();
-          if (sJson && Array.isArray(sJson.data)) candidates = sJson.data;
-        }
-      } catch (e) {}
+  // 2. Match in comprehensive official student database (STUDENTS_INTERNAL_MARKS_LIST)
+  if (Array.isArray(STUDENTS_INTERNAL_MARKS_LIST) && STUDENTS_INTERNAL_MARKS_LIST.length > 0) {
+    if (rollId) {
+      studentRecord = STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || '').toUpperCase() === rollId);
     }
-
-    if (candidates.length === 0 && namePart) {
-      try {
-        const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(namePart)}`);
-        if (sRes && sRes.ok) {
-          const sJson = await sRes.json();
-          if (sJson && Array.isArray(sJson.data)) candidates = sJson.data;
-        }
-      } catch (e) {}
-    }
-
-    if (candidates.length > 0) {
-      if (deptCode) {
-        const exactMatch = candidates.find(st => 
-          (st.roll_no || '').includes(deptCode) && 
-          (!batchYr || (st.roll_no || '').includes(batchYr))
-        );
-        if (exactMatch) {
-          rollId = exactMatch.roll_no;
-          searchApiData = exactMatch;
-        }
+    
+    // Exact email match
+    if (!studentRecord && isEmail) {
+      studentRecord = STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.email || '').toLowerCase() === cleanInput);
+      if (studentRecord && studentRecord.rollNo) {
+        rollId = studentRecord.rollNo;
       }
-      if (!rollId) {
-        rollId = candidates[0].roll_no;
-        searchApiData = candidates[0];
+    }
+
+    // Name + department prefix matching from email (e.g. kavya.ec23@bitsathy.ac.in -> KAVYA + EC23)
+    if (!studentRecord) {
+      const dotParts = emailPrefix.split('.');
+      const namePart = dotParts[0] || '';
+      const deptYrPart = dotParts[1] || '';
+      const deptMatch = deptYrPart.match(/^([a-z]+)(\d{2})$/i);
+      const deptCode = deptMatch ? deptMatch[1].toUpperCase() : '';
+      const batchYr = deptMatch ? deptMatch[2] : '';
+
+      studentRecord = STUDENTS_INTERNAL_MARKS_LIST.find(st => {
+        const sName = (st.name || '').toLowerCase();
+        const sRoll = (st.rollNo || '').toUpperCase();
+        const sEmail = (st.email || '').toLowerCase();
+
+        const nameMatches = (cleanName && sName.includes(cleanName)) || (namePart && sName.includes(namePart)) || sEmail.includes(namePart);
+        const deptMatches = !deptCode || sRoll.includes(deptCode);
+        const batchMatches = !batchYr || sRoll.includes(batchYr);
+
+        return nameMatches && deptMatches && batchMatches;
+      });
+
+      if (studentRecord && studentRecord.rollNo) {
+        rollId = studentRecord.rollNo;
       }
     }
   }
 
+  // 3. Match in STUDENTS_DATABASE fallback
+  if (!studentRecord && Array.isArray(STUDENTS_DATABASE)) {
+    studentRecord = STUDENTS_DATABASE.find(s => 
+      (s.id && s.id.toUpperCase() === rollId) || 
+      (isEmail && s.email && s.email.toLowerCase() === cleanInput) ||
+      (cleanName && s.name && s.name.toLowerCase().includes(cleanName))
+    );
+    if (studentRecord && studentRecord.id) {
+      rollId = studentRecord.id;
+    }
+  }
+
+  // 4. Default fallback to uppercase prefix if nothing else found
   if (!rollId) {
     rollId = emailPrefix.toUpperCase();
   }
 
-  // 4. Fetch searchApiData with resolved rollId if not already present
-  if (!searchApiData) {
+  let profileApiData = studentRecord ? {
+    roll_no: studentRecord.rollNo || studentRecord.id || rollId,
+    register_no: studentRecord.rollNo || studentRecord.id || rollId,
+    student_name: studentRecord.name || googleName,
+    department: studentRecord.department || 'Engineering',
+    mentor_name: studentRecord.mentor || 'BIT Faculty',
+    year: studentRecord.year || 'IV',
+    email: studentRecord.email || cleanInput,
+    activityBreakdown: studentRecord.activityBreakdown || [],
+    theoryCourses: studentRecord.theoryCourses || [],
+    labCourses: studentRecord.labCourses || [],
+    addonCourses: studentRecord.addonCourses || [],
+    grandTotal: studentRecord.grandTotal || '0.00',
+    balance_points: studentRecord.balancePoints !== undefined ? String(studentRecord.balancePoints) : '0',
+    cumulative_reward_points: studentRecord.cumulativePoints !== undefined ? String(studentRecord.cumulativePoints) : '0',
+    redeemed_points: studentRecord.redeemedPoints !== undefined ? String(studentRecord.redeemedPoints) : '0'
+  } : null;
+
+  // Real-time live synchronization with Google Sheets
+  if (rollId) {
     try {
-      const sRes = await bitcentralFetch(`/search?q=${encodeURIComponent(rollId)}`);
-      if (sRes && sRes.ok) {
-        const sJson = await sRes.json();
-        if (sJson && Array.isArray(sJson.data) && sJson.data.length > 0) {
-          searchApiData = sJson.data[0];
+      const deptName = studentRecord?.department || 'CT';
+      const liveSheetStudent = await fetchStudentRewardPointsFromSheet(rollId, deptName);
+      if (liveSheetStudent) {
+        if (!profileApiData) {
+          profileApiData = {
+            roll_no: rollId,
+            register_no: rollId,
+            student_name: liveSheetStudent.name || googleName || rollId,
+            department: liveSheetStudent.department || deptName,
+            mentor_name: liveSheetStudent.mentor || 'BIT Faculty',
+            year: liveSheetStudent.year || 'IV',
+            email: cleanInput.includes('@') ? cleanInput : `${rollId.toLowerCase()}@bitsathy.ac.in`,
+            activityBreakdown: [],
+            theoryCourses: [],
+            labCourses: [],
+            addonCourses: [],
+            grandTotal: '0.00'
+          };
+        }
+        if (liveSheetStudent.balance_points !== undefined) {
+          profileApiData.balance_points = String(liveSheetStudent.balance_points);
+        }
+        if (liveSheetStudent.cumulative_points !== undefined) {
+          profileApiData.cumulative_reward_points = String(liveSheetStudent.cumulative_points);
+        }
+        if (liveSheetStudent.redeemed_points !== undefined) {
+          profileApiData.redeemed_points = String(liveSheetStudent.redeemed_points);
+        }
+        if (liveSheetStudent.mentor) {
+          profileApiData.mentor_name = liveSheetStudent.mentor;
         }
       }
-    } catch (e) {}
+    } catch (liveErr) {
+      console.warn('[LiveSheetSync] Fallback to cached student data:', liveErr);
+    }
   }
+
+  const searchApiData = profileApiData;
 
   return { rollId, profileApiData, searchApiData };
 }
 
-// Flipkart-style Auto-sliding Featured Hero Banner Slider
 function DashboardHeroSlider({ 
   weatherData, 
   student, 
@@ -407,9 +460,18 @@ function DashboardHeroSlider({
   const percentOfAvg = targetYearAvg > 0 ? Math.round((studentPointsNum / targetYearAvg) * 100) : 100;
   const diffAbs = Math.abs(pointsDiff).toLocaleString();
 
-  // Find next upcoming leave
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const nextLeave = (leavesList || []).find(l => (l.to_date || l.from_date) >= todayStr) || (leavesList && leavesList[0]);
+  // Find next upcoming leave based on local date
+  const todayDate = new Date();
+  const todayStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+  const sortedLeavesList = [...(leavesList || [])].sort((a, b) => {
+    const da = a.from_date || a.fromDate || '';
+    const db = b.from_date || b.fromDate || '';
+    return da.localeCompare(db);
+  });
+  const nextLeave = sortedLeavesList.find(l => {
+    const endDate = l.to_date || l.toDate || l.from_date || l.fromDate;
+    return endDate >= todayStr;
+  }) || sortedLeavesList[0];
 
   const totalSlides = 7;
 
@@ -649,7 +711,16 @@ function DashboardHeroSlider({
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
               {nextLeave 
-                ? `Scheduled from ${nextLeave.from_date}${nextLeave.to_date && nextLeave.to_date !== nextLeave.from_date ? ` to ${nextLeave.to_date}` : ''} ${nextLeave.from_half_day ? `(${nextLeave.from_half_day} Session Gate Pass)` : ''}.`
+                ? (() => {
+                    const from = nextLeave.from_date || nextLeave.fromDate;
+                    const to = nextLeave.to_date || nextLeave.toDate;
+                    const day = nextLeave.day ? ` (${nextLeave.day})` : '';
+                    const gpSession = (nextLeave.from_half_day || nextLeave.fromHalfDay) ? ` (${nextLeave.from_half_day || nextLeave.fromHalfDay} Session Gate Pass)` : '';
+                    if (to && to !== from) {
+                      return `Scheduled from ${from} to ${to}${gpSession}.`;
+                    }
+                    return `Scheduled on ${from}${day}${gpSession}.`;
+                  })()
                 : 'View official schedule of General Permissions (GP), national holidays, and semester vacation periods.'}
             </p>
           </div>
@@ -1374,34 +1445,58 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
 // Transform API response item to standard student model
 function transformApiStudent(apiItem) {
   if (!apiItem) return null;
-  const name = String(apiItem.student_name || 'STUDENT').toUpperCase();
+  const rollNo = String(apiItem.roll_no || apiItem.rollNo || apiItem.id || '').toUpperCase().trim();
+
+  // Find corresponding rich record in Master Spreadsheet dataset
+  const masterRecord = Array.isArray(STUDENTS_INTERNAL_MARKS_LIST)
+    ? STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || '').toUpperCase() === rollNo)
+    : null;
+
+  const name = String(masterRecord?.name || apiItem.student_name || apiItem.name || 'STUDENT').toUpperCase();
   const initials = name.split(' ').map(w => w[0]).filter(Boolean).join('').slice(0, 2) || 'ST';
-  const balanceRaw = apiItem.balance_points !== undefined && apiItem.balance_points !== null ? String(apiItem.balance_points).replace(/,/g, '') : '0';
+
+  const balanceRaw = apiItem.balance_points !== undefined && apiItem.balance_points !== null
+    ? String(apiItem.balance_points).replace(/,/g, '')
+    : (masterRecord ? String(masterRecord.balancePoints || 0) : '0');
   const balancePts = (parseFloat(balanceRaw) || 0).toLocaleString();
-  const cumulativeRaw = apiItem.cumulative_reward_points !== undefined && apiItem.cumulative_reward_points !== null 
-    ? String(apiItem.cumulative_reward_points).replace(/,/g, '') 
-    : balanceRaw;
+
+  const cumulativeRaw = apiItem.cumulative_reward_points !== undefined && apiItem.cumulative_reward_points !== null
+    ? String(apiItem.cumulative_reward_points).replace(/,/g, '')
+    : (apiItem.cumulative_points !== undefined ? String(apiItem.cumulative_points).replace(/,/g, '') : (masterRecord ? String(masterRecord.cumulativePoints || balanceRaw) : balanceRaw));
   const cumulativePts = (parseFloat(cumulativeRaw) || 0).toLocaleString();
-  const redeemedRaw = apiItem.redeemed_points !== undefined && apiItem.redeemed_points !== null 
-    ? String(apiItem.redeemed_points).replace(/,/g, '') 
-    : '0';
+
+  const redeemedRaw = apiItem.redeemed_points !== undefined && apiItem.redeemed_points !== null
+    ? String(apiItem.redeemed_points).replace(/,/g, '')
+    : (masterRecord ? String(masterRecord.redeemedPoints || 0) : '0');
   const redeemedPts = (parseFloat(redeemedRaw) || 0).toLocaleString();
 
+  const mentorName = masterRecord?.mentor || apiItem.mentor_name || apiItem.mentor || "BIT Faculty";
+  const deptName = masterRecord?.department || apiItem.department || "COMPUTER TECHNOLOGY";
+  const courseCode = masterRecord?.courseCode || apiItem.course_code || "B. Tech.";
+  const yr = masterRecord?.year || apiItem.year || "IV";
+
   return {
-    id: apiItem.roll_no || "7376232CT108",
+    id: rollNo || "7376232CT109",
     name: name,
     initials: initials,
-    department: apiItem.department || "COMPUTER TECHNOLOGY",
-    course_code: apiItem.course_code || "B. Tech.",
-    year: apiItem.year ? (String(apiItem.year).startsWith('Year') ? String(apiItem.year) : `Year ${apiItem.year}`) : "Year IV",
-    mentor_name: apiItem.mentor_name || "BIT Faculty",
+    department: deptName,
+    course_code: courseCode,
+    year: yr ? (String(yr).startsWith('Year') ? String(yr) : `Year ${yr}`) : "Year IV",
+    mentor_name: mentorName,
     currentPoints: balancePts,
     cumulativePoints: cumulativePts,
     redeemedPoints: redeemedPts,
     avatarBg: "from-[#38c4ee] to-[#0ea5e9]",
     badge: "Verified BIT Student",
-    email: `${(apiItem.roll_no || 'student').toLowerCase()}@bitsathy.ac.in`,
+    email: masterRecord?.email || `${(rollNo || 'student').toLowerCase()}@bitsathy.ac.in`,
     cgpa: "8.92",
+    activityBreakdown: masterRecord?.activityBreakdown || [],
+    theoryCourses: masterRecord?.theoryCourses || [],
+    labCourses: masterRecord?.labCourses || [],
+    addonCourses: masterRecord?.addonCourses || [],
+    ip1Total: masterRecord?.ip1Total || '0.00',
+    ip2Total: masterRecord?.ip2Total || '0.00',
+    grandTotal: masterRecord?.grandTotal || '0.00',
     history: [
       { id: 1, title: "Cumulative RP Earned", date: "Academic Year 2024-2025", points: `+${cumulativePts} RP`, category: "Activities", icon: Trophy, color: "text-amber-500 bg-amber-50" },
       { id: 2, title: "Redeemed Points", date: "Benefits & Vouchers", points: `-${redeemedPts} RP`, category: "Redemption", icon: Gift, color: "text-indigo-500 bg-indigo-50" },
@@ -2326,6 +2421,45 @@ export default function App() {
   });
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState('all'); // 'all' | 'unread' | 'points' | 'placements'
+  const [activeToast, setActiveToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  // Universal Notification Dispatcher: Syncs state, localStorage, in-app floating toast & native Web Notification
+  const dispatchNotification = useCallback((notif) => {
+    setNotifications(prev => {
+      const isDuplicate = prev.some(n => 
+        n.title === notif.title && 
+        Math.abs(new Date(n.timestamp || Date.now()).getTime() - Date.now()) < 20000
+      );
+      if (isDuplicate) return prev;
+      const updated = [notif, ...prev.filter(n => n.id !== notif.id)].slice(0, 50);
+      try {
+        const userKey = currentUser?.email?.toLowerCase() || 'default';
+        localStorage.setItem(`bit_notifications_${userKey}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // Show floating toast
+    setActiveToast(notif);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setActiveToast(null);
+    }, 6000);
+
+    // Trigger Native OS / Browser Notification if granted
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(notif.title, {
+          body: notif.description,
+          icon: '/favicon.ico',
+          tag: notif.id
+        });
+      } catch (e) {
+        console.warn('Native notification error:', e);
+      }
+    }
+  }, [currentUser?.email]);
 
   // Sync notifications when logged-in user changes
   useEffect(() => {
@@ -2343,6 +2477,48 @@ export default function App() {
       }
     } catch (e) {}
   }, [currentUser?.email, isLoggedIn]);
+
+  // Live Google Sheet Reward Points Auto-Sync for Logged-In Student & Displayed Student
+  useEffect(() => {
+    const studentToSync = displayedStudent || currentUser;
+    if (!studentToSync?.id && !studentToSync?.roll_no) return;
+
+    const rollNo = (studentToSync.id || studentToSync.roll_no || studentToSync.rollNo || '').trim().toUpperCase();
+    const dept = studentToSync.department || 'CT';
+
+    async function syncLiveSheetPoints() {
+      try {
+        const liveRecord = await fetchStudentRewardPointsFromSheet(rollNo, dept);
+        if (liveRecord && liveRecord.balance_points !== undefined) {
+          const livePointsStr = liveRecord.balance_points.toString();
+          
+          if (currentUser && (currentUser.id === rollNo || currentUser.roll_no === rollNo)) {
+            if (currentUser.currentPoints !== livePointsStr || currentUser.balance_points !== liveRecord.balance_points) {
+              setCurrentUser(prev => ({
+                ...prev,
+                currentPoints: livePointsStr,
+                balance_points: liveRecord.balance_points
+              }));
+            }
+          }
+
+          if (displayedStudent && (displayedStudent.id === rollNo || displayedStudent.roll_no === rollNo)) {
+            if (displayedStudent.currentPoints !== livePointsStr || displayedStudent.balance_points !== liveRecord.balance_points) {
+              setDisplayedStudent(prev => ({
+                ...prev,
+                currentPoints: livePointsStr,
+                balance_points: liveRecord.balance_points
+              }));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[LiveSheetSync] Unable to sync live points:', err);
+      }
+    }
+
+    syncLiveSheetPoints();
+  }, [currentUser?.id, displayedStudent?.id]);
 
   // Ref locks to avoid duplicate processing on rapid re-renders
   const lastProcessedRpRef = useRef(null);
@@ -2390,20 +2566,7 @@ export default function App() {
           localStorage.setItem(storageKey, currentPoints.toString());
         } catch (e) {}
 
-        setNotifications(prev => {
-          // Strictly prevent duplicate notifications within 2 minutes with identical title
-          const isDuplicate = prev.some(n => 
-            n.title === newNotif.title && 
-            Math.abs(new Date(n.timestamp).getTime() - Date.now()) < 120000
-          );
-          if (isDuplicate) return prev;
-
-          const updated = [newNotif, ...prev.filter(n => n.id !== newNotif.id)].slice(0, 50);
-          try {
-            localStorage.setItem(notifKey, JSON.stringify(updated));
-          } catch (e) {}
-          return updated;
-        });
+        dispatchNotification(newNotif);
       } else {
         lastProcessedRpRef.current = `${userKey}_${currentPoints}`;
       }
@@ -2416,23 +2579,19 @@ export default function App() {
       
       // Show personalized welcome notification for newly logged-in student
       const studentName = currentUser?.name || currentUser?.student_name || currentUser?.displayName || currentUser?.roll_no || 'Student';
+      const welcomeNotif = {
+        id: `welcome_${Date.now()}`,
+        type: 'welcome',
+        title: `👋 Welcome back, ${studentName}!`,
+        description: `Welcome to the Rewards Points Portal! Your active balance is ${currentPoints.toLocaleString()} RP.`,
+        timestamp: new Date().toISOString(),
+        read: false,
+        linkTab: 'Dashboard'
+      };
       setNotifications(prev => {
         const hasWelcome = prev.some(n => n.type === 'welcome');
         if (!hasWelcome) {
-          const welcomeNotif = {
-            id: `welcome_${Date.now()}`,
-            type: 'welcome',
-            title: `👋 Welcome To the Rewards App, ${studentName}!`,
-            description: `Welcome to the Rewards Points Portal! Your active balance is ${currentPoints.toLocaleString()} RP.`,
-            timestamp: new Date().toISOString(),
-            read: false,
-            linkTab: 'Dashboard'
-          };
-          const initialList = [welcomeNotif, ...prev];
-          try {
-            localStorage.setItem(notifKey, JSON.stringify(initialList));
-          } catch (e) {}
-          return initialList;
+          dispatchNotification(welcomeNotif);
         }
         return prev;
       });
@@ -2469,27 +2628,7 @@ export default function App() {
         localStorage.setItem(placementKey, currentEdition);
       } catch (e) {}
 
-      setNotifications(prev => {
-        if (prev.some(n => n.title === placementNotif.title)) return prev;
-        const updated = [placementNotif, ...prev].slice(0, 50);
-        try {
-          localStorage.setItem(notifKey, JSON.stringify(updated));
-        } catch (e) {}
-        return updated;
-      });
-
-      // Trigger Native OS Push Notification if permitted
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        try {
-          new Notification(placementNotif.title, {
-            body: placementNotif.description,
-            icon: '/favicon.ico',
-            tag: `placement_${currentEdition}`
-          });
-        } catch (pushErr) {
-          console.warn('Native notification push error:', pushErr);
-        }
-      }
+      dispatchNotification(placementNotif);
     } else {
       lastProcessedPlacementRef.current = `${userKey}_${currentEdition}`;
       try {
@@ -2512,9 +2651,14 @@ export default function App() {
         const res = await Notification.requestPermission();
         setPushPermission(res);
         if (res === 'granted') {
-          new Notification('🔔 BIT Placement Alerts Enabled!', {
-            body: 'You will receive automatic alerts when daily placement records update at 5:00 PM!',
-            icon: '/favicon.ico'
+          dispatchNotification({
+            id: `perm_${Date.now()}`,
+            type: 'system',
+            title: '🔔 Notifications Enabled!',
+            description: 'You will receive real-time alerts for reward points, placement records, and campus updates!',
+            timestamp: new Date().toISOString(),
+            read: false,
+            linkTab: 'BIT Placements'
           });
         }
       } catch (err) {
@@ -2765,6 +2909,79 @@ export default function App() {
   const [deptFilterQuery, setDeptFilterQuery] = useState('');
   const [deptStudentSearch, setDeptStudentSearch] = useState('');
   const [selectedLeaderboardYear, setSelectedLeaderboardYear] = useState('ALL');
+
+  // Admin Uploaded Schedules (Leave Schedule, Boys Menu, Girls Menu)
+  const [adminSchedules, setAdminSchedules] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bit_admin_uploaded_documents');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      leave_schedule: null,
+      boys_menu: null,
+      girls_menu: null
+    };
+  });
+
+  const [activeMenuTab, setActiveMenuTab] = useState('BOYS'); // 'BOYS' | 'GIRLS'
+  const [viewingPdfModal, setViewingPdfModal] = useState(null); // { title, dataUrl, fileName } | null
+  const [leaveViewMode, setLeaveViewMode] = useState('list'); // 'list' | 'pdf'
+
+  // Load all uploaded PDFs reliably from IndexedDB on startup
+  useEffect(() => {
+    loadAllPdfDocumentsFromDB().then((docs) => {
+      if (docs) {
+        setAdminSchedules(prev => ({
+          leave_schedule: docs.leave_schedule || prev.leave_schedule,
+          boys_menu: docs.boys_menu || prev.boys_menu,
+          girls_menu: docs.girls_menu || prev.girls_menu
+        }));
+      }
+    });
+  }, []);
+
+  const handleAdminPdfUpload = (type, file) => {
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please upload a valid PDF file (.pdf)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target.result;
+      const docObj = {
+        title: type === 'leave_schedule' 
+          ? 'Official Academic Leave & GP Schedule' 
+          : (type === 'boys_menu' ? 'Boys Hostel Mess & Dining Menu' : 'Girls Hostel Mess & Dining Menu'),
+        fileName: file.name,
+        fileSize: (file.size / 1024).toFixed(1) + ' KB',
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: currentUser?.name || 'Admin',
+        dataUrl: dataUrl,
+        isPublished: true
+      };
+
+      // Persist in IndexedDB (handles multi-megabyte PDFs without browser limits)
+      await savePdfDocumentToDB(type, docObj);
+
+      setAdminSchedules(prev => ({
+        ...prev,
+        [type]: docObj
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAdminPdfRemove = async (type) => {
+    if (window.confirm('Are you sure you want to remove this schedule document?')) {
+      await removePdfDocumentFromDB(type);
+      setAdminSchedules(prev => ({
+        ...prev,
+        [type]: null
+      }));
+    }
+  };
 
   // Admin Console & Google Sheets Analytics State
   const [googleSheetUrl, setGoogleSheetUrl] = useState(() => {
@@ -3269,6 +3486,105 @@ export default function App() {
     return 'Year IV';
   };
 
+  const formatLeaderboardStudent = (item) => {
+    const rollNo = (item.roll_no || item.rollNo || item.id || '').toString().toUpperCase().trim();
+    const name = (item.student_name || item.name || `Student (${rollNo})`).toString().trim();
+    const balanceRaw = (item.balance_points ?? item.balancePoints ?? item.currentPoints ?? item.numBalance ?? '0').toString().replace(/,/g, '');
+    const cumulativeRaw = (item.cumulative_points ?? item.cumulativePoints ?? item.numCumulative ?? balanceRaw).toString().replace(/,/g, '');
+    const redeemedRaw = (item.redeemed_points ?? item.redeemedPoints ?? '0').toString().replace(/,/g, '');
+
+    const numBalance = parseFloat(balanceRaw) || 0;
+    const numCumulative = parseFloat(cumulativeRaw) || numBalance;
+    const numRedeemed = parseFloat(redeemedRaw) || 0;
+    const normYear = normalizeStudentYear(item.year || item.normalizedYear, rollNo);
+
+    return {
+      ...item,
+      id: rollNo,
+      roll_no: rollNo,
+      rollNo: rollNo,
+      name: name,
+      student_name: name,
+      normalizedYear: normYear,
+      mentor_name: item.mentor_name || item.mentor || 'Dr. ANANDAKUMAR K ISE',
+      numPoints: numBalance,
+      numBalance: numBalance,
+      numCumulative: numCumulative,
+      numRedeemed: numRedeemed,
+      displayPoints: numBalance.toLocaleString(),
+      displayBalance: numBalance.toLocaleString(),
+      displayCumulative: numCumulative.toLocaleString(),
+      displayRedeemed: numRedeemed.toLocaleString()
+    };
+  };
+
+  const isStudentInDepartment = (student, deptId) => {
+    const roll = (student?.roll_no || student?.rollNo || student?.id || '').toString().trim().toUpperCase();
+    const studentDept = (student?.department || '').toString().trim().toUpperCase();
+    const deptNorm = (deptId || '').trim().toUpperCase();
+
+    switch (deptNorm) {
+      case 'CT':
+        return (roll.includes('CT') || studentDept === 'COMPUTER TECHNOLOGY' || studentDept === 'CT') && !roll.includes('MTRS');
+      case 'CSE':
+      case 'CS':
+        return (roll.includes('CS') || studentDept === 'COMPUTER SCIENCE AND ENGINEERING' || studentDept === 'CSE') && !roll.includes('CSBS') && !roll.includes('CSD') && !roll.includes('CB') && !roll.includes('CD');
+      case 'AI&DS':
+      case 'AD':
+        return roll.includes('AD') || studentDept.includes('ARTIFICIAL INTELLIGENCE AND DATA') || studentDept.includes('AI & DS') || studentDept.includes('AI&DS');
+      case 'AIML':
+      case 'AL':
+      case 'AM':
+        return roll.includes('AL') || roll.includes('AM') || studentDept.includes('MACHINE LEARNING') || studentDept === 'AIML';
+      case 'IT':
+        return roll.includes('IT') || studentDept === 'INFORMATION TECHNOLOGY' || studentDept === 'IT';
+      case 'ECE':
+      case 'EC':
+        return (roll.includes('EC') || studentDept.includes('ELECTRONICS AND COMMUNICATION')) && !roll.includes('EIE') && !roll.includes('EI');
+      case 'EEE':
+      case 'EE':
+        return roll.includes('EE') || studentDept.includes('ELECTRICAL AND ELECTRONICS');
+      case 'MECH':
+      case 'ME':
+        return (roll.includes('ME') || studentDept.includes('MECHANICAL')) && !roll.includes('MZ') && !roll.includes('MT') && !roll.includes('MC') && !studentDept.includes('MECHATRONICS');
+      case 'EIE':
+      case 'EI':
+        return roll.includes('EI') || studentDept.includes('INSTRUMENTATION');
+      case 'CSBS':
+      case 'CB':
+        return roll.includes('CB') || studentDept.includes('BUSINESS SYSTEMS') || studentDept === 'CSBS';
+      case 'AGRI':
+      case 'AG':
+        return roll.includes('AG') || studentDept.includes('AGRICULTURAL') || studentDept === 'AGRI';
+      case 'BT':
+        return roll.includes('BT') || studentDept === 'BIOTECHNOLOGY' || studentDept === 'BT';
+      case 'CSD':
+      case 'CD':
+        return roll.includes('CD') || studentDept.includes('DESIGN') || studentDept === 'CSD';
+      case 'CIVIL':
+      case 'CE':
+        return roll.includes('CE') || studentDept.includes('CIVIL') || studentDept === 'CIVIL';
+      case 'BIOMEDICAL':
+      case 'BM':
+        return roll.includes('BM') || studentDept.includes('BIOMEDICAL') || studentDept === 'BM';
+      case 'FD':
+        return roll.includes('FD') || studentDept.includes('FOOD') || studentDept === 'FD';
+      case 'FT':
+        return roll.includes('FT') || studentDept.includes('FASHION') || studentDept === 'FT';
+      case 'ISE':
+      case 'IS':
+      case 'SE':
+        return roll.includes('SE') || roll.includes('IS') || studentDept.includes('INFORMATION SCIENCE') || studentDept === 'ISE';
+      case 'MTRS':
+      case 'MZ':
+      case 'MT':
+      case 'MC':
+        return roll.includes('MZ') || roll.includes('MT') || roll.includes('MC') || studentDept.includes('MECHATRONICS') || studentDept === 'MTRS';
+      default:
+        return roll.includes(deptNorm);
+    }
+  };
+
   const handleViewDepartmentLeaderboard = async (dept) => {
     setSelectedDeptLeaderboard(dept);
     setLoadingDeptLeaderboard(true);
@@ -3277,78 +3593,74 @@ export default function App() {
     setSelectedLeaderboardYear('ALL');
 
     try {
-      const studentMap = new Map();
-      const responses = await Promise.all(
-        (dept.prefixes || []).map(prefix =>
-          bitcentralFetch(`/search?q=${encodeURIComponent(prefix)}`)
-            .then(res => (res.ok ? res.json() : null))
-            .catch(() => null)
-        )
-      );
-
-      for (const json of responses) {
-        if (json && Array.isArray(json.data)) {
-          json.data.forEach(item => {
-            if (item.roll_no && !studentMap.has(item.roll_no)) {
-              const balanceRaw = item.balance_points !== undefined && item.balance_points !== null ? String(item.balance_points).replace(/,/g, '') : '0';
-              const cumulativeRaw = item.cumulative_reward_points !== undefined && item.cumulative_reward_points !== null
-                ? String(item.cumulative_reward_points).replace(/,/g, '')
-                : balanceRaw;
-              const numCumulative = parseFloat(cumulativeRaw) || parseFloat(balanceRaw) || 0;
-              const numBalance = parseFloat(balanceRaw) || 0;
-              const normYear = normalizeStudentYear(item.year, item.roll_no);
-              
-              studentMap.set(item.roll_no, {
-                ...item,
-                numPoints: numBalance,
-                numBalance: numBalance,
-                numCumulative: numCumulative,
-                normalizedYear: normYear,
-                displayPoints: numBalance.toLocaleString(),
-                displayBalance: numBalance.toLocaleString(),
-                displayCumulative: numCumulative.toLocaleString(),
-                displayRedeemed: item.redeemed_points !== undefined && item.redeemed_points !== null
-                  ? parseFloat(String(item.redeemed_points).replace(/,/g, '')).toLocaleString()
-                  : '0'
-              });
-            }
-          });
+      // 1. Fetch live from official Google Sheet for this department
+      const sheetStudents = await fetchDepartmentSheetData(dept.id || dept.name || 'CT');
+      if (sheetStudents && sheetStudents.length > 0) {
+        // Filter strictly to this department
+        const strictlyMatched = sheetStudents.filter(s => isStudentInDepartment(s, dept.id || dept.name));
+        if (strictlyMatched.length > 0) {
+          const formatted = strictlyMatched.map(formatLeaderboardStudent).sort((a, b) => b.numBalance - a.numBalance);
+          setDeptLeaderboardList(formatted);
+          setLoadingDeptLeaderboard(false);
+          return;
         }
       }
 
-      // Sort in descending order (highest active balance_points first, with cumulative points as tie-breaker)
-      const sorted = Array.from(studentMap.values()).sort((a, b) => {
-        if (b.numBalance !== a.numBalance) {
-          return b.numBalance - a.numBalance;
+      // 2. Strict in-memory student database filter (from STUDENTS_INTERNAL_MARKS_LIST & STUDENTS_DATABASE)
+      const studentMap = new Map();
+      const combinedSource = [...(STUDENTS_INTERNAL_MARKS_LIST || []), ...(STUDENTS_DATABASE || [])];
+
+      combinedSource.forEach(s => {
+        const rId = (s.rollNo || s.id || s.roll_no || '').toString().toUpperCase().trim();
+        if (rId && !studentMap.has(rId) && isStudentInDepartment(s, dept.id || dept.name)) {
+          studentMap.set(rId, formatLeaderboardStudent(s));
         }
+      });
+
+      const sorted = Array.from(studentMap.values()).sort((a, b) => {
+        if (b.numBalance !== a.numBalance) return b.numBalance - a.numBalance;
         return b.numCumulative - a.numCumulative;
       });
+
       setDeptLeaderboardList(sorted);
     } catch (err) {
       console.error('Error fetching department leaderboard:', err);
+      const fallbackList = (STUDENTS_INTERNAL_MARKS_LIST || [])
+        .filter(s => isStudentInDepartment(s, dept.id || dept.name))
+        .map(formatLeaderboardStudent);
+      setDeptLeaderboardList(fallbackList);
     } finally {
       setLoadingDeptLeaderboard(false);
     }
   };
 
-  // Fetch live campus hostel mess menu with date support
+  // Fetch live campus hostel mess menu with date support and instant official 30-day schedule fallback
   const fetchMessMenu = async (hostel = messHostel, date = selectedMessDate) => {
     setLoadingMess(true);
     setMessError('');
     try {
-      const url = date 
-        ? `/mess?hostel=${encodeURIComponent(hostel)}&date=${encodeURIComponent(date)}`
-        : `/mess?hostel=${encodeURIComponent(hostel)}`;
-      const res = await bitcentralFetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        setMessData(data);
-      } else {
-        setMessError('Unable to load mess menu for the selected date & hostel.');
+      // Immediate local resolution of official September 2026 dataset
+      const localMenu = getCampusMessMenu(hostel, date);
+      setMessData(localMenu);
+
+      // Attempt live proxy update if bitcentral server has real-time overrides
+      try {
+        const url = date 
+          ? `/mess?hostel=${encodeURIComponent(hostel)}&date=${encodeURIComponent(date)}`
+          : `/mess?hostel=${encodeURIComponent(hostel)}`;
+        const res = await bitcentralFetch(url);
+        if (res.ok) {
+          const liveData = await res.json();
+          if (liveData && liveData.full_menu && (liveData.full_menu.breakfast?.length || liveData.full_menu.lunch?.length)) {
+            setMessData(liveData);
+          }
+        }
+      } catch (innerErr) {
+        // Local dataset already active
       }
     } catch (e) {
       console.warn('Mess menu fetch error:', e);
-      setMessError('Network error while fetching campus mess menu.');
+      setMessData(getCampusMessMenu(hostel, date));
     } finally {
       setLoadingMess(false);
     }
@@ -3383,17 +3695,10 @@ export default function App() {
     setLoadingLeaves(true);
     setLeavesError('');
     try {
-      const res = await bitcentralFetch('/leaves');
-      if (res.ok) {
-        const json = await res.json();
-        const list = Array.isArray(json?.data) ? json.data : [];
-        setLeavesList(list);
-      } else {
-        setLeavesError('Unable to load college leave schedule.');
-      }
+      setLeavesList(COLLEGE_HOLIDAYS_AND_LEAVES || []);
     } catch (e) {
       console.warn('Leaves schedule error:', e);
-      setLeavesError('Network error while fetching leave schedule.');
+      setLeavesList(COLLEGE_HOLIDAYS_AND_LEAVES || []);
     } finally {
       setLoadingLeaves(false);
     }
@@ -3408,17 +3713,10 @@ export default function App() {
     setLoadingFaculty(true);
     setFacultyError('');
     try {
-      const res = await bitcentralFetch('/faculty');
-      if (res.ok) {
-        const json = await res.json();
-        const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
-        setFacultyList(list);
-      } else {
-        setFacultyError('Unable to load faculty directory.');
-      }
+      setFacultyList(FACULTY_DIRECTORY_DATA || []);
     } catch (e) {
       console.warn('Faculty directory error:', e);
-      setFacultyError('Network error while fetching faculty directory.');
+      setFacultyList(FACULTY_DIRECTORY_DATA || []);
     } finally {
       setLoadingFaculty(false);
     }
@@ -3448,45 +3746,135 @@ export default function App() {
     setExamHallError('');
     setExamHallSearched(true);
     try {
-      const dateParam = date ? `&date=${encodeURIComponent(date)}` : '';
-      const res = await bitcentralFetch(`/exam-hall?registerNo=${encodeURIComponent(cleanReg)}${dateParam}`);
-      const json = await res.json();
-      if (res.ok && json && (json.data || json.hall_no || json.room_no || json.block)) {
-        setExamHallResult(json.data || json);
+      const records = EXAM_HALL_INDEX_DATA[cleanReg];
+      if (records && records.length > 0) {
+        const first = records[0];
+        setExamHallResult({
+          hall_no: first.hallNo,
+          course_code: first.courseCode,
+          all_sessions: records,
+          register_no: cleanReg
+        });
       } else {
         setExamHallResult(null);
-        setExamHallError('Currently no exam hall are allocated for you by COE');
+        setExamHallError('Currently no exam hall is allocated for you for the selected schedule.');
       }
     } catch (e) {
-      console.warn('Exam hall fetch error:', e);
+      console.warn('Exam hall lookup error:', e);
       setExamHallResult(null);
-      setExamHallError('Currently no exam hall are allocated for you by COE');
+      setExamHallError('Currently no exam hall is allocated for you for the selected schedule.');
     } finally {
       setLoadingExamHall(false);
     }
   };
 
-  // Fetch live rewards history from endpoint whenever displayed student changes
+    // Fetch live rewards history with granular P-Skill course certifications, individual events & activities
   useEffect(() => {
     if (!displayedStudent || !displayedStudent.id) return;
     async function fetchRewards() {
       setLoadingRewards(true);
       try {
-        let roll = displayedStudent.id;
+        let roll = (displayedStudent.id || displayedStudent.roll_no || '').toString().trim().toUpperCase();
         if (roll.includes('.') || roll.includes('@')) {
           const { rollId } = await resolveStudentRollAndProfile(roll, displayedStudent.name || '');
           if (rollId) roll = rollId;
         }
-        const res = await bitcentralFetch(`/rewards?roll_no=${encodeURIComponent(roll)}&page=1&limit=100`);
-        if (res.ok) {
-          const json = await res.json();
-          const list = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
-          setRewardsData(list);
-          setRewardsTotal(json?.total || list.length);
-        } else {
-          setRewardsData([]);
-          setRewardsTotal(0);
+
+        const masterRecord = Array.isArray(STUDENTS_INTERNAL_MARKS_LIST)
+          ? STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || '').toUpperCase() === roll)
+          : null;
+
+        const dbStudent = Array.isArray(STUDENTS_DATABASE)
+          ? STUDENTS_DATABASE.find(s => (s.id || '').toUpperCase() === roll)
+          : null;
+
+        let eventLogs = (STUDENT_EVENT_LOGS_MAP && STUDENT_EVENT_LOGS_MAP[roll]) || masterRecord?.eventLogs || [];
+        try {
+          const liveLogs = await fetchLiveStudentEventLogs(roll);
+          if (Array.isArray(liveLogs) && liveLogs.length > 0) {
+            // Prefer live logs from Google Sheets
+            eventLogs = liveLogs;
+          }
+        } catch (e) {
+          console.warn('[LiveLogs] Fallback to mapped logs:', e);
         }
+
+        const activities = [];
+
+        // 1. Student Verified Activities from database if available
+        if (dbStudent && Array.isArray(dbStudent.history)) {
+          dbStudent.history.forEach((h, hIdx) => {
+            const pts = parseFloat(String(h.points || '0').replace(/[^0-9.]/g, '')) || 0;
+            activities.push({
+              id: `db-act-${hIdx}`,
+              activity_name: h.title,
+              course_name: h.title,
+              date: h.date || 'Academic Year 2024-2025',
+              activity_type: h.category || 'Event',
+              reward_points: pts.toLocaleString(),
+              type: 'positive'
+            });
+          });
+        }
+
+        // 2. Add granular individual event participation & penalty logs from sheets
+        if (Array.isArray(eventLogs) && eventLogs.length > 0) {
+          eventLogs.forEach(ev => {
+            activities.push({
+              activity_name: ev.activity_name || ev.name,
+              course_name: ev.course_name || ev.name,
+              date: ev.date || "Academic Year 2024-2025",
+              activity_type: ev.activity_type || (ev.points < 0 ? "Penalty" : "P Skill"),
+              reward_points: Math.abs(ev.points).toLocaleString(),
+              type: ev.points < 0 ? "negative" : "positive",
+              organizer: ev.organizer || ""
+            });
+          });
+        }
+
+        // 3. Add Master Sheet 8-Category Activities (for categories not covered by individual logs)
+        if (masterRecord && Array.isArray(masterRecord.activityBreakdown)) {
+          masterRecord.activityBreakdown.forEach((act) => {
+            const pts = typeof act.points === 'number' ? act.points : parseFloat(String(act.points || '0').replace(/,/g, ''));
+            if (pts > 0) {
+              let title = act.label;
+              let actType = act.label.split(' ')[0] || 'Technical';
+
+              if (act.id === 'pskill') {
+                title = 'P-Skill';
+                actType = 'P Skill';
+              } else if (act.id === 'initiatives') {
+                title = 'Student Initiatives & GP Challenge (BPI)';
+                actType = 'Initiative';
+              } else if (act.id === 'interview_extra') {
+                title = 'Interview & Extra-Curricular Assessment';
+                actType = 'Interview';
+              }
+
+              // Check if already covered by positive individual logs
+              const hasDirectLogs = eventLogs.some(ev => {
+                if (ev.points <= 0) return false;
+                if (act.id === 'pskill' && (ev.activity_type.toUpperCase().includes('P SKILL') || ev.activity_type.toUpperCase().includes('PSKILL'))) return true;
+                if (act.id === 'initiatives' && ev.activity_type.toUpperCase().includes('INITIATIVE')) return true;
+                return false;
+              });
+
+              if (!hasDirectLogs && !activities.some(a => a.activity_name.startsWith(title))) {
+                activities.push({
+                  activity_name: `${title}${act.count > 1 ? ` (${act.count} Events)` : ''}`,
+                  course_name: title,
+                  date: 'Academic Year 2024-2025',
+                  activity_type: actType,
+                  reward_points: pts.toLocaleString(),
+                  type: 'positive'
+                });
+              }
+            }
+          });
+        }
+
+        setRewardsData(activities);
+        setRewardsTotal(activities.length);
       } catch (err) {
         console.error('Error fetching rewards overview:', err);
         setRewardsData([]);
@@ -3498,27 +3886,122 @@ export default function App() {
     fetchRewards();
   }, [displayedStudent?.id]);
 
-  // Fetch live rewards specifically for selectedStudent in the Detail Modal
+    // Load rewards history specifically for selectedStudent in the Detail Modal (ONLY RP Activities)
   useEffect(() => {
     if (!isModalOpen || !selectedStudent?.id) return;
     let isMounted = true;
     async function fetchModalRewards() {
       setLoadingModalRewards(true);
       try {
-        const res = await bitcentralFetch(`/rewards?roll_no=${encodeURIComponent(selectedStudent.id)}&page=1&limit=50`);
-        if (res.ok) {
-          const json = await res.json();
-          if (isMounted) {
-            if (json && Array.isArray(json.data)) {
-              setModalRewardsData(json.data);
-            } else if (Array.isArray(json)) {
-              setModalRewardsData(json);
-            } else {
-              setModalRewardsData([]);
-            }
+        const roll = String(selectedStudent.id || selectedStudent.roll_no || '').toUpperCase().trim();
+        const masterRecord = Array.isArray(STUDENTS_INTERNAL_MARKS_LIST)
+          ? STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || '').toUpperCase() === roll)
+          : null;
+
+        let eventLogs = (STUDENT_EVENT_LOGS_MAP && STUDENT_EVENT_LOGS_MAP[roll]) || masterRecord?.eventLogs || [];
+        try {
+          const liveLogs = await fetchLiveStudentEventLogs(roll);
+          if (Array.isArray(liveLogs) && liveLogs.length > 0) {
+            // Prefer live logs from Google Sheets
+            eventLogs = liveLogs;
           }
-        } else {
-          if (isMounted) setModalRewardsData([]);
+        } catch (e) {
+          console.warn('[LiveLogs] Fallback to mapped logs:', e);
+        }
+
+        const activities = [];
+
+        const initialRaw = masterRecord?.initialPoints || selectedStudent.initialPoints || 0;
+
+        // 1. Student Verified Activities from database if available
+        const studentDbRecord = Array.isArray(STUDENTS_DATABASE)
+          ? STUDENTS_DATABASE.find(s => (s.id || '').toUpperCase() === roll)
+          : null;
+
+        if (studentDbRecord && Array.isArray(studentDbRecord.history)) {
+          studentDbRecord.history.forEach((h, hIdx) => {
+            const pts = parseFloat(String(h.points || '0').replace(/[^0-9.]/g, '')) || 0;
+            activities.push({
+              id: `db-act-${hIdx}`,
+              activity_name: h.title,
+              course_name: h.title,
+              date: h.date || 'Academic Year 2024-2025',
+              activity_type: h.category || 'Event',
+              reward_points: pts.toLocaleString(),
+              type: 'positive'
+            });
+          });
+        }
+
+        // 1b. Carry-In / Previous Semester Verified Points
+        const initNum = parseFloat(String(initialRaw).replace(/,/g, '')) || 0;
+        if (initNum > 0) {
+          activities.push({
+            activity_name: "Carry-In / Previous Semester Verified Points",
+            course_name: "Carry-In Reward Points",
+            date: "Academic Year 2024-2025",
+            activity_type: "Carry-In",
+            reward_points: initNum.toLocaleString(),
+            type: "positive"
+          });
+        }
+
+
+
+        // 2. Individual Event Participation & Penalty Logs
+        if (Array.isArray(eventLogs) && eventLogs.length > 0) {
+          eventLogs.forEach(ev => {
+            activities.push({
+              activity_name: ev.activity_name || ev.name,
+              course_name: ev.course_name || ev.name,
+              date: ev.date || "Academic Year 2024-2025",
+              activity_type: ev.activity_type || (ev.points < 0 ? "Penalty" : "P Skill"),
+              reward_points: Math.abs(ev.points).toLocaleString(),
+              type: ev.points < 0 ? "negative" : "positive",
+              organizer: ev.organizer || ""
+            });
+          });
+        }
+
+        // 3. Add Master Sheet 8-Category Activities (for categories not covered by direct logs)
+        if (masterRecord && Array.isArray(masterRecord.activityBreakdown)) {
+          masterRecord.activityBreakdown.forEach((act) => {
+            const pts = typeof act.points === 'number' ? act.points : parseFloat(String(act.points || '0').replace(/,/g, ''));
+            if (pts > 0) {
+              let title = act.label;
+              let actType = act.label.split(' ')[0] || 'Technical';
+
+              if (act.id === 'pskill') {
+                title = 'P-Skill';
+                actType = 'P Skill';
+              } else if (act.id === 'initiatives') {
+                title = 'Student Initiatives & GP Challenge (BPI)';
+                actType = 'Initiative';
+              }
+
+              const hasDirectLogs = eventLogs.some(ev => {
+                if (ev.points <= 0) return false;
+                if (act.id === 'pskill' && (ev.activity_type.toUpperCase().includes('P SKILL') || ev.activity_type.toUpperCase().includes('PSKILL'))) return true;
+                if (act.id === 'initiatives' && ev.activity_type.toUpperCase().includes('INITIATIVE')) return true;
+                return false;
+              });
+
+              if (!hasDirectLogs && !activities.some(a => a.activity_name.startsWith(title))) {
+                activities.push({
+                  activity_name: `${title}${act.count > 1 ? ` (${act.count} Events)` : ''}`,
+                  course_name: title,
+                  date: 'Academic Year 2024-2025',
+                  activity_type: actType,
+                  reward_points: pts.toLocaleString(),
+                  type: 'positive'
+                });
+              }
+            }
+          });
+        }
+
+        if (isMounted) {
+          setModalRewardsData(activities);
         }
       } catch (err) {
         console.error('Error fetching modal rewards:', err);
@@ -3598,21 +4081,18 @@ export default function App() {
     fetchInitialStudent();
   }, []);
 
-  // Fetch averages from endpoint (exact dynamic API data)
+  // Fetch averages from official Google Sheet benchmarks and live index
   useEffect(() => {
     async function fetchAverages() {
       try {
-        const res = await bitcentralFetch('/averages');
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.averages) {
-            setYearlyAverages({
-              year_1: Number(data.averages.year_1) || 0,
-              year_2: Number(data.averages.year_2) || 0,
-              year_3: Number(data.averages.year_3) || 0,
-              year_4: Number(data.averages.year_4) || 0,
-            });
-          }
+        const averages = await fetchInstitutionalAveragesFromSheet();
+        if (averages) {
+          setYearlyAverages({
+            year_1: Number(averages.year_1) || 0,
+            year_2: Number(averages.year_2) || 0,
+            year_3: Number(averages.year_3) || 0,
+            year_4: Number(averages.year_4) || 0,
+          });
         }
       } catch (err) {
         console.error('Error fetching averages:', err);
@@ -3651,6 +4131,7 @@ export default function App() {
               icon = '⛈️';
               condition = 'Thunderstorm';
             }
+
             setWeatherData({
               temp: Math.round(cw.temperature),
               wind: Math.round(cw.windspeed),
@@ -3668,7 +4149,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Live API Search on searchQuery change (with debouncing)
+  // Instant Live Search across all 4,824 BIT students
   useEffect(() => {
     const query = searchQuery.trim();
     if (!query) {
@@ -3679,31 +4160,34 @@ export default function App() {
     }
 
     setIsSearching(true);
-    const timeout = setTimeout(async () => {
-      try {
-        const res = await bitcentralFetch(`/search?q=${encodeURIComponent(query)}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json && Array.isArray(json.data)) {
-            setSearchResults(json.data);
-            setShowDropdown(true);
+    const clean = query.toUpperCase();
 
-            // If exact roll number match, also auto-update the display card
-            if (json.data.length === 1) {
-              setDisplayedStudent(transformApiStudent(json.data[0]));
-            }
-          } else {
-            setSearchResults([]);
-          }
-        }
-      } catch (err) {
-        console.error('Search API error:', err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 280);
+    // Query 4,824 students database
+    const combinedList = Array.isArray(STUDENTS_INTERNAL_MARKS_LIST) ? STUDENTS_INTERNAL_MARKS_LIST : [];
+    const matched = combinedList.filter(s => {
+      const r = (s.rollNo || s.id || '').toUpperCase();
+      const n = (s.name || s.student_name || '').toUpperCase();
+      const d = (s.department || '').toUpperCase();
+      const e = (s.email || '').toUpperCase();
+      return r.includes(clean) || n.includes(clean) || d.includes(clean) || e.includes(clean);
+    }).slice(0, 15);
 
-    return () => clearTimeout(timeout);
+    const formattedResults = matched.map(s => ({
+      roll_no: s.rollNo || s.id,
+      student_name: s.name || s.student_name,
+      department: s.department,
+      year: s.year,
+      mentor_name: s.mentor || 'BIT Faculty',
+      balance_points: (s.balancePoints !== undefined ? s.balancePoints : (s.currentPoints || 0)).toString(),
+      cumulative_reward_points: (s.cumulativePoints !== undefined ? s.cumulativePoints : (s.cumulativePoints || 0)).toString(),
+      redeemed_points: (s.redeemedPoints !== undefined ? s.redeemedPoints : (s.redeemedPoints || 0)).toString(),
+      email: s.email,
+      activityBreakdown: s.activityBreakdown || []
+    }));
+
+    setSearchResults(formattedResults);
+    setShowDropdown(formattedResults.length > 0);
+    setIsSearching(false);
   }, [searchQuery]);
 
   const handleSelectStudent = (apiItem) => {
@@ -4519,6 +5003,8 @@ export default function App() {
             <span>Internal Mark</span>
           </button>
 
+          
+
           <button
             onClick={() => { setActiveNav('Menu Details'); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
@@ -4562,17 +5048,17 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => { setActiveNav('Exam Hall Finder'); setIsSidebarOpen(false); }}
+            onClick={() => { setActiveNav('Student Mentors'); setIsSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Exam Hall Finder'
+              activeNav === 'Student Mentors'
                 ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
                 : isDarkMode
                   ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Compass className="w-5 h-5" strokeWidth={activeNav === 'Exam Hall Finder' ? 2.2 : 1.8} />
-            <span>Exam Hall Finder</span>
+            <UserCheck className="w-5 h-5" strokeWidth={activeNav === 'Student Mentors' ? 2.2 : 1.8} />
+            <span>Student Mentors</span>
           </button>
 
           <button
@@ -5055,6 +5541,72 @@ export default function App() {
                       />
                     </div>
                   </div>
+
+                  {/* AVERAGE REWARD POINTS BY YEAR (Native 4-Card Widget) */}
+                  <section className="mb-8">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className={`text-xs font-black tracking-wider uppercase ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        AVERAGE REWARD POINTS BY YEAR
+                      </h2>
+                      <span className={`text-[11px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Official College Benchmarks
+                      </span>
+                    </div>
+
+                    {/* 4 Year Cards Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { key: 'year_1', label: 'Year I', value: yearlyAverages.year_1 },
+                        { key: 'year_2', label: 'Year II', value: yearlyAverages.year_2 },
+                        { key: 'year_3', label: 'Year III', value: yearlyAverages.year_3 },
+                        { key: 'year_4', label: 'Year IV', value: yearlyAverages.year_4 },
+                      ].map(card => {
+                        const userYear = normalizeStudentYear(currentUser?.year, currentUser?.id);
+                        const isHighlighted = userYear === card.label;
+
+                        if (isHighlighted) {
+                          return (
+                            <div 
+                              key={card.key}
+                              className="rounded-2xl p-5 sm:p-6 shadow-xl shadow-indigo-600/25 bg-gradient-to-r from-indigo-600 to-violet-600 text-white overflow-hidden flex flex-col justify-between transition-all duration-200 ring-2 ring-indigo-400/50"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-bold text-indigo-100">{card.label}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-xs">
+                                  YOUR YEAR
+                                </span>
+                              </div>
+                              <div className="flex items-baseline gap-1.5 mt-2">
+                                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                                  {Number(card.value).toLocaleString()}
+                                </span>
+                                <span className="text-xs sm:text-sm font-bold text-indigo-200">RP</span>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div 
+                            key={card.key}
+                            className={`rounded-2xl border p-5 sm:p-6 shadow-xs overflow-hidden flex flex-col justify-between transition-all duration-200 ${
+                              isDarkMode ? 'border-slate-800 bg-slate-900/90 text-slate-100' : 'border-slate-200 bg-white text-slate-900 shadow-sm'
+                            }`}
+                          >
+                            <div className="mb-2">
+                              <span className={`text-xs font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{card.label}</span>
+                            </div>
+                            <div className="flex items-baseline gap-1.5 mt-2">
+                              <span className={`text-2xl sm:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {Number(card.value).toLocaleString()}
+                              </span>
+                              <span className={`text-xs sm:text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>RP</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
 
                   {/* 19 Department Cards Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -5620,6 +6172,9 @@ export default function App() {
             <InternalMarksView currentUser={currentUser} isDarkMode={isDarkMode} />
           )}
 
+          
+
+          {/* VIEW 3: MENU DETAILS (CAMPUS MESS & DINING) */}
           {/* VIEW 3: MENU DETAILS (CAMPUS MESS & DINING) */}
           {activeNav === 'Menu Details' && (
             <div className="max-w-6xl mx-auto w-full space-y-6">
@@ -5629,9 +6184,6 @@ export default function App() {
                   <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                     Campus Dining & Mess Menu
                   </h1>
-                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Live daily meal schedule, hostel dining items, and current meal details.
-                  </p>
                 </div>
 
                 {/* Hostel Switcher Pills */}
@@ -5661,11 +6213,13 @@ export default function App() {
                 </div>
               </div>
 
+
+
               {/* Date Navigation & Controls Bar */}
               <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 ${
                 isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
               }`}>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => changeMessDateBy(-1)}
                     className={`p-2 rounded-xl border transition-colors cursor-pointer ${
@@ -5692,6 +6246,23 @@ export default function App() {
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
+
+                  {/* HTML Date Picker Input for instant calendar jumping */}
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={selectedMessDate}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setSelectedMessDate(e.target.value);
+                        }
+                      }}
+                      className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer outline-none transition-all ${
+                        isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-100 border-slate-300 text-slate-700'
+                      }`}
+                      title="Choose custom date"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -5906,6 +6477,8 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+
 
               {/* Top Highlight Metric Cards */}
               {(() => {
@@ -6229,8 +6802,13 @@ export default function App() {
                                 <p className={`text-xs font-medium mt-0.5 ${
                                   isDarkMode ? 'text-slate-400' : 'text-slate-500'
                                 }`}>
-                                  {leave.day || (isMultiDay ? 'Multi-day leave' : 'Single day')}
+                                  {leave.dateDisplay || leave.day || (isMultiDay ? 'Multi-day leave' : 'Single day')}
                                 </p>
+                                {leave.remarks && (
+                                  <div className="mt-2 text-[10px] font-semibold px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                                    <span>⚠️ {leave.remarks}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -6265,6 +6843,16 @@ export default function App() {
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {/* VIEW: STUDENT-TO-MENTOR MAPPING DIRECTORY */}
+          {activeNav === 'Student Mentors' && (
+            <div className="max-w-6xl mx-auto w-full">
+              <StudentMentorMappingView
+                currentUser={currentUser}
+                isDarkMode={isDarkMode}
+              />
             </div>
           )}
 
@@ -6772,278 +7360,6 @@ export default function App() {
                   </div>
                 );
               })()}
-            </div>
-          )}
-
-          {/* VIEW 3.7: EXAM HALL & SEATING FINDER */}
-          {activeNav === 'Exam Hall Finder' && (
-            <div className="max-w-5xl mx-auto w-full space-y-6">
-              {/* Header */}
-              <div>
-                <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Exam Hall & Seating Finder
-                </h1>
-                <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Search and locate your allocated examination hall, room number, floor block, and desk position.
-                </p>
-              </div>
-
-              {/* Form Input Card */}
-              <div className={`p-5 sm:p-7 rounded-3xl border space-y-5 transition-all ${
-                isDarkMode ? 'bg-slate-900/90 border-slate-800 shadow-xl' : 'bg-white border-slate-200 shadow-md'
-              }`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Register / Roll Number Input */}
-                  <div className="space-y-1.5">
-                    <label className={`text-xs font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Student Register / Roll Number
-                    </label>
-                    <div className="relative">
-                      <IdCard className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`} />
-                      <input
-                        type="text"
-                        value={examRegNo}
-                        onChange={(e) => setExamRegNo(e.target.value.toUpperCase())}
-                        placeholder="e.g. 7376232CT109"
-                        className={`w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-mono font-bold uppercase border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
-                          isDarkMode 
-                            ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-500' 
-                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Calendar / Exam Date Input */}
-                  <div className="space-y-1.5">
-                    <label className={`text-xs font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Exam Date
-                    </label>
-                    <div className="relative">
-                      <Calendar className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`} />
-                      <input
-                        type="date"
-                        value={examDate}
-                        onChange={(e) => setExamDate(e.target.value)}
-                        className={`w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
-                          isDarkMode 
-                            ? 'bg-slate-800/80 border-slate-700 text-white [color-scheme:dark]' 
-                            : 'bg-slate-50 border-slate-200 text-slate-900 [color-scheme:light]'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExamHallResult(null);
-                      setExamHallSearched(false);
-                      setExamHallError('');
-                    }}
-                    className={`px-4 py-2.5 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
-                      isDarkMode 
-                        ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' 
-                        : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    Clear
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => fetchExamHall(examRegNo, examDate)}
-                    disabled={loadingExamHall || !examRegNo}
-                    className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-indigo-500/25 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                  >
-                    <Compass className={`w-4 h-4 ${loadingExamHall ? 'animate-spin' : ''}`} />
-                    <span>{loadingExamHall ? 'Searching Hall...' : 'Find Exam Hall'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Results & Status Display */}
-              {loadingExamHall ? (
-                <div className={`p-10 rounded-3xl border text-center space-y-4 animate-pulse ${
-                  isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-                }`}>
-                  <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  <p className="font-bold text-sm text-slate-400">
-                    Checking exam hall allocation for {examRegNo}...
-                  </p>
-                </div>
-              ) : examHallResult ? (
-                <div className="space-y-4 animate-fadeIn">
-                  {/* Active Allocation Banner */}
-                  <div className="p-6 rounded-3xl bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white border border-indigo-500/30 shadow-xl relative overflow-hidden">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
-                        Allocated Examination Hall
-                      </span>
-                      <span className="text-xs text-indigo-300 font-mono">
-                        {examRegNo}
-                      </span>
-                    </div>
-                    <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
-                      {examHallResult.hall_no || examHallResult.room_no || 'Examination Hall Assigned'}
-                    </h3>
-                    {examDate && (
-                      <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                        Date: <strong className="text-white font-mono">{examDate}</strong>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Hall Details Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Room Block */}
-                    <div className={`p-5 rounded-3xl border ${
-                      isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
-                    }`}>
-                      <div className="flex items-center gap-2 text-indigo-500 mb-1">
-                        <Building2 className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Block / Floor</span>
-                      </div>
-                      <div className="text-xl font-black font-mono mt-1">
-                        {examHallResult.block || 'Main Block'}
-                      </div>
-                      <span className="text-xs text-slate-400 block mt-0.5">
-                        {examHallResult.floor || 'Level 1'}
-                      </span>
-                    </div>
-
-                    {/* Desk Seat Number */}
-                    <div className={`p-5 rounded-3xl border ${
-                      isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
-                    }`}>
-                      <div className="flex items-center gap-2 text-emerald-500 mb-1">
-                        <MapPin className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Assigned Desk / Seat</span>
-                      </div>
-                      <div className="text-xl font-black font-mono mt-1 text-emerald-500 dark:text-emerald-400">
-                        {examHallResult.seat_no || examHallResult.bench_no || 'Desk Allocated'}
-                      </div>
-                      <span className="text-xs text-slate-400 block mt-0.5">
-                        Verify roll slip on desk
-                      </span>
-                    </div>
-
-                    {/* Session Schedule */}
-                    <div className={`p-5 rounded-3xl border ${
-                      isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
-                    }`}>
-                      <div className="flex items-center gap-2 text-purple-500 mb-1">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Exam Session</span>
-                      </div>
-                      <div className="text-xl font-black font-mono mt-1 text-purple-500 dark:text-purple-400">
-                        {examHallResult.session || 'FN Session'}
-                      </div>
-                      <span className="text-xs text-slate-400 block mt-0.5">
-                        09:30 AM – 12:30 PM
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : examHallSearched ? (
-                /* No Match / Not-Found Card */
-                <div className={`p-6 sm:p-8 rounded-3xl border space-y-4 transition-all ${
-                  isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-                }`}>
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center border border-indigo-500/25 flex-shrink-0">
-                      <Compass className="w-6 h-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`text-lg sm:text-xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                        Currently no exam hall are allocated for you by COE
-                      </h3>
-                      <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Examination seating arrangements are published by the Controller of Examinations (COE) prior to scheduled End Semester Examinations.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Exam Guidelines Box */}
-                  <div className={`p-4 rounded-2xl border text-xs space-y-2 ${
-                    isDarkMode ? 'bg-slate-950/60 border-slate-800/80 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                  }`}>
-                    <div className="font-bold uppercase tracking-wider text-[10px] text-indigo-500 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Standard BIT Examination Day Guidelines:</span>
-                    </div>
-                    <ul className="list-disc list-inside space-y-1 text-[11px] leading-relaxed pl-1 text-slate-500 dark:text-slate-400">
-                      <li>Ensure you carry your physical <strong>BIT Student ID Card</strong> and official <strong>Hall Ticket</strong>.</li>
-                      <li>Report to your allocated examination hall block at least <strong>15 minutes</strong> before session commencement.</li>
-                      <li>Smartphones, digital smartwatches, and programmable calculators are strictly prohibited inside the hall.</li>
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                /* Initial Prompt Card */
-                <div className={`p-8 sm:p-10 rounded-3xl border text-center space-y-3 ${
-                  isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-                }`}>
-                  <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center border border-indigo-500/20">
-                    <Compass className="w-7 h-7" />
-                  </div>
-                  <h3 className={`text-base sm:text-lg font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Lookup Your Examination Hall
-                  </h3>
-                  <p className={`text-xs sm:text-sm max-w-md mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Select your exam date and verify your roll number above, then click <strong>Find Exam Hall</strong>.
-                  </p>
-                </div>
-              )}
-
-              {/* Campus Examination Blocks Guide */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Campus Examination Venues
-                  </h3>
-                  <span className={`text-[11px] font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    5 Designated Blocks
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                  {[
-                    { code: 'IB Block', tag: 'Exam Venue', iconColor: 'text-indigo-500 dark:text-indigo-400', iconBg: 'bg-indigo-500/10 border-indigo-500/20', dot: 'bg-indigo-500' },
-                    { code: 'SF Block', tag: 'Exam Venue', iconColor: 'text-blue-500 dark:text-blue-400', iconBg: 'bg-blue-500/10 border-blue-500/20', dot: 'bg-blue-500' },
-                    { code: 'AS Block', tag: 'Exam Venue', iconColor: 'text-emerald-500 dark:text-emerald-400', iconBg: 'bg-emerald-500/10 border-emerald-500/20', dot: 'bg-emerald-500' },
-                    { code: 'Mech Block', tag: 'Exam Venue', iconColor: 'text-amber-500 dark:text-amber-400', iconBg: 'bg-amber-500/10 border-amber-500/20', dot: 'bg-amber-500' },
-                    { code: 'Research Park', tag: 'Exam Venue', iconColor: 'text-purple-500 dark:text-purple-400', iconBg: 'bg-purple-500/10 border-purple-500/20', dot: 'bg-purple-500' }
-                  ].map((blk, idx) => (
-                    <div 
-                      key={idx}
-                      className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between hover:shadow-md hover:-translate-y-0.5 ${
-                        isDarkMode 
-                          ? 'bg-slate-900/80 border-slate-800 hover:border-slate-700' 
-                          : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${blk.iconBg} ${blk.iconColor}`}>
-                          <Building2 className="w-4 h-4" />
-                        </div>
-                        <span className={`w-2 h-2 rounded-full ${blk.dot}`}></span>
-                      </div>
-                      <div>
-                        <div className={`text-sm font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                          {blk.code}
-                        </div>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider block mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {blk.tag}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
@@ -7733,6 +8049,221 @@ export default function App() {
                 </div>
               </div>
 
+              {/* 📄 OFFICIAL COLLEGE SCHEDULES & PDF DOCUMENT UPLOAD HUB */}
+              <div className={`p-6 sm:p-7 rounded-3xl border shadow-xl transition-all ${
+                isDarkMode ? 'border-purple-900/40 bg-slate-900/90' : 'border-purple-200 bg-white'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
+                      <FileUp className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className={`text-lg font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        College Schedules & PDF Document Manager
+                      </h2>
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Upload official Leave Schedule, Boys Mess Menu, and Girls Mess Menu PDFs. Instant live updates for all students.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30 w-fit">
+                    ADMIN UPLOAD HUB
+                  </span>
+                </div>
+
+                {/* 3 Upload Option Cards Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  
+                  {/* Card 1: Leave Schedule PDF */}
+                  <div className={`p-5 rounded-2xl border flex flex-col justify-between transition-all ${
+                    isDarkMode ? 'border-slate-800 bg-slate-800/40' : 'border-slate-200 bg-slate-50'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center font-bold">
+                          <CalendarDays className="w-5 h-5" />
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          adminSchedules?.leave_schedule ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-slate-700 text-slate-400 border-slate-600'
+                        }`}>
+                          {adminSchedules?.leave_schedule ? '✓ Published' : 'Not Uploaded'}
+                        </span>
+                      </div>
+                      <h3 className={`text-sm font-extrabold mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Leave Schedule (PDF)
+                      </h3>
+                      <p className={`text-xs mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Official college holiday & GP circular for students.
+                      </p>
+
+                      {adminSchedules?.leave_schedule && (
+                        <div className="p-2.5 rounded-xl bg-black/20 text-[11px] font-medium space-y-1 mb-3 text-slate-300">
+                          <p className="truncate font-semibold text-emerald-400">{adminSchedules.leave_schedule.fileName}</p>
+                          <p className="text-[10px] text-slate-400">Size: {adminSchedules.leave_schedule.fileSize}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <label className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md shadow-emerald-950/20">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{adminSchedules?.leave_schedule ? 'Replace Leave PDF' : 'Upload Leave PDF'}</span>
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          onChange={(e) => handleAdminPdfUpload('leave_schedule', e.target.files?.[0])}
+                        />
+                      </label>
+                      {adminSchedules?.leave_schedule && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setViewingPdfModal(adminSchedules.leave_schedule)}
+                            className={`flex-1 py-1.5 rounded-xl border text-[11px] font-bold transition-all ${
+                              isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => handleAdminPdfRemove('leave_schedule')}
+                            className="px-3 py-1.5 rounded-xl border border-rose-900/50 bg-rose-950/30 text-rose-400 hover:bg-rose-900/50 text-[11px] font-bold transition-all cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card 2: Boys Hostel Menu PDF */}
+                  <div className={`p-5 rounded-2xl border flex flex-col justify-between transition-all ${
+                    isDarkMode ? 'border-slate-800 bg-slate-800/40' : 'border-slate-200 bg-slate-50'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+                          <Utensils className="w-5 h-5" />
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          adminSchedules?.boys_menu ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40' : 'bg-slate-700 text-slate-400 border-slate-600'
+                        }`}>
+                          {adminSchedules?.boys_menu ? '✓ Published' : 'Not Uploaded'}
+                        </span>
+                      </div>
+                      <h3 className={`text-sm font-extrabold mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Boys Mess Menu (PDF)
+                      </h3>
+                      <p className={`text-xs mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Weekly dining schedule for all boys hostels.
+                      </p>
+
+                      {adminSchedules?.boys_menu && (
+                        <div className="p-2.5 rounded-xl bg-black/20 text-[11px] font-medium space-y-1 mb-3 text-slate-300">
+                          <p className="truncate font-semibold text-indigo-400">{adminSchedules.boys_menu.fileName}</p>
+                          <p className="text-[10px] text-slate-400">Size: {adminSchedules.boys_menu.fileSize}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <label className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md shadow-indigo-950/20">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{adminSchedules?.boys_menu ? 'Replace Boys Menu' : 'Upload Boys Menu'}</span>
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          onChange={(e) => handleAdminPdfUpload('boys_menu', e.target.files?.[0])}
+                        />
+                      </label>
+                      {adminSchedules?.boys_menu && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setViewingPdfModal(adminSchedules.boys_menu)}
+                            className={`flex-1 py-1.5 rounded-xl border text-[11px] font-bold transition-all ${
+                              isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => handleAdminPdfRemove('boys_menu')}
+                            className="px-3 py-1.5 rounded-xl border border-rose-900/50 bg-rose-950/30 text-rose-400 hover:bg-rose-900/50 text-[11px] font-bold transition-all cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card 3: Girls Hostel Menu PDF */}
+                  <div className={`p-5 rounded-2xl border flex flex-col justify-between transition-all ${
+                    isDarkMode ? 'border-slate-800 bg-slate-800/40' : 'border-slate-200 bg-slate-50'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
+                          <UtensilsCrossed className="w-5 h-5" />
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          adminSchedules?.girls_menu ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' : 'bg-slate-700 text-slate-400 border-slate-600'
+                        }`}>
+                          {adminSchedules?.girls_menu ? '✓ Published' : 'Not Uploaded'}
+                        </span>
+                      </div>
+                      <h3 className={`text-sm font-extrabold mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Girls Mess Menu (PDF)
+                      </h3>
+                      <p className={`text-xs mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Weekly dining schedule for all girls hostels.
+                      </p>
+
+                      {adminSchedules?.girls_menu && (
+                        <div className="p-2.5 rounded-xl bg-black/20 text-[11px] font-medium space-y-1 mb-3 text-slate-300">
+                          <p className="truncate font-semibold text-purple-400">{adminSchedules.girls_menu.fileName}</p>
+                          <p className="text-[10px] text-slate-400">Size: {adminSchedules.girls_menu.fileSize}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <label className="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md shadow-purple-950/20">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{adminSchedules?.girls_menu ? 'Replace Girls Menu' : 'Upload Girls Menu'}</span>
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          onChange={(e) => handleAdminPdfUpload('girls_menu', e.target.files?.[0])}
+                        />
+                      </label>
+                      {adminSchedules?.girls_menu && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setViewingPdfModal(adminSchedules.girls_menu)}
+                            className={`flex-1 py-1.5 rounded-xl border text-[11px] font-bold transition-all ${
+                              isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => handleAdminPdfRemove('girls_menu')}
+                            className="px-3 py-1.5 rounded-xl border border-rose-900/50 bg-rose-950/30 text-rose-400 hover:bg-rose-900/50 text-[11px] font-bold transition-all cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
               {/* 4 KPI Top Metric Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
                 
@@ -8406,7 +8937,7 @@ export default function App() {
             </button>
 
             {/* Modal Header */}
-            <div className={`flex items-center gap-3 sm:gap-4 pb-4 sm:pb-6 border-b pr-8 ${
+            <div className={`flex items-start sm:items-center gap-3 sm:gap-4 pb-4 sm:pb-6 border-b pr-8 ${
               isDarkMode ? 'border-slate-800' : 'border-slate-200'
             }`}>
               <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border-2 ${
@@ -8421,7 +8952,9 @@ export default function App() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <h3 className={`text-base sm:text-2xl font-black tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{selectedStudent.name}</h3>
+                  <h3 className={`text-base sm:text-2xl font-black tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                    {selectedStudent.name}
+                  </h3>
                   <span className={`text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full border flex-shrink-0 ${
                     isDarkMode ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   }`}>
@@ -8431,6 +8964,25 @@ export default function App() {
                 <p className={`text-[11px] sm:text-xs mt-0.5 font-medium truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   {selectedStudent.id} • {selectedStudent.department}
                 </p>
+
+                {/* Mentor & Email Info Badges without icons */}
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {selectedStudent.mentor_name && (
+                    <span className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold px-2.5 py-0.5 rounded-lg border ${
+                      isDarkMode ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    }`}>
+                      <span>Mentor:</span>
+                      <span className="font-bold">{selectedStudent.mentor_name}</span>
+                    </span>
+                  )}
+                  {selectedStudent.email && (
+                    <span className={`inline-flex items-center text-[10px] sm:text-[11px] font-medium px-2.5 py-0.5 rounded-lg border ${
+                      isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
+                      <span className="truncate max-w-[220px]">{selectedStudent.email}</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -8456,7 +9008,43 @@ export default function App() {
               </div>
             </div>
 
-            {/* Recent RP Activities */}
+            {/* 8-Category Official Activity Breakdown from Master Sheet */}
+            {Array.isArray(selectedStudent.activityBreakdown) && selectedStudent.activityBreakdown.length > 0 && (
+              <div className="mb-6">
+                <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center justify-between ${
+                  isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                }`}>
+                  <span>Reward Points Category Breakdown</span>
+                  <span className="text-[10px] font-medium text-indigo-400">Official College Audit</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {selectedStudent.activityBreakdown.map((act) => (
+                    <div
+                      key={act.id}
+                      className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2 ${
+                        isDarkMode ? 'bg-slate-800/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-xs font-semibold truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                          {act.label}
+                        </div>
+                        <div className={`text-[10px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Count: <span className="font-bold">{act.count || 0}</span> events
+                        </div>
+                      </div>
+                      <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 whitespace-nowrap">
+                        {act.points || 0} RP
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+
+
+            {/* Recent RP Activities History */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Recent Activity History</h4>
@@ -8466,15 +9054,15 @@ export default function App() {
                   </span>
                 )}
               </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
                 {loadingModalRewards ? (
                   <div className={`p-6 text-center text-xs flex flex-col items-center justify-center gap-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                     <span>Loading student's authentic reward logs...</span>
                   </div>
-                ) : modalRewardsData.length > 0 ? (
-                  modalRewardsData.slice(0, 8).map((act, index) => {
-                    const rawPts = act.reward_points ? parseFloat(act.reward_points.replace(/,/g, '')) : 0;
+                ) : (modalRewardsData.length > 0 || (selectedStudent.history && selectedStudent.history.length > 0)) ? (
+                  (modalRewardsData.length > 0 ? modalRewardsData : (selectedStudent.history || [])).slice(0, 8).map((act, index) => {
+                    const rawPts = act.reward_points ? parseFloat(String(act.reward_points).replace(/,/g, '')) : (act.points ? parseFloat(String(act.points).replace(/[^0-9.]/g, '')) : 0);
                     const isPositive = act.type !== 'negative' && rawPts >= 0;
                     return (
                       <div
@@ -8492,8 +9080,8 @@ export default function App() {
                             <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className={`text-xs font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{act.activity_name || act.course_name}</div>
-                            <div className={`text-[10px] sm:text-[11px] truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{act.date} • {act.activity_type}</div>
+                            <div className={`text-xs font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{act.activity_name || act.title || act.course_name}</div>
+                            <div className={`text-[10px] sm:text-[11px] truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{act.date} • {act.activity_type || act.category || 'Event'}</div>
                           </div>
                         </div>
                         <span className={`text-[10px] sm:text-xs font-black px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full whitespace-nowrap flex-shrink-0 ${
@@ -8524,6 +9112,55 @@ export default function App() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* PDF DOCUMENT VIEWER MODAL */}
+      {viewingPdfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+          <div className={`w-full max-w-5xl h-[90vh] rounded-3xl shadow-2xl border flex flex-col overflow-hidden ${
+            isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
+          }`}>
+            {/* Modal Header */}
+            <div className={`px-5 py-3.5 border-b flex items-center justify-between flex-shrink-0 ${
+              isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
+            }`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <FileText className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                <div className="truncate">
+                  <h3 className="font-extrabold text-sm sm:text-base truncate">{viewingPdfModal.title || 'Schedule Document'}</h3>
+                  <p className="text-[11px] text-slate-400 truncate">{viewingPdfModal.fileName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href={viewingPdfModal.dataUrl}
+                  download={viewingPdfModal.fileName || 'schedule.pdf'}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Download</span>
+                </a>
+                <button
+                  onClick={() => setViewingPdfModal(null)}
+                  className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
+                    isDarkMode ? 'border-slate-700 hover:bg-slate-800 text-slate-300' : 'border-slate-300 hover:bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: PDF Iframe */}
+            <div className="flex-1 bg-slate-950 p-2 sm:p-4">
+              <iframe
+                src={viewingPdfModal.dataUrl}
+                title={viewingPdfModal.title}
+                className="w-full h-full rounded-2xl border border-slate-800"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -8659,6 +9296,61 @@ export default function App() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Interactive Toast Notification */}
+      {activeToast && (
+        <div 
+          onClick={() => {
+            if (activeToast.linkTab) setActiveNav(activeToast.linkTab);
+            markNotificationAsRead(activeToast.id);
+            setActiveToast(null);
+          }}
+          className="fixed bottom-5 right-5 z-50 max-w-sm sm:max-w-md w-[calc(100vw-40px)] p-4 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-indigo-500/30 shadow-2xl shadow-indigo-500/20 backdrop-blur-xl cursor-pointer transition-all hover:scale-[1.02] flex items-start gap-3 animate-fadeIn"
+          role="alert"
+        >
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            activeToast.type === 'points_credited'
+              ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/20'
+              : activeToast.type === 'points_debited'
+                ? 'bg-rose-500/15 text-rose-500 border border-rose-500/20'
+                : activeToast.type === 'placement_update'
+                  ? 'bg-indigo-500/15 text-indigo-500 border border-indigo-500/20'
+                  : 'bg-blue-500/15 text-blue-500 border border-blue-500/20'
+          }`}>
+            {activeToast.type === 'points_credited' ? (
+              <Trophy className="w-5 h-5 text-emerald-500" />
+            ) : activeToast.type === 'points_debited' ? (
+              <TrendingDown className="w-5 h-5 text-rose-500" />
+            ) : activeToast.type === 'placement_update' ? (
+              <Briefcase className="w-5 h-5 text-indigo-500" />
+            ) : (
+              <BellRing className="w-5 h-5 text-blue-500" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0 pr-2">
+            <div className="flex items-center justify-between gap-1 mb-0.5">
+              <span className="text-xs font-black text-slate-900 dark:text-white truncate">
+                {activeToast.title}
+              </span>
+              <span className="text-[10px] text-slate-400 font-semibold shrink-0">Just now</span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+              {activeToast.description}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveToast(null);
+            }}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

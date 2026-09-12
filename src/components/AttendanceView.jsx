@@ -1,29 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Calendar,
-  CalendarDays,
   Clock,
-  CheckCircle,
-  XCircle,
-  Send,
-  RefreshCw,
-  Sparkles,
   Check,
   X,
-  ChevronLeft,
-  ChevronRight,
+  Send,
+  RefreshCw,
   ShieldCheck,
-  ExternalLink,
-  Zap,
-  Bookmark,
-  Key,
-  Copy,
-  Database,
-  Cloud,
-  Info
+  CalendarDays
 } from 'lucide-react';
-
-const DEFAULT_FIREBASE_DB_URL = 'https://rewards-site-7a5a8-default-rtdb.firebaseio.com';
 
 export default function AttendanceView({
   currentUser,
@@ -38,7 +23,7 @@ export default function AttendanceView({
     return raw.includes('@') ? raw.split('@')[0].toUpperCase() : raw;
   }, [student, currentUser]);
 
-  // Selected Date State: formatted as YYYY-MM-DD for native input
+  // Selected Date State: formatted as YYYY-MM-DD
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     const year = d.getFullYear();
@@ -48,12 +33,16 @@ export default function AttendanceView({
   });
 
   const [loading, setLoading] = useState(false);
-  const [dailyData, setDailyData] = useState(null);
-  const [overallData, setOverallData] = useState(null);
-  const [syncStatus, setSyncStatus] = useState('cloud_synced'); // 'cloud_synced' | 'syncing' | 'offline_preview'
+  const [attendanceData, setAttendanceData] = useState(() => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const cached = localStorage.getItem(`bit_attendance_${today}`);
+      if (cached) return JSON.parse(cached);
+    } catch(e) {}
+    return null;
+  });
+
   const [syncFeedback, setSyncFeedback] = useState('');
-  const [showManualTokenModal, setShowManualTokenModal] = useState(false);
-  const [manualTokenInput, setManualTokenInput] = useState('');
 
   // Missed Request Modal State
   const [missedModalSession, setMissedModalSession] = useState(null);
@@ -71,7 +60,7 @@ export default function AttendanceView({
       
       const dayStr = String(d).padStart(2, '0');
       const monthStr = String(m).padStart(2, '0');
-      const displayFormatted = `${days[dt.getDay()]}, ${dayStr} ${months[m - 1]} ${y}`;
+      const displayFormatted = `${days[dt.getDay()]}, ${d} ${months[m - 1]} ${y}`;
       const ddmmyyyy = `${dayStr}-${monthStr}-${y}`;
 
       return {
@@ -86,141 +75,89 @@ export default function AttendanceView({
     }
   }, [selectedDate]);
 
-  // Primary Fetcher: Query Firebase Realtime Database with Serverless fallback
-  const loadAttendance = useCallback(async (dateStr = selectedDate, forceSync = false) => {
+  // Primary Fetcher: Query Live BIT PS Portal via direct proxy gateway
+  const loadAttendance = useCallback(async (dateStr = selectedDate, showFeedback = false) => {
     setLoading(true);
-    const fbUrl = (typeof window !== 'undefined' ? localStorage.getItem('bit_firebase_url') : '') || DEFAULT_FIREBASE_DB_URL;
-    const cleanFbUrl = fbUrl.replace(/\/$/, '');
-
     try {
-      // 1. Check if direct Bearer token is stored in local session
-      const activePsToken = (typeof window !== 'undefined' ? localStorage.getItem('bit_ps_token') : '') || psToken;
-
-      // If forceSync or if user has active token, call the sync worker
-      if (forceSync || activePsToken) {
-        setSyncStatus('syncing');
-        try {
-          const syncUrl = `/api/sync-attendance?roll=${encodeURIComponent(studentRoll)}&date=${encodeURIComponent(dateStr)}${activePsToken ? `&token=${encodeURIComponent(activePsToken)}` : ''}`;
-          const syncRes = await fetch(syncUrl);
-          if (syncRes.ok) {
-            const syncJson = await syncRes.json();
-            if (syncJson?.data?.daily) {
-              setDailyData(syncJson.data.daily);
-              if (syncJson.data.overall) setOverallData(syncJson.data.overall);
-              setSyncStatus('cloud_synced');
-              setSyncFeedback('✅ Attendance updated with live cloud records!');
-              setTimeout(() => setSyncFeedback(''), 3000);
-              setLoading(false);
-              return;
-            }
+      // 1. Direct proxy request to BIT PS API
+      const proxyUrl = `/api/ps-portal/api/ps_v2/activity/my-attendance?date=${dateStr}`;
+      const res = await fetch(proxyUrl);
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.data?.data || json.data;
+        if (data && Array.isArray(data.attendance_log)) {
+          setAttendanceData(data);
+          try {
+            localStorage.setItem(`bit_attendance_${dateStr}`, JSON.stringify(data));
+          } catch(e) {}
+          if (showFeedback) {
+            setSyncFeedback('✅ Attendance updated live from PS Portal!');
+            setTimeout(() => setSyncFeedback(''), 3000);
           }
-        } catch (syncErr) {
-          console.warn('Sync worker background call:', syncErr);
+          setLoading(false);
+          return;
         }
       }
-
-      // 2. Fetch daily records from Firebase
-      const dailyRes = await fetch(`${cleanFbUrl}/attendance/${encodeURIComponent(studentRoll)}/daily/${dateStr}.json`);
-      if (dailyRes.ok) {
-        const dJson = await dailyRes.json();
-        if (dJson && Array.isArray(dJson.sessions)) {
-          setDailyData(dJson);
-          setSyncStatus('cloud_synced');
-        } else {
-          setDailyData(null);
-        }
-      }
-
-      // 3. Fetch overall summary from Firebase
-      const overallRes = await fetch(`${cleanFbUrl}/attendance/${encodeURIComponent(studentRoll)}/overall.json`);
-      if (overallRes.ok) {
-        const oJson = await overallRes.json();
-        if (oJson && oJson.percentage) {
-          setOverallData(oJson);
-        }
-      }
-
-      setLoading(false);
     } catch (err) {
-      console.warn('Error loading attendance from Firebase:', err);
-      setSyncStatus('offline_preview');
-      setLoading(false);
+      console.warn('Live attendance proxy fetch error:', err);
     }
-  }, [selectedDate, studentRoll, psToken]);
+
+    // 2. Check localStorage cache
+    try {
+      const cached = localStorage.getItem(`bit_attendance_${dateStr}`);
+      if (cached) {
+        setAttendanceData(JSON.parse(cached));
+        setLoading(false);
+        return;
+      }
+    } catch(e) {}
+
+    // 3. Fallback default template if network is unavailable
+    setAttendanceData(prev => prev || {
+      percentage: 100,
+      total_days: 74,
+      present: 74,
+      absent: 0,
+      attendance_log: [
+        { session_id: 1, timing: '08:45 am to 09:35 am', session: 'Forenoon', status: 'Absent', attendance_by: '—', session_finished: true },
+        { session_id: 2, timing: '09:35 am to 10:25 am', session: 'Forenoon', status: 'Absent', attendance_by: '—', session_finished: true },
+        { session_id: 3, timing: '10:40 am to 11:30 am', session: 'Forenoon', status: 'Absent', attendance_by: '—', session_finished: true },
+        { session_id: 4, timing: '11:30 am to 12:20 pm', session: 'Forenoon', status: 'Absent', attendance_by: '—', session_finished: true },
+        { session_id: 5, timing: '01:30 pm to 02:20 pm', session: 'Afternoon', status: 'Absent', attendance_by: '—', session_finished: true },
+        { session_id: 6, timing: '02:20 pm to 03:10 pm', session: 'Afternoon', status: 'Absent', attendance_by: '—', session_finished: true },
+        { session_id: 7, timing: '03:25 pm to 04:25 pm', session: 'Afternoon', status: 'Absent', attendance_by: '—', session_finished: true }
+      ]
+    });
+
+    setLoading(false);
+  }, [selectedDate]);
 
   useEffect(() => {
     loadAttendance(selectedDate, false);
   }, [selectedDate, loadAttendance]);
 
-  // Handle Save Manual Token
-  const handleSaveManualToken = () => {
-    const clean = manualTokenInput.replace(/^Bearer\s+/i, '').trim();
-    if (!clean) return;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('bit_ps_token', clean);
-    }
-    if (setPsToken) setPsToken(clean);
-    setShowManualTokenModal(false);
-    loadAttendance(selectedDate, true);
-  };
+  const rawLogs = attendanceData?.attendance_log || [];
+  
+  const forenoonSessions = useMemo(() => {
+    return rawLogs.filter(s => String(s.session || '').toLowerCase().includes('fore'));
+  }, [rawLogs]);
 
-  // Determine 7 Period Sessions (Forenoon: 4, Afternoon: 3)
-  const sessions = useMemo(() => {
-    // If daily data exists from Firebase or API, map it
-    if (dailyData && Array.isArray(dailyData.sessions) && dailyData.sessions.length > 0) {
-      return dailyData.sessions.slice(0, 7).map((s, idx) => ({
-        id: idx + 1,
-        timing: s.timing || getPeriodTiming(idx + 1),
-        slot: idx < 4 ? 'Forenoon' : 'Afternoon',
-        section: idx < 4 ? 'Forenoon' : 'Afternoon',
-        markedBy: s.markedBy || s.marked_by || s.faculty || '—',
-        status: s.status || (s.is_present ? 'Present' : 'Absent')
-      }));
-    }
+  const afternoonSessions = useMemo(() => {
+    return rawLogs.filter(s => String(s.session || '').toLowerCase().includes('after'));
+  }, [rawLogs]);
 
-    // Default 7-period timetable preview
-    const isWeekend = formattedDateInfo.isWeekend;
-    const now = new Date();
-    const isToday = selectedDate === now.toISOString().split('T')[0];
-    const isPast = selectedDate < now.toISOString().split('T')[0];
+  const presentCount = useMemo(() => {
+    return rawLogs.filter(s => s.status === 'Present' || s.status === 'OnDuty').length;
+  }, [rawLogs]);
 
-    return [
-      // Forenoon Sessions (4)
-      { id: 1, timing: '08:45 am to 09:35 am', slot: 'Forenoon', section: 'Forenoon', markedBy: '—', status: isWeekend ? 'Holiday' : isPast ? 'Present' : 'Absent' },
-      { id: 2, timing: '09:35 am to 10:25 am', slot: 'Forenoon', section: 'Forenoon', markedBy: '—', status: isWeekend ? 'Holiday' : isPast ? 'Present' : 'Absent' },
-      { id: 3, timing: '10:45 am to 11:35 am', slot: 'Forenoon', section: 'Forenoon', markedBy: '—', status: isWeekend ? 'Holiday' : isPast ? 'Present' : 'Absent' },
-      { id: 4, timing: '11:35 am to 12:25 pm', slot: 'Forenoon', section: 'Forenoon', markedBy: '—', status: isWeekend ? 'Holiday' : isPast ? 'Present' : 'Absent' },
-      
-      // Afternoon Sessions (3)
-      { id: 5, timing: '01:25 pm to 02:15 pm', slot: 'Afternoon', section: 'Afternoon', markedBy: '—', status: isWeekend ? 'Holiday' : isPast ? 'Present' : 'Absent' },
-      { id: 6, timing: '02:15 pm to 03:05 pm', slot: 'Afternoon', section: 'Afternoon', markedBy: '—', status: isWeekend ? 'Holiday' : isPast ? 'Present' : 'Absent' },
-      { id: 7, timing: '03:15 pm to 04:30 pm', slot: 'Afternoon', section: 'Afternoon', markedBy: '—', status: isWeekend ? 'Holiday' : isPast ? 'Present' : 'Absent' }
-    ];
-  }, [dailyData, selectedDate, formattedDateInfo.isWeekend]);
+  const absentCount = useMemo(() => {
+    return rawLogs.filter(s => s.status === 'Absent').length;
+  }, [rawLogs]);
 
-  function getPeriodTiming(id) {
-    const times = [
-      '08:45 am to 09:35 am',
-      '09:35 am to 10:25 am',
-      '10:45 am to 11:35 am',
-      '11:35 am to 12:25 pm',
-      '01:25 pm to 02:15 pm',
-      '02:15 pm to 03:05 pm',
-      '03:15 pm to 04:30 pm'
-    ];
-    return times[id - 1] || '08:45 am to 09:35 am';
-  }
-
-  const forenoonSessions = sessions.filter(s => s.section === 'Forenoon');
-  const afternoonSessions = sessions.filter(s => s.section === 'Afternoon');
-
-  const presentCount = sessions.filter(s => s.status === 'Present').length;
-  const absentCount = sessions.filter(s => s.status === 'Absent').length;
-
-  const totalWorkingDays = overallData?.totalWorkingDays || 71;
-  const daysPresent = overallData?.daysPresent !== undefined ? overallData.daysPresent : (presentCount > 0 ? 71 : 70);
-  const daysAbsent = overallData?.daysAbsent !== undefined ? overallData.daysAbsent : (totalWorkingDays - daysPresent);
-  const overallPercentage = overallData?.percentage !== undefined ? Number(overallData.percentage).toFixed(2) : ((daysPresent / totalWorkingDays) * 100).toFixed(2);
+  const totalWorkingDays = attendanceData?.total_days || 74;
+  const daysPresent = attendanceData?.present ?? 74;
+  const daysAbsent = attendanceData?.absent ?? 0;
+  const overallPercentage = Number(attendanceData?.percentage || 100).toFixed(2);
 
   const handleOpenMissedRequest = (session) => {
     setMissedModalSession(session);
@@ -239,50 +176,43 @@ export default function AttendanceView({
   return (
     <div className="max-w-6xl mx-auto w-full space-y-6 font-sans animate-fadeIn">
       
-      {/* 1. Header Card with Title, Sync Status & Attendance Date Picker */}
+      {/* 1. Header Card with Title & Attendance Date Picker */}
       <div className={`p-6 sm:p-7 rounded-3xl border shadow-sm transition-all ${
         isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           
-          {/* Left: Icon + My Attendance Title + Formatted Subtitle + Cloud Indicator */}
+          {/* Left: Icon + My Attendance Title + Formatted Subtitle */}
           <div className="flex items-center gap-4">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0 ${
               isDarkMode ? 'bg-slate-800 text-indigo-400 border border-slate-700' : 'bg-[#0f172a] text-white'
             }`}>
-              <CalendarDays className="w-6 h-6" />
+              <Calendar className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                  My Attendance
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Cloud Live Sync</span>
-                </span>
-              </div>
+              <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                My Attendance
+              </h1>
               <p className={`text-xs sm:text-sm mt-0.5 font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                {formattedDateInfo.displayFormatted} • Student: <strong className="font-mono text-indigo-500">{studentRoll}</strong>
+                {formattedDateInfo.displayFormatted}
               </p>
             </div>
           </div>
 
-          {/* Right: ATTENDANCE DATE & Action Controls */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {/* Right: ATTENDANCE DATE Picker */}
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => loadAttendance(selectedDate, true)}
               disabled={loading}
-              className="px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-60"
-              title="Refresh Attendance"
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all cursor-pointer disabled:opacity-50"
+              title="Sync latest attendance"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-500' : ''}`} />
             </button>
 
             <div className="flex flex-col items-start sm:items-end gap-1">
-              <span className={`text-[10px] font-bold tracking-wider uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
+              <span className={`text-[11px] font-bold tracking-wider uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 ATTENDANCE DATE
               </span>
               <div className="relative flex items-center">
@@ -292,8 +222,8 @@ export default function AttendanceView({
                   onChange={(e) => setSelectedDate(e.target.value)}
                   className={`px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold border-2 outline-none transition-all cursor-pointer ${
                     isDarkMode
-                      ? 'bg-slate-800/90 border-indigo-500/80 text-white focus:ring-2 focus:ring-indigo-500/40'
-                      : 'bg-slate-50 border-[#6366f1] text-slate-900 focus:ring-2 focus:ring-indigo-500/30'
+                      ? 'bg-slate-800 border-indigo-500/80 text-white focus:ring-2 focus:ring-indigo-500/40'
+                      : 'bg-white border-[#6366f1] text-slate-900 focus:ring-2 focus:ring-indigo-500/30 shadow-xs'
                   }`}
                 />
               </div>
@@ -315,7 +245,7 @@ export default function AttendanceView({
         
         {/* Card 1: OVERALL */}
         <div className={`p-5 sm:p-6 rounded-3xl border shadow-xs flex items-center justify-between transition-all ${
-          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
+          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}>
           <div className="flex items-center gap-4">
             {/* Circular Gauge Ring */}
@@ -344,13 +274,13 @@ export default function AttendanceView({
             </div>
 
             <div>
-              <span className={`text-[10px] font-bold tracking-wider uppercase block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
+              <span className={`text-[11px] font-bold tracking-wider uppercase block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
                 OVERALL
               </span>
               <div className={`text-xl sm:text-2xl font-black mt-0.5 tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                 {overallPercentage}%
               </div>
-              <span className={`text-[11px] font-medium block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span className={`text-[11px] font-medium block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
                 {totalWorkingDays} working days
               </span>
             </div>
@@ -359,55 +289,55 @@ export default function AttendanceView({
 
         {/* Card 2: DAYS PRESENT */}
         <div className={`p-5 sm:p-6 rounded-3xl border shadow-xs flex items-center justify-between transition-all ${
-          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
+          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}>
           <div>
-            <span className={`text-[10px] font-bold tracking-wider uppercase block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
+            <span className={`text-[11px] font-bold tracking-wider uppercase block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
               DAYS PRESENT
             </span>
             <div className={`text-2xl sm:text-3xl font-black mt-1 tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               {daysPresent}
             </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
-            <Check className="w-5 h-5" strokeWidth={3} />
+          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
+            <Check className="w-4 h-4" strokeWidth={3} />
           </div>
         </div>
 
         {/* Card 3: DAYS ABSENT */}
         <div className={`p-5 sm:p-6 rounded-3xl border shadow-xs flex items-center justify-between transition-all ${
-          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
+          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}>
           <div>
-            <span className={`text-[10px] font-bold tracking-wider uppercase block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
+            <span className={`text-[11px] font-bold tracking-wider uppercase block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
               DAYS ABSENT
             </span>
             <div className={`text-2xl sm:text-3xl font-black mt-1 tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               {daysAbsent}
             </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center flex-shrink-0 border border-rose-500/20">
-            <X className="w-5 h-5" strokeWidth={3} />
+          <div className="w-8 h-8 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center flex-shrink-0 border border-rose-500/20">
+            <X className="w-4 h-4" strokeWidth={3} />
           </div>
         </div>
 
         {/* Card 4: SELECTED DAY */}
         <div className={`p-5 sm:p-6 rounded-3xl border shadow-xs flex items-center justify-between transition-all ${
-          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/90'
+          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
         }`}>
           <div>
-            <span className={`text-[10px] font-bold tracking-wider uppercase block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
+            <span className={`text-[11px] font-bold tracking-wider uppercase block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
               SELECTED DAY
             </span>
             <div className={`text-2xl sm:text-3xl font-black mt-1 tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-              {presentCount}/7
+              {presentCount}/{rawLogs.length || 7}
             </div>
-            <span className={`text-[11px] font-medium block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            <span className={`text-[11px] font-medium block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
               Present / periods
             </span>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center flex-shrink-0 border border-slate-200 dark:border-slate-700">
-            <Clock className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center flex-shrink-0 border border-slate-200 dark:border-slate-700">
+            <Clock className="w-4 h-4" />
           </div>
         </div>
 
@@ -420,7 +350,7 @@ export default function AttendanceView({
         
         {/* Register Top Bar */}
         <div className={`p-5 sm:p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-          isDarkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-100 bg-slate-50/50'
+          isDarkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-100 bg-white'
         }`}>
           <div>
             <h3 className={`text-base font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -449,7 +379,7 @@ export default function AttendanceView({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider border-b ${
-                isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-100 bg-white text-slate-400'
+                isDarkMode ? 'border-slate-800 bg-slate-900 text-slate-400' : 'border-slate-100 bg-slate-50/50 text-slate-400'
               }`}>
                 <th className="py-3 px-5 sm:px-6">TIMING</th>
                 <th className="py-3 px-4">SLOT</th>
@@ -461,229 +391,232 @@ export default function AttendanceView({
             <tbody className={`divide-y text-xs sm:text-sm font-medium ${isDarkMode ? 'divide-slate-800/80' : 'divide-slate-100'}`}>
               
               {/* Forenoon Group Header */}
-              <tr className={isDarkMode ? 'bg-slate-950/60 text-slate-300' : 'bg-slate-50/70 text-slate-700'}>
-                <td colSpan="5" className="py-2.5 px-5 sm:px-6 text-xs font-bold">
-                  <span>Forenoon</span> <span className="font-normal text-[11px] text-slate-400 ml-1">Morning sessions</span>
-                  <span className="float-right font-normal text-[11px] text-slate-400">4 sessions</span>
-                </td>
-              </tr>
-
-              {/* Forenoon Sessions */}
-              {forenoonSessions.map((session) => {
-                const isPresent = session.status === 'Present';
-                const isHoliday = session.status === 'Holiday';
-
-                return (
-                  <tr key={session.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'}`}>
-                    {/* TIMING with Left Vertical Accent Line */}
-                    <td className="py-4 px-5 sm:px-6 font-semibold whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <span className={`w-1 h-6 rounded-full shrink-0 ${
-                          isHoliday ? 'bg-amber-400' : isPresent ? 'bg-emerald-500' : 'bg-rose-500'
-                        }`} />
-                        <span className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>
-                          {session.timing}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* SLOT */}
-                    <td className={`py-4 px-4 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {session.slot}
-                    </td>
-
-                    {/* MARKED BY */}
-                    <td className={`py-4 px-4 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {session.markedBy}
-                    </td>
-
-                    {/* STATUS */}
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      {isHoliday ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          Holiday
-                        </span>
-                      ) : isPresent ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Present
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          Absent
-                        </span>
-                      )}
-                    </td>
-
-                    {/* ACTION */}
-                    <td className="py-4 px-5 sm:px-6 text-right whitespace-nowrap">
-                      {!isPresent && !isHoliday && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenMissedRequest(session)}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                            isDarkMode 
-                              ? 'border-slate-700 bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white' 
-                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
-                          }`}
-                        >
-                          <Send className="w-3 h-3 text-slate-400" />
-                          <span>Missed request</span>
-                        </button>
-                      )}
+              {forenoonSessions.length > 0 && (
+                <>
+                  <tr className={isDarkMode ? 'bg-slate-950/60 text-slate-300' : 'bg-slate-50/70 text-slate-700'}>
+                    <td colSpan="5" className="py-2.5 px-5 sm:px-6 text-xs font-bold">
+                      <span>Forenoon</span> <span className="font-normal text-[11px] text-slate-400 ml-1">Morning sessions</span>
+                      <span className="float-right font-normal text-[11px] text-slate-400">{forenoonSessions.length} sessions</span>
                     </td>
                   </tr>
-                );
-              })}
+
+                  {forenoonSessions.map((session, idx) => {
+                    const isPresent = session.status === 'Present' || session.status === 'OnDuty';
+                    const isHoliday = session.status === 'Holiday';
+
+                    return (
+                      <tr key={session.session_id || idx} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'}`}>
+                        {/* TIMING with Left Vertical Accent Line */}
+                        <td className="py-4 px-5 sm:px-6 font-semibold whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-1 h-6 rounded-full shrink-0 ${
+                              isHoliday ? 'bg-amber-400' : isPresent ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`} />
+                            <span className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>
+                              {session.timing}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* SLOT */}
+                        <td className={`py-4 px-4 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {session.session || 'Forenoon'}
+                        </td>
+
+                        {/* MARKED BY */}
+                        <td className={`py-4 px-4 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
+                          {session.attendance_by || '—'}
+                        </td>
+
+                        {/* STATUS */}
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          {isHoliday ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              Holiday
+                            </span>
+                          ) : isPresent ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Present
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              Absent
+                            </span>
+                          )}
+                        </td>
+
+                        {/* ACTION */}
+                        <td className="py-4 px-5 sm:px-6 text-right whitespace-nowrap">
+                          {!isPresent && !isHoliday && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenMissedRequest(session)}
+                              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                                isDarkMode 
+                                  ? 'border-slate-700 bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white' 
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
+                              }`}
+                            >
+                              <Send className="w-3 h-3 text-slate-400" />
+                              <span>Missed request</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </>
+              )}
 
               {/* Afternoon Group Header */}
-              <tr className={isDarkMode ? 'bg-slate-950/60 text-slate-300' : 'bg-slate-50/70 text-slate-700'}>
-                <td colSpan="5" className="py-2.5 px-5 sm:px-6 text-xs font-bold">
-                  <span>Afternoon</span> <span className="font-normal text-[11px] text-slate-400 ml-1">Afternoon sessions</span>
-                  <span className="float-right font-normal text-[11px] text-slate-400">3 sessions</span>
-                </td>
-              </tr>
-
-              {/* Afternoon Sessions */}
-              {afternoonSessions.map((session) => {
-                const isPresent = session.status === 'Present';
-                const isHoliday = session.status === 'Holiday';
-
-                return (
-                  <tr key={session.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'}`}>
-                    {/* TIMING with Left Vertical Accent Line */}
-                    <td className="py-4 px-5 sm:px-6 font-semibold whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <span className={`w-1 h-6 rounded-full shrink-0 ${
-                          isHoliday ? 'bg-amber-400' : isPresent ? 'bg-emerald-500' : 'bg-rose-500'
-                        }`} />
-                        <span className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>
-                          {session.timing}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* SLOT */}
-                    <td className={`py-4 px-4 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {session.slot}
-                    </td>
-
-                    {/* MARKED BY */}
-                    <td className={`py-4 px-4 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {session.markedBy}
-                    </td>
-
-                    {/* STATUS */}
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      {isHoliday ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          Holiday
-                        </span>
-                      ) : isPresent ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Present
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          Absent
-                        </span>
-                      )}
-                    </td>
-
-                    {/* ACTION */}
-                    <td className="py-4 px-5 sm:px-6 text-right whitespace-nowrap">
-                      {!isPresent && !isHoliday && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenMissedRequest(session)}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                            isDarkMode 
-                              ? 'border-slate-700 bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white' 
-                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
-                          }`}
-                        >
-                          <Send className="w-3 h-3 text-slate-400" />
-                          <span>Missed request</span>
-                        </button>
-                      )}
+              {afternoonSessions.length > 0 && (
+                <>
+                  <tr className={isDarkMode ? 'bg-slate-950/60 text-slate-300' : 'bg-slate-50/70 text-slate-700'}>
+                    <td colSpan="5" className="py-2.5 px-5 sm:px-6 text-xs font-bold">
+                      <span>Afternoon</span> <span className="font-normal text-[11px] text-slate-400 ml-1">Afternoon sessions</span>
+                      <span className="float-right font-normal text-[11px] text-slate-400">{afternoonSessions.length} sessions</span>
                     </td>
                   </tr>
-                );
-              })}
+
+                  {afternoonSessions.map((session, idx) => {
+                    const isPresent = session.status === 'Present' || session.status === 'OnDuty';
+                    const isHoliday = session.status === 'Holiday';
+
+                    return (
+                      <tr key={session.session_id || idx} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'}`}>
+                        {/* TIMING with Left Vertical Accent Line */}
+                        <td className="py-4 px-5 sm:px-6 font-semibold whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-1 h-6 rounded-full shrink-0 ${
+                              isHoliday ? 'bg-amber-400' : isPresent ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`} />
+                            <span className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>
+                              {session.timing}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* SLOT */}
+                        <td className={`py-4 px-4 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {session.session || 'Afternoon'}
+                        </td>
+
+                        {/* MARKED BY */}
+                        <td className={`py-4 px-4 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>
+                          {session.attendance_by || '—'}
+                        </td>
+
+                        {/* STATUS */}
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          {isHoliday ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              Holiday
+                            </span>
+                          ) : isPresent ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Present
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              Absent
+                            </span>
+                          )}
+                        </td>
+
+                        {/* ACTION */}
+                        <td className="py-4 px-5 sm:px-6 text-right whitespace-nowrap">
+                          {!isPresent && !isHoliday && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenMissedRequest(session)}
+                              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                                isDarkMode 
+                                  ? 'border-slate-700 bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white' 
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
+                              }`}
+                            >
+                              <Send className="w-3 h-3 text-slate-400" />
+                              <span>Missed request</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </>
+              )}
 
             </tbody>
           </table>
         </div>
-
       </div>
 
-      {/* 4. Missed Request Modal */}
+      {/* Missed Request Modal */}
       {missedModalSession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-          <div className={`w-full max-w-md rounded-3xl p-6 shadow-2xl border ${
-            isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+          <div className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl transition-all ${
+            isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Send className="w-5 h-5 text-indigo-500" />
-                <h3 className="font-extrabold text-lg">Submit Missed Attendance Request</h3>
+                <h3 className="text-base font-bold">Submit Missed Attendance Request</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setMissedModalSession(null)}
-                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 cursor-pointer"
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 space-y-1">
-                <div className="font-semibold text-slate-700 dark:text-slate-300">
-                  Session: <span className="font-mono font-bold text-indigo-500">{missedModalSession.timing} ({missedModalSession.slot})</span>
-                </div>
-                <div className="text-slate-500 dark:text-slate-400">
-                  Date: {formattedDateInfo.ddmmyyyy}
-                </div>
+            <div className="mt-4 space-y-3 text-xs sm:text-sm">
+              <div className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-slate-950/60 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                <p><strong>Session:</strong> {missedModalSession.timing}</p>
+                <p><strong>Slot:</strong> {missedModalSession.session || missedModalSession.slot}</p>
+                <p><strong>Date:</strong> {formattedDateInfo.displayFormatted}</p>
               </div>
 
               <div>
-                <label className="font-bold text-[11px] block mb-1 uppercase tracking-wider text-slate-400">
-                  Reason for missed OTP / OD / Medical
-                </label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Reason for absence / regularization request:</label>
                 <textarea
-                  rows={3}
                   value={requestReason}
                   onChange={(e) => setRequestReason(e.target.value)}
-                  placeholder="State reason for faculty / department advisor review..."
-                  className={`w-full p-3 rounded-2xl border outline-none text-xs transition-all ${
-                    isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500'
+                  rows={3}
+                  placeholder="e.g. Attended on-campus placement drive / technical symposium / lab task..."
+                  className={`w-full p-3 rounded-xl border text-xs outline-none ${
+                    isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
                   }`}
                 />
               </div>
 
               {requestSubmitted ? (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 font-bold text-center">
-                  ✅ Missed request submitted to Mentor successfully!
+                <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-center font-bold text-xs">
+                  ✅ Missed request submitted successfully to advisor!
                 </div>
               ) : (
                 <div className="flex justify-end gap-2 pt-2">
                   <button
+                    type="button"
                     onClick={() => setMissedModalSession(null)}
-                    className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 font-semibold cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
+                    type="button"
                     onClick={handleSendRequest}
                     disabled={!requestReason.trim()}
-                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold cursor-pointer"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 cursor-pointer"
                   >
-                    Submit Request
+                    Send Request
                   </button>
                 </div>
               )}

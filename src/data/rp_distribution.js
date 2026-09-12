@@ -9,6 +9,68 @@ export const BIT_SPREADSHEET_CONFIG = {
     `https://sheets.googleapis.com/v4/spreadsheets/1gHiOy41cpyg8dZxDWu-MsF8o0abLbL8MHbVK-GkMjqw/values/${encodeURIComponent('Studentwise Reward Points')}!A1:ZZ10000`
 };
 
+// Reusable parser for event logs and penalty entries
+export function parseEventLogs(raw) {
+  const posEntries = raw?.sheets?.['Reward Points Entry'] || [];
+  const negEntries = raw?.sheets?.['Negative Reward Points'] || [];
+  const logsMap = {};
+
+  // Positive entries (Row 2 onwards)
+  for (let i = 2; i < posEntries.length; i++) {
+    const row = posEntries[i];
+    if (!row) continue;
+    const roll = (row[3] || '').trim().toUpperCase();
+    if (roll && /^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) {
+      if (!logsMap[roll]) logsMap[roll] = [];
+      const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
+      let actType = (row[8] || 'P SKILL').trim();
+      if (actType.toUpperCase().includes('P SKILL') || actType.toUpperCase().includes('PSKILL')) actType = 'P Skill';
+      else if (actType.toUpperCase().includes('INITIATIVE')) actType = 'Initiative';
+      else if (actType.toUpperCase().includes('TECHNICAL')) actType = 'Technical';
+      
+      logsMap[roll].push({
+        id: `pos-${i}`,
+        date: row[1] || 'Academic Year 2024-2025',
+        code: row[2] || '',
+        points: pts,
+        activity_name: row[9] || 'P-Skill Activity',
+        course_name: row[9] || 'P-Skill Activity',
+        activity_type: actType,
+        reward_points: pts.toLocaleString(),
+        organizer: row[10] || '',
+        type: 'positive'
+      });
+    }
+  }
+
+  // Negative penalty entries (Row 1 onwards)
+  for (let i = 1; i < negEntries.length; i++) {
+    const row = negEntries[i];
+    if (!row) continue;
+    const roll = (row[3] || '').trim().toUpperCase();
+    if (roll && /^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) {
+      if (!logsMap[roll]) logsMap[roll] = [];
+      const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
+      logsMap[roll].push({
+        id: `neg-${i}`,
+        date: row[1] || 'Academic Year 2024-2025',
+        code: row[2] || '',
+        points: -Math.abs(pts),
+        activity_name: row[9] || 'Penalty / Absent',
+        course_name: row[9] || 'Penalty / Absent',
+        activity_type: 'Penalty',
+        reward_points: (-Math.abs(pts)).toLocaleString(),
+        organizer: row[10] || '',
+        type: 'negative'
+      });
+    }
+  }
+
+  return logsMap;
+}
+
+export const STUDENT_EVENT_LOGS_MAP = parseEventLogs(rawData);
+
 // Reusable parser for 2D array of rows from Google Sheets API
 export function parseStudentRows(rows) {
   if (!rows || rows.length <= 2) return [];
@@ -135,8 +197,11 @@ export function parseStudentRows(rows) {
     const redeemedPoints = parseFloat((r[colIdx['Redeemed Points']] || '0').replace(/,/g, '')) || 0;
     const balancePoints = parseFloat((r[colIdx['Balance Points']] || '0').replace(/,/g, '')) || (cumulativePoints - redeemedPoints);
 
+    const initialPoints = parseFloat((r[colIdx['Initial Points']] || '0').replace(/,/g, '')) || 0;
+
     const activityBreakdown = [
-      { id: 'pskill', label: 'P-Skill Certifications', count: pSkillCount, points: pSkillPts, iconType: 'Code', color: 'indigo', barColor: 'bg-indigo-600' },
+      ...(initialPoints > 0 ? [{ id: 'carry_in', label: 'Carry-In / Initial Balance', count: 1, points: initialPoints, iconType: 'Award', color: 'cyan', barColor: 'bg-cyan-600' }] : []),
+      { id: 'pskill', label: 'P-Skill', count: pSkillCount, points: pSkillPts, iconType: 'Code', color: 'indigo', barColor: 'bg-indigo-600' },
       { id: 'initiatives', label: 'Student Initiatives', count: studentInitCount, points: studentInitPts, iconType: 'Award', color: 'emerald', barColor: 'bg-emerald-600' },
       { id: 'tac', label: 'Training & Assessment (TAC)', count: tacCount, points: tacPts, iconType: 'Cpu', color: 'blue', barColor: 'bg-blue-600' },
       { id: 'spl_lab', label: 'Special Lab Initiatives', count: splLabCount, points: splLabPts, iconType: 'Sparkles', color: 'purple', barColor: 'bg-purple-600' },
@@ -145,6 +210,8 @@ export function parseStudentRows(rows) {
       { id: 'tech_soc', label: 'Technical Societies (IEEE/ACM)', count: techSocietyCount, points: techSocietyPts, iconType: 'Users', color: 'violet', barColor: 'bg-violet-600' },
       { id: 'interview_extra', label: 'Interviews & Extra-Curricular', count: interviewCount, points: interviewPts, iconType: 'Briefcase', color: 'rose', barColor: 'bg-rose-500' }
     ];
+
+    const eventLogs = (STUDENT_EVENT_LOGS_MAP && STUDENT_EVENT_LOGS_MAP[rollNo]) || [];
 
     return {
       id: idx + 1,
@@ -157,6 +224,8 @@ export function parseStudentRows(rows) {
       mentor,
       email,
       activityBreakdown,
+      initialPoints,
+      eventLogs,
       totalPoints,
       cumulativePoints,
       redeemedPoints,
@@ -182,6 +251,3 @@ export const STUDENTS_INTERNAL_MARKS_LIST = parseStudentRows(initialStudentRows)
 export const STUDENTS_RP_DATA = STUDENTS_INTERNAL_MARKS_LIST;
 export const INTERNAL_MARKS_STUDENTS = STUDENTS_INTERNAL_MARKS_LIST;
 export const ALL_DEPARTMENTS = Array.from(new Set(STUDENTS_INTERNAL_MARKS_LIST.map(s => s.department).filter(Boolean))).sort();
-
-
-

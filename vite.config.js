@@ -8,19 +8,5 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
-  server: {
-    proxy: {
-      '/api/bitcentral': {
-        target: 'https://bitcentral-v2.onrender.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/bitcentral/, ''),
-      },
-      '/api/ps-portal': {
-        target: 'https://ps.bitsathy.ac.in',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/ps-portal/, ''),
-        secure: false,
-      },
-    },
-  },
 })
+
