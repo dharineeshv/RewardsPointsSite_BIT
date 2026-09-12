@@ -55,6 +55,61 @@ export function parseEventLogs(raw) {
     }
   }
 
+  // External Reward Points entries (Competitions, Hackathons, Ideathons)
+  const extEntries = raw?.sheets?.['EXTERNAL REWARD POINTS'] || [];
+  const existingKeys = new Set();
+  Object.keys(logsMap).forEach(r => {
+    logsMap[r].forEach(e => {
+      if (e.code) existingKeys.add(`${e.code}_${r}`);
+    });
+  });
+
+  for (let i = 2; i < extEntries.length; i++) {
+    const row = extEntries[i];
+    if (!row) continue;
+    const roll = (row[3] || '').trim().toUpperCase();
+    const code = (row[2] || '').trim();
+    if (roll && /^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) {
+      if (code && existingKeys.has(`${code}_${roll}`)) continue; // avoid duplicates
+
+      if (!logsMap[roll]) logsMap[roll] = [];
+      const pts = Math.round(parseFloat((row[7] || '0').replace(/,/g, ''))) || 0;
+      const rawType = (row[8] || 'EXTERNAL').trim();
+      const detailedAct = (row[11] || '').trim();
+      let actName = (row[9] || 'External Event').trim();
+      if (detailedAct && detailedAct !== '#REF!') {
+        const parts = detailedAct.split(' / ');
+        if (parts.length >= 4) {
+          actName = `${parts[4] || parts[3]} (${parts[1] || ''} - ${parts[3] || parts[2]})`;
+        } else {
+          actName = detailedAct;
+        }
+      }
+
+      logsMap[roll].push({
+        id: `ext-${i}`,
+        sl_no: row[0] || String(i),
+        date: row[1] || 'Academic Year 2024-2025',
+        code: code,
+        activity_code: code,
+        roll_no: roll,
+        student_name: (row[4] || '').trim(),
+        year: row[5] || '',
+        department: row[6] || '',
+        points: pts,
+        activity_name: actName,
+        course_name: actName,
+        activity_type: 'External',
+        raw_type: rawType,
+        reward_points: pts.toLocaleString(),
+        organizer: row[10] || '',
+        email: row[12] && row[12] !== '#REF!' ? row[12] : '',
+        type: 'positive',
+        isPS: false
+      });
+    }
+  }
+
   // Negative penalty entries (Row 1 onwards)
   for (let i = 1; i < negEntries.length; i++) {
     const row = negEntries[i];
@@ -62,7 +117,7 @@ export function parseEventLogs(raw) {
     const roll = (row[3] || '').trim().toUpperCase();
     if (roll && /^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) {
       if (!logsMap[roll]) logsMap[roll] = [];
-      const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
+      const pts = Math.round(parseFloat((row[7] || '0').replace(/,/g, ''))) || 0;
       logsMap[roll].push({
         id: `neg-${i}`,
         sl_no: row[0] || String(i),
@@ -91,21 +146,25 @@ export function parseEventLogs(raw) {
 
 export function parseAllTransactions(raw) {
   const posEntries = raw?.sheets?.['Reward Points Entry'] || [];
+  const extEntries = raw?.sheets?.['EXTERNAL REWARD POINTS'] || [];
   const negEntries = raw?.sheets?.['Negative Reward Points'] || [];
   const list = [];
+  const existingKeys = new Set();
 
   for (let i = 2; i < posEntries.length; i++) {
     const row = posEntries[i];
     if (!row || !row[3]) continue;
     const roll = (row[3] || '').trim().toUpperCase();
-    const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
+    const code = (row[2] || '').trim();
+    if (code) existingKeys.add(`${code}_${roll}`);
+    const pts = Math.round(parseFloat((row[7] || '0').replace(/,/g, ''))) || 0;
     const rawType = (row[8] || 'P SKILL').trim();
     const isPS = rawType.toUpperCase().includes('P SKILL') || rawType.toUpperCase().includes('PSKILL') || rawType.toUpperCase().includes('SKILL');
     list.push({
       id: `pos-${i}`,
       slNo: row[0] || String(i - 1),
       date: row[1] || '',
-      code: row[2] || '',
+      code: code,
       rollNo: roll,
       name: (row[4] || '').trim(),
       year: row[5] || '',
@@ -123,11 +182,51 @@ export function parseAllTransactions(raw) {
     });
   }
 
+  for (let i = 2; i < extEntries.length; i++) {
+    const row = extEntries[i];
+    if (!row || !row[3]) continue;
+    const roll = (row[3] || '').trim().toUpperCase();
+    const code = (row[2] || '').trim();
+    if (code && existingKeys.has(`${code}_${roll}`)) continue;
+    const pts = Math.round(parseFloat((row[7] || '0').replace(/,/g, ''))) || 0;
+    const detailedAct = (row[11] || '').trim();
+    let actName = (row[9] || 'External Activity').trim();
+    if (detailedAct && detailedAct !== '#REF!') {
+      const parts = detailedAct.split(' / ');
+      if (parts.length >= 4) {
+        actName = `${parts[4] || parts[3]} (${parts[1] || ''} - ${parts[3] || parts[2]})`;
+      } else {
+        actName = detailedAct;
+      }
+    }
+
+    list.push({
+      id: `ext-${i}`,
+      slNo: row[0] || String(i),
+      date: row[1] || '',
+      code: code,
+      rollNo: roll,
+      name: (row[4] || '').trim(),
+      year: row[5] || '',
+      department: row[6] || '',
+      points: pts,
+      reward_points: pts.toLocaleString(),
+      activity_type: 'External',
+      raw_type: (row[8] || 'EXTERNAL').trim(),
+      activity_name: actName,
+      course_name: actName,
+      organizer: row[10] || '',
+      email: row[12] && row[12] !== '#REF!' ? row[12] : '',
+      type: 'positive',
+      isPS: false
+    });
+  }
+
   for (let i = 1; i < negEntries.length; i++) {
     const row = negEntries[i];
     if (!row || !row[3]) continue;
     const roll = (row[3] || '').trim().toUpperCase();
-    const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
+    const pts = Math.round(parseFloat((row[7] || '0').replace(/,/g, ''))) || 0;
     list.push({
       id: `neg-${i}`,
       slNo: row[0] || String(i),
