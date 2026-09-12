@@ -1,7 +1,7 @@
 {
   "name": "rewards-points-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -36,5 +36,6 @@
     "@codetrix-studio/capacitor-google-auth": {
       "@capacitor/core": "$@capacitor/core"
     }
-  }
+  },
+  "buildTime": "2026-09-12T09:24:06.106Z"
 }
