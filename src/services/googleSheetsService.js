@@ -341,27 +341,170 @@ export async function fetchLiveMasterSpreadsheet(token = null) {
 }
 
 /**
- * Fetch a specific student's live transactional event logs directly from Google Sheets API
+ * Google Apps Script Live P-Skills & Student Initiative Ledger URL
+ */
+export const APPS_SCRIPT_PSKILL_URL = 'https://script.google.com/a/macros/bitsathy.ac.in/s/AKfycbyRoy2c2L2A1zyQ1v_XFD_XCR7nc86kvoQhPyGHtyf0OWwO2n1L2ytSkcbakZ-qAjlcwg/exec';
+
+/**
+ * Fetch dynamic live P-Skill and Student Initiative completion records from the BIT Apps Script Web App
+ */
+export async function fetchLivePSkillLedgerFromAppsScript(rollNo = null, token = null, forceRefresh = false) {
+  const accessToken = token || (typeof window !== 'undefined' ? localStorage.getItem('bit_rp_access_token') : null);
+  const cacheKey = 'bit_apps_script_pskill_ledger';
+
+  // 1. Check fresh cache (3 minutes TTL) unless forceRefresh is true
+  if (!forceRefresh && typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && Array.isArray(parsed.records) && Date.now() - parsed.timestamp < 3 * 60 * 1000) {
+          return parsed.records;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. Fetch live data from Google Apps Script endpoint
+  try {
+    const url = new URL(APPS_SCRIPT_PSKILL_URL);
+    if (accessToken) {
+      url.searchParams.append('access_token', accessToken);
+    }
+    if (rollNo) {
+      url.searchParams.append('rollNo', rollNo);
+    }
+
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      credentials: 'include',
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+    });
+
+    if (res.ok) {
+      const text = await res.text();
+      let records = [];
+      try {
+        const json = JSON.parse(text);
+        records = Array.isArray(json) ? json : (json.records || json.data || json.rows || []);
+      } catch (e) {
+        // If the script returns an HTML table, parse table rows directly
+        if (typeof DOMParser !== 'undefined' && text.includes('<table')) {
+          const doc = new DOMParser().parseFromString(text, 'text/html');
+          const rows = doc.querySelectorAll('table tr');
+          rows.forEach((tr, rIdx) => {
+            if (rIdx === 0) return; // skip header row
+            const cols = Array.from(tr.querySelectorAll('td, th')).map(c => c.textContent.trim());
+            if (cols.length >= 7) {
+              const pts = cleanPointValue(cols[6]);
+              const rawType = cols[7] || 'P SKILL';
+              const isPS = rawType.toUpperCase().includes('P SKILL') || rawType.toUpperCase().includes('PSKILL') || rawType.toUpperCase().includes('SKILL');
+              records.push({
+                date: cols[0],
+                activity_code: cols[1],
+                code: cols[1],
+                roll_no: (cols[2] || '').toUpperCase(),
+                student_name: cols[3],
+                year: cols[4],
+                department: cols[5],
+                reward_points: pts.toLocaleString(),
+                points: pts,
+                activity_type: isPS ? 'P Skill' : (rawType.toUpperCase().includes('INITIATIVE') ? 'Initiative' : rawType),
+                raw_type: rawType,
+                activity_name: cols[8] || 'P-Skill Activity',
+                course_name: cols[8] || 'P-Skill Activity',
+                organizer: cols[9] || '',
+                type: 'positive',
+                isPS
+              });
+            }
+          });
+        }
+      }
+
+      if (Array.isArray(records) && records.length > 0) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({
+              timestamp: Date.now(),
+              records
+            }));
+            localStorage.setItem('bit_pskill_last_synced', new Date().toISOString());
+          } catch (err) {}
+        }
+        return records;
+      }
+    }
+  } catch (err) {
+    console.warn('[AppsScript] Live P-Skill ledger fetch error:', err);
+  }
+
+  // 3. Fallback to existing cache if network was unavailable
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed.records)) return parsed.records;
+      }
+    } catch (e) {}
+  }
+
+  return [];
+}
+
+/**
+ * Fetch a specific student's live transactional event logs directly from Google Sheets / Apps Script API
  */
 export async function fetchLiveStudentEventLogs(rollNo, token = null) {
   if (!rollNo) return [];
   const cleanRoll = String(rollNo).trim().toUpperCase();
   const accessToken = token || (typeof window !== 'undefined' ? localStorage.getItem('bit_rp_access_token') : null);
 
-  // 1. Check in-memory/localStorage live cache first
+  const events = [];
+
+  // 1. First check live Apps Script P-Skill records
+  try {
+    const appsScriptLogs = await fetchLivePSkillLedgerFromAppsScript(cleanRoll, accessToken);
+    if (Array.isArray(appsScriptLogs) && appsScriptLogs.length > 0) {
+      const matched = appsScriptLogs.filter(r => (r.roll_no || r.rollNo || '').toUpperCase() === cleanRoll);
+      matched.forEach((r, idx) => {
+        events.push({
+          id: `as-ps-${idx}`,
+          date: r.date || '2025-2026',
+          code: r.activity_code || r.code || '',
+          activity_code: r.activity_code || r.code || '',
+          points: r.points || cleanPointValue(r.reward_points),
+          activity_name: r.activity_name || r.course_name || 'P-Skill Activity',
+          course_name: r.course_name || r.activity_name || 'P-Skill Activity',
+          activity_type: r.activity_type || 'P Skill',
+          reward_points: (r.points || cleanPointValue(r.reward_points)).toLocaleString(),
+          organizer: r.organizer || '',
+          type: 'positive',
+          isPS: r.isPS !== undefined ? r.isPS : true
+        });
+      });
+    }
+  } catch (asErr) {
+    console.warn('[GoogleSheetsService] Apps Script fetch notice:', asErr);
+  }
+
+  // 2. Check in-memory/localStorage live cache
   if (typeof window !== 'undefined') {
     try {
       const cached = localStorage.getItem('bit_master_sheet_live_cache');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && Array.isArray(parsed.posEntries)) {
-          const events = [];
-          
           // Positive entries
           parsed.posEntries.forEach((row, idx) => {
             if (idx < 2 || !row) return;
             const r = String(row[3] || '').trim().toUpperCase();
             if (r === cleanRoll) {
+              const code = row[2] || '';
+              // Avoid duplicate if already pulled from Apps Script
+              if (code && events.some(e => e.code === code)) return;
+
               const pts = parseFloat((row[7] || '0').replace(/,/g, '')) || 0;
               let actType = (row[8] || 'P SKILL').trim();
               if (actType.toUpperCase().includes('P SKILL') || actType.toUpperCase().includes('PSKILL')) actType = 'P Skill';
@@ -371,7 +514,7 @@ export async function fetchLiveStudentEventLogs(rollNo, token = null) {
               events.push({
                 id: `live-pos-${idx}`,
                 date: row[1] || 'Academic Year 2024-2025',
-                code: row[2] || '',
+                code: code,
                 points: pts,
                 activity_name: row[9] || 'P-Skill Activity',
                 course_name: row[9] || 'P-Skill Activity',
@@ -405,14 +548,14 @@ export async function fetchLiveStudentEventLogs(rollNo, token = null) {
               }
             });
           }
-
-          if (events.length > 0) return events;
         }
       }
     } catch (e) {}
   }
 
-  // 2. If token is available and cache didn't have it, trigger live fetch
+  if (events.length > 0) return events;
+
+  // 3. If token is available and events is empty, trigger live fetch
   if (accessToken) {
     try {
       const freshData = await fetchLiveMasterSpreadsheet(accessToken);
@@ -424,5 +567,5 @@ export async function fetchLiveStudentEventLogs(rollNo, token = null) {
     }
   }
 
-  return [];
+  return events;
 }

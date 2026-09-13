@@ -129,29 +129,23 @@ export default function AveragePointsBarChart({
       <div className="absolute top-0 right-0 w-60 sm:w-80 h-60 sm:h-80 bg-gradient-to-bl from-purple-500/10 via-indigo-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-60 sm:w-80 h-60 sm:h-80 bg-gradient-to-tr from-teal-500/10 via-cyan-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-      {/* Header with Title, Live Badge and View Switcher */}
-      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 mb-4 sm:mb-6">
+      {/* Header with Title and View Switcher */}
+      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 mb-4 sm:mb-5">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl border flex items-center justify-center shrink-0 shadow-xs ${
               isDarkMode 
                 ? 'bg-indigo-500/15 border-indigo-500/25 text-indigo-400 ring-1 ring-indigo-500/20' 
                 : 'bg-indigo-50 border-indigo-200 text-indigo-700'
             }`}>
-              <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
+              <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <h2 className={`text-xs sm:text-sm font-black tracking-wider uppercase truncate ${
-                  isDarkMode ? 'text-white' : 'text-slate-900'
-                }`}>
-                  {title}
-                </h2>
-                <span className="text-[9px] px-1.5 py-0.2 rounded-md font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center gap-1 shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  Live
-                </span>
-              </div>
+              <h2 className={`text-xs sm:text-sm font-black tracking-wider uppercase truncate ${
+                isDarkMode ? 'text-white' : 'text-slate-900'
+              }`}>
+                {title}
+              </h2>
               <span className={`text-[10px] sm:text-[11px] font-semibold block truncate ${
                 isDarkMode ? 'text-slate-400' : 'text-slate-500'
               }`}>
@@ -200,48 +194,65 @@ export default function AveragePointsBarChart({
         )}
       </div>
 
-      {/* Student Comparison Insight Banner */}
+      {/* Student Comparison Insight Banner (Matching Reference Image 2) */}
       {activeStudent && (
-        <div className={`relative z-10 mb-4 sm:mb-6 p-3 sm:p-4 rounded-xl sm:rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 transition-all duration-300 backdrop-blur-md ${
-          isAboveAvg
-            ? isDarkMode 
-              ? 'bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-slate-900/60 border-emerald-500/40 text-emerald-300 shadow-md shadow-emerald-500/5' 
-              : 'bg-emerald-50/90 border-emerald-300 text-emerald-900'
-            : isDarkMode 
-              ? 'bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900/60 border-indigo-500/40 text-indigo-300 shadow-md shadow-indigo-500/5' 
-              : 'bg-indigo-50/90 border-indigo-300 text-indigo-900'
+        <div className={`relative z-10 mb-4 sm:mb-5 p-3 sm:p-4 rounded-xl sm:rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all duration-300 ${
+          isDarkMode 
+            ? 'bg-slate-900/90 border-indigo-900/40 text-slate-100 shadow-md shadow-indigo-950/20' 
+            : 'bg-[#EEF2FF] border-[#C7D7FE] text-slate-900 shadow-xs'
         }`}>
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 border shadow-xs ${
-              isAboveAvg
-                ? isDarkMode ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400 ring-1 ring-emerald-500/20' : 'bg-emerald-200 text-emerald-800 border-emerald-300'
-                : isDarkMode ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400 ring-1 ring-indigo-500/20' : 'bg-indigo-200 text-indigo-800 border-indigo-300'
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Squircle Trend Icon */}
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 border transition-all ${
+              isDarkMode 
+                ? 'bg-indigo-950/80 border-indigo-800/60 text-indigo-400 shadow-xs' 
+                : 'bg-[#D6E2FF] border-[#BACDFF] text-indigo-700 shadow-xs'
             }`}>
               <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
+
+            {/* Score & Benchmark Text with High-Contrast Badges */}
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] sm:text-xs font-bold flex items-center gap-1 sm:gap-1.5 flex-wrap leading-tight">
-                <span>Score: <strong className="font-mono px-1 py-0.2 rounded bg-black/20 text-white dark:text-white">{studentPoints.toLocaleString()} RP</strong></span>
-                <span className="opacity-50">•</span>
-                <span>{activeYearData.label} Avg: <strong className="font-mono px-1 py-0.2 rounded bg-black/20 text-white dark:text-white">{activeYearData.value.toLocaleString()} RP</strong></span>
-              </div>
-              <p className={`text-[11px] sm:text-xs font-semibold mt-0.5 sm:mt-1 flex items-center gap-1 truncate ${
-                isAboveAvg
-                  ? isDarkMode ? 'text-emerald-400' : 'text-emerald-700'
-                  : isDarkMode ? 'text-indigo-400' : 'text-indigo-700'
+              <div className={`text-[11px] sm:text-xs font-bold flex items-center gap-1.5 sm:gap-2 flex-wrap leading-tight ${
+                isDarkMode ? 'text-slate-100' : 'text-slate-900'
               }`}>
-                {isAboveAvg
-                  ? `🚀 You are ${Math.abs(diffFromAvg).toLocaleString()} RP higher than average RP`
-                  : `🎯 You are ${Math.abs(diffFromAvg).toLocaleString()} RP below average RP`}
+                <span className={`flex items-center gap-1.5 font-extrabold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                  Score: 
+                  <span className={`font-mono font-black px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] tracking-tight shadow-xs ${
+                    isDarkMode ? 'bg-slate-800 text-white border border-slate-700' : 'bg-slate-900 text-white'
+                  }`}>
+                    {studentPoints.toLocaleString()} RP
+                  </span>
+                </span>
+                <span className={`font-black ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>•</span>
+                <span className={`flex items-center gap-1.5 font-extrabold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                  {activeYearData.label} Avg: 
+                  <span className={`font-mono font-black px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] tracking-tight shadow-xs ${
+                    isDarkMode ? 'bg-slate-800 text-white border border-slate-700' : 'bg-slate-900 text-white'
+                  }`}>
+                    {activeYearData.value.toLocaleString()} RP
+                  </span>
+                </span>
+              </div>
+              <p className={`text-[11px] sm:text-xs font-bold mt-1.5 flex items-center gap-1.5 truncate ${
+                isDarkMode ? 'text-indigo-300' : 'text-indigo-950'
+              }`}>
+                <span>{isAboveAvg ? '🚀' : '🎯'}</span>
+                <span>
+                  {isAboveAvg
+                    ? `You are ${Math.abs(diffFromAvg).toLocaleString()} RP higher than average RP`
+                    : `You are ${Math.abs(diffFromAvg).toLocaleString()} RP below average RP`}
+                </span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-            <span className={`px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-black border font-mono tracking-tight shadow-md ${
-              isAboveAvg
-                ? isDarkMode ? 'bg-emerald-500/25 text-emerald-300 border-emerald-400/50 shadow-emerald-500/20' : 'bg-emerald-200 text-emerald-900 border-emerald-400'
-                : isDarkMode ? 'bg-indigo-500/25 text-indigo-300 border-indigo-400/50 shadow-indigo-500/20' : 'bg-indigo-200 text-indigo-900 border-indigo-400'
+          {/* Right Difference Pill */}
+          <div className="flex items-center self-start sm:self-auto shrink-0">
+            <span className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-black border font-mono tracking-tight shadow-xs ${
+              isDarkMode 
+                ? 'bg-indigo-950/90 text-indigo-200 border-indigo-800/60' 
+                : 'bg-[#C6D7FE] text-slate-950 border-[#AEC5FD]'
             }`}>
               {isAboveAvg ? `+${diffFromAvg.toLocaleString()} RP` : `${diffFromAvg.toLocaleString()} RP`}
             </span>
@@ -342,7 +353,7 @@ export default function AveragePointsBarChart({
                       <div className="flex items-center gap-1">
                         <span className={`text-[11px] sm:text-sm font-extrabold transition-colors whitespace-nowrap ${
                           isUserYear
-                            ? 'text-purple-400 dark:text-purple-300 font-black'
+                            ? (isDarkMode ? 'text-purple-300 font-black' : 'text-purple-700 font-black')
                             : isDarkMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-800 group-hover:text-black'
                         }`}>
                           {item.label}
@@ -376,12 +387,14 @@ export default function AveragePointsBarChart({
                   key={y.key} 
                   onClick={() => setSelectedYear(selectedYear === y.key ? null : y.key)}
                   className={`flex items-center gap-1.5 cursor-pointer px-1.5 py-0.5 rounded-md transition-colors ${
-                    selectedYear === y.key ? 'bg-slate-800 ring-1 ring-white/20' : 'hover:bg-slate-800/40'
+                    selectedYear === y.key 
+                      ? (isDarkMode ? 'bg-slate-800 text-white ring-1 ring-white/20' : 'bg-slate-200 text-slate-900 ring-1 ring-slate-400') 
+                      : (isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-100')
                   }`}
                 >
                   <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gradient-to-r ${y.theme.gradient} inline-block shrink-0 shadow-xs`} />
-                  <span className={`text-[10px] sm:text-[11px] font-bold ${selectedYear === y.key ? 'text-white' : ''}`}>{y.label}</span>
-                  <span className="text-[9px] sm:text-[10px] font-mono opacity-80">({y.value} RP)</span>
+                  <span className={`text-[10px] sm:text-[11px] font-bold ${selectedYear === y.key ? (isDarkMode ? 'text-white' : 'text-slate-900') : ''}`}>{y.label}</span>
+                  <span className="text-[9px] sm:text-[10px] font-mono font-bold opacity-90">({y.value} RP)</span>
                 </div>
               ))}
             </div>

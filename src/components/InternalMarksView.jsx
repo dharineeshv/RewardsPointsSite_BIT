@@ -6,7 +6,11 @@ import {
   GraduationCap,
   Activity,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Sliders,
+  ArrowRight,
+  Sparkles,
+  FlaskConical
 } from 'lucide-react';
 import {
   STUDENTS_INTERNAL_MARKS_LIST,
@@ -14,7 +18,7 @@ import {
   parseStudentRows
 } from '../data/rp_distribution';
 
-export default function InternalMarksView({ currentUser, isDarkMode }) {
+export default function InternalMarksView({ currentUser, isDarkMode, onNavigateToSkew }) {
   const [studentsData, setStudentsData] = useState(() => {
     try {
       const cached = localStorage.getItem('bit_live_internal_marks');
@@ -198,9 +202,43 @@ export default function InternalMarksView({ currentUser, isDarkMode }) {
                   <span>Mentor: {activeStudent.mentor}</span>
                 </span>
               )}
+              {activeStudent.specialLab && (
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                  activeStudent.specialLab.code === 'UAL'
+                    ? isDarkMode
+                      ? 'bg-amber-950/70 border-amber-800 text-amber-300'
+                      : 'bg-amber-50 border-amber-200 text-amber-700'
+                    : activeStudent.specialLab.code === 'PBL'
+                    ? isDarkMode
+                      ? 'bg-emerald-950/70 border-emerald-800 text-emerald-300'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : isDarkMode
+                    ? 'bg-blue-950/70 border-blue-800 text-blue-300'
+                    : 'bg-blue-50 border-blue-200 text-blue-700'
+                }`}>
+                  <FlaskConical className="w-3.5 h-3.5 shrink-0" />
+                  <span>Lab Track: {activeStudent.specialLab.label}</span>
+                </span>
+              )}
             </div>
           </div>
         </div>
+
+        {onNavigateToSkew && (
+          <div className="mt-4 pt-3 border-t border-slate-800/40 flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Want to see how many points are needed per mark (15 / 30 scale)?</span>
+            </div>
+            <button
+              onClick={onNavigateToSkew}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+            >
+              <span>View Skew Benchmarks</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 2. 8 Activity Categories & Points Breakdown (Collapsible) */}

@@ -1,5 +1,6 @@
 import StudentMentorMappingView from './components/StudentMentorMappingView';
 import AveragePointsBarChart from './components/AveragePointsBarChart';
+import PointsToMarksSkewView from './components/PointsToMarksSkewView';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
@@ -11,11 +12,13 @@ import { savePdfDocumentToDB, loadAllPdfDocumentsFromDB, removePdfDocumentFromDB
 import { getCampusMessMenu } from './data/messMenuData';
 import FACULTY_DIRECTORY_DATA from './data/facultyDirectory.json';
 import EXAM_HALL_INDEX_DATA from './data/examHallIndex.json';
-import { STUDENTS_INTERNAL_MARKS_LIST, STUDENT_EVENT_LOGS_MAP, ALL_REWARD_POINTS_ENTRIES, TOTAL_PS_COMPLETIONS_COUNT } from './data/rp_distribution';
+import { STUDENTS_INTERNAL_MARKS_LIST, STUDENT_EVENT_LOGS_MAP, ALL_REWARD_POINTS_ENTRIES, TOTAL_PS_COMPLETIONS_COUNT, STUDENT_SPECIAL_LAB_MAP } from './data/rp_distribution';
 import {
   FileSpreadsheet,
   LayoutGrid,
   BarChart2,
+  Sliders,
+  Calculator,
   History,
   Settings,
   Search,
@@ -136,6 +139,20 @@ const ALL_DEPARTMENTS = [
   { id: 'ISE', name: 'Information Science & Engineering', fullTitle: 'INFORMATION SCIENCE AND ENGINEERING', degree: 'B.E.', prefixes: ['7376221SE', '7376231SE', '7376241SE', '7376251SE', '7376221IS', '7376231IS', '7376241IS', '7376251IS'], Icon: Library, color: 'from-blue-600 to-cyan-600', badgeColor: 'bg-blue-950/80 text-blue-300 border-blue-800' },
   { id: 'MTRS', name: 'Mechatronics Engineering', fullTitle: 'MECHATRONICS ENGINEERING', degree: 'B.E.', prefixes: ['7376221MZ', '7376231MZ', '7376241MZ', '7376251MZ', '7376231MT', '7376241MT', '7376251MT', '7376231MC'] }
 ];
+
+export const getStudentTrack = (st) => {
+  if (!st) return { code: 'PBL', label: 'PBL (Project-Based Learning)' };
+  const roll = String(st.id || st.rollNo || st.roll_no || st.roll || '').trim().toUpperCase();
+  if (st.specialLab?.code) return st.specialLab;
+  if (st.track) return { 
+    code: st.track, 
+    label: st.track === 'UAL' ? 'UAL (Fast-Track / Internship)' : 'PBL (Project-Based Learning)' 
+  };
+  if (STUDENT_SPECIAL_LAB_MAP && roll && STUDENT_SPECIAL_LAB_MAP[roll]) {
+    return STUDENT_SPECIAL_LAB_MAP[roll];
+  }
+  return { code: 'PBL', label: 'PBL (Project-Based Learning)' };
+};
 
 export const BIT_DAILY_PLACEMENT_DATA = placementData;
 
@@ -1484,6 +1501,12 @@ function transformApiStudent(apiItem) {
     course_code: courseCode,
     year: yr ? (String(yr).startsWith('Year') ? String(yr) : `Year ${yr}`) : "Year IV",
     mentor_name: mentorName,
+    track: masterRecord?.specialLab?.code || (STUDENT_SPECIAL_LAB_MAP && rollNo ? STUDENT_SPECIAL_LAB_MAP[rollNo]?.code : 'PBL') || 'PBL',
+    specialLab: masterRecord?.specialLab || (STUDENT_SPECIAL_LAB_MAP && rollNo ? STUDENT_SPECIAL_LAB_MAP[rollNo] : null) || {
+      code: 'PBL',
+      label: 'PBL (Project-Based Learning)',
+      badgeClass: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+    },
     currentPoints: balancePts,
     cumulativePoints: cumulativePts,
     redeemedPoints: redeemedPts,
@@ -2066,8 +2089,11 @@ Response Guidelines:
 
   return (
     <>
-      {/* Floating Robot Action Button (FAB with Smiling Tara) */}
-      <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-[100] flex items-center gap-2 pointer-events-auto">
+      {/* Floating Robot Action Button (FAB with Smiling Tara - Fixed & Perfectly Positioned for Mobile & Desktop) */}
+      <div 
+        style={{ position: 'fixed', bottom: 'calc(2.25rem + env(safe-area-inset-bottom, 0px))', right: '1.25rem', zIndex: 99999 }}
+        className="fixed bottom-9 right-5 sm:bottom-10 sm:right-7 z-[99999] flex items-center gap-2 pointer-events-auto touch-manipulation select-none"
+      >
         <button
           type="button"
           onClick={(e) => {
@@ -2075,34 +2101,37 @@ Response Guidelines:
             e.stopPropagation();
             setIsOpen(prev => !prev);
           }}
-          className={`group relative flex items-center justify-center w-14 h-14 sm:w-15 sm:h-15 rounded-full cursor-pointer transition-all duration-300 active:scale-95 shadow-2xl pointer-events-auto ${
+          className={`group relative flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full cursor-pointer transition-all duration-300 active:scale-95 shadow-2xl pointer-events-auto ${
             isOpen 
               ? 'bg-gradient-to-tr from-rose-600 to-red-500 shadow-rose-500/40 rotate-90' 
-              : 'bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 shadow-indigo-500/40 hover:scale-108 animate-float tara-avatar-glow'
+              : 'bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 shadow-indigo-500/40 hover:scale-108 tara-avatar-glow'
           }`}
           title={isOpen ? 'Close Assistant' : 'Chat with Tara'}
           aria-label="Open Tara BIT Assistant"
         >
           {/* Animated Ambient Halo Glow */}
           {!isOpen && (
-            <span className="absolute -inset-1.5 bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 rounded-full blur-md opacity-60 group-hover:opacity-100 animate-pulse-glow -z-10 pointer-events-none" />
+            <span className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 rounded-full blur-md opacity-60 group-hover:opacity-100 animate-pulse-glow -z-10 pointer-events-none" />
           )}
 
           {isOpen ? (
-            <X className="w-6 h-6 text-white transition-transform duration-200" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6 text-white transition-transform duration-200" />
           ) : (
-            <TaraRobotFace size={40} mood="happy" className="group-hover:scale-110 transition-transform duration-200 pointer-events-none" />
+            <TaraRobotFace size={30} mood="happy" className="group-hover:scale-110 transition-transform duration-200 pointer-events-none" />
           )}
         </button>
       </div>
 
-      {/* Floating Chat Modal */}
+      {/* Floating Chat Modal (Fully Responsive on Mobile & Desktop) */}
       {isOpen && (
-        <div className={`fixed bottom-22 right-3.5 sm:right-6 w-[calc(100vw-28px)] sm:w-[440px] h-[580px] max-h-[82vh] rounded-3xl z-[110] flex flex-col shadow-2xl border backdrop-blur-2xl transition-all duration-200 overflow-hidden pointer-events-auto ${
-          isDarkMode 
-            ? 'bg-slate-900/95 border-slate-700/80 text-white shadow-black/80' 
-            : 'bg-white/95 border-slate-200/90 text-slate-900 shadow-indigo-950/20'
-        }`}>
+        <div 
+          style={{ position: 'fixed', bottom: 'calc(6.25rem + env(safe-area-inset-bottom, 0px))', zIndex: 100000 }}
+          className={`fixed bottom-24 right-3 left-3 sm:left-auto sm:right-7 sm:w-[440px] h-[520px] max-h-[80vh] rounded-3xl z-[100000] flex flex-col shadow-2xl border backdrop-blur-2xl transition-all duration-200 overflow-hidden pointer-events-auto ${
+            isDarkMode 
+              ? 'bg-slate-900/95 border-slate-700/80 text-white shadow-black/80' 
+              : 'bg-white/95 border-slate-200/90 text-slate-900 shadow-indigo-950/20'
+          }`}
+        >
           {/* 1. Header with Tara Branding */}
           <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white flex items-center justify-between shadow-md shrink-0">
             <div className="flex items-center gap-2.5">
@@ -3807,28 +3836,31 @@ export default function App() {
         }
 
         const activities = [];
+        const seenKeys = new Set();
 
-        // 1. Student Verified Activities from database if available
-        if (dbStudent && Array.isArray(dbStudent.history)) {
-          dbStudent.history.forEach((h, hIdx) => {
-            const pts = parseFloat(String(h.points || '0').replace(/[^0-9.]/g, '')) || 0;
-            activities.push({
-              id: `db-act-${hIdx}`,
-              activity_name: h.title,
-              course_name: h.title,
-              date: h.date || 'Academic Year 2024-2025',
-              activity_type: h.category || 'Event',
-              reward_points: pts.toLocaleString(),
-              type: 'positive'
-            });
-          });
-        }
+        const addActivity = (act) => {
+          if (!act) return;
+          const codeKey = (act.code || act.activity_code || '').trim().toUpperCase();
+          const nameKey = (act.activity_name || act.course_name || act.title || '').trim().toLowerCase();
+          const uniqueKey = codeKey ? `code_${codeKey}` : `name_${nameKey}_${act.points || act.reward_points}`;
+          
+          if (!seenKeys.has(uniqueKey)) {
+            seenKeys.add(uniqueKey);
+            activities.push(act);
+          }
+        };
 
-        // 2. Add granular individual event participation & penalty logs from sheets
+        // 1. Add granular individual event participation & P-Skill logs from Apps Script / Google Sheets
+        let hasDirectPSLogs = false;
+        let hasDirectInitiativeLogs = false;
+
         if (Array.isArray(eventLogs) && eventLogs.length > 0) {
           eventLogs.forEach(ev => {
             const isPS = ev.isPS !== undefined ? ev.isPS : ((ev.activity_type || '').toUpperCase().includes('P SKILL') || (ev.activity_name || '').toUpperCase().includes('LEVEL'));
-            activities.push({
+            if (isPS) hasDirectPSLogs = true;
+            if ((ev.activity_type || '').toUpperCase().includes('INITIATIVE')) hasDirectInitiativeLogs = true;
+
+            addActivity({
               id: ev.id,
               sl_no: ev.sl_no || '',
               code: ev.code || ev.activity_code || '',
@@ -3836,6 +3868,7 @@ export default function App() {
               activity_name: ev.activity_name || ev.name,
               course_name: ev.course_name || ev.name,
               date: ev.date || "Academic Year 2024-2025",
+              year: ev.year || ev.year_of_study || displayedStudent?.year || 'III',
               activity_type: ev.activity_type || (ev.points < 0 ? "Penalty" : (isPS ? "P Skill" : "Event")),
               reward_points: Math.abs(ev.points).toLocaleString(),
               points: ev.points,
@@ -3847,7 +3880,25 @@ export default function App() {
           });
         }
 
-        // 3. Add Master Sheet 8-Category Activities (for categories not covered by individual logs)
+        // 2. Student Verified Activities from database if available (deduplicated)
+        if (dbStudent && Array.isArray(dbStudent.history)) {
+          dbStudent.history.forEach((h, hIdx) => {
+            const pts = parseFloat(String(h.points || '0').replace(/[^0-9.]/g, '')) || 0;
+            addActivity({
+              id: `db-act-${hIdx}`,
+              activity_name: h.title,
+              course_name: h.title,
+              date: h.date || 'Academic Year 2024-2025',
+              year: displayedStudent?.year || 'III',
+              activity_type: h.category || 'Event',
+              reward_points: pts.toLocaleString(),
+              points: pts,
+              type: 'positive'
+            });
+          });
+        }
+
+        // 3. Add Master Sheet Categories only for categories without direct logs (strictly avoiding duplicates)
         if (masterRecord && Array.isArray(masterRecord.activityBreakdown)) {
           masterRecord.activityBreakdown.forEach((act) => {
             const pts = typeof act.points === 'number' ? act.points : parseFloat(String(act.points || '0').replace(/,/g, ''));
@@ -3856,9 +3907,11 @@ export default function App() {
               let actType = act.label.split(' ')[0] || 'Technical';
 
               if (act.id === 'pskill') {
+                if (hasDirectPSLogs) return; // omit summary duplicate
                 title = 'P-Skill';
                 actType = 'P Skill';
               } else if (act.id === 'initiatives') {
+                if (hasDirectInitiativeLogs) return; // omit summary duplicate
                 title = 'Student Initiatives & GP Challenge (BPI)';
                 actType = 'Initiative';
               } else if (act.id === 'interview_extra') {
@@ -3866,24 +3919,16 @@ export default function App() {
                 actType = 'Interview';
               }
 
-              // Check if already covered by positive individual logs
-              const hasDirectLogs = eventLogs.some(ev => {
-                if (ev.points <= 0) return false;
-                if (act.id === 'pskill' && (ev.activity_type.toUpperCase().includes('P SKILL') || ev.activity_type.toUpperCase().includes('PSKILL'))) return true;
-                if (act.id === 'initiatives' && ev.activity_type.toUpperCase().includes('INITIATIVE')) return true;
-                return false;
+              addActivity({
+                activity_name: `${title}${act.count > 1 ? ` (${act.count} Events)` : ''}`,
+                course_name: title,
+                date: 'Academic Year 2024-2025',
+                year: displayedStudent?.year || 'III',
+                activity_type: actType,
+                reward_points: pts.toLocaleString(),
+                points: pts,
+                type: 'positive'
               });
-
-              if (!hasDirectLogs && !activities.some(a => a.activity_name.startsWith(title))) {
-                activities.push({
-                  activity_name: `${title}${act.count > 1 ? ` (${act.count} Events)` : ''}`,
-                  course_name: title,
-                  date: 'Academic Year 2024-2025',
-                  activity_type: actType,
-                  reward_points: pts.toLocaleString(),
-                  type: 'positive'
-                });
-              }
             }
           });
         }
@@ -3901,7 +3946,7 @@ export default function App() {
     fetchRewards();
   }, [displayedStudent?.id]);
 
-    // Load rewards history specifically for selectedStudent in the Detail Modal (ONLY RP Activities)
+  // Load rewards history specifically for selectedStudent in the Detail Modal (ONLY RP Activities)
   useEffect(() => {
     if (!isModalOpen || !selectedStudent?.id) return;
     let isMounted = true;
@@ -3925,49 +3970,33 @@ export default function App() {
         }
 
         const activities = [];
+        const seenKeys = new Set();
+
+        const addModalActivity = (act) => {
+          if (!act) return;
+          const codeKey = (act.code || act.activity_code || '').trim().toUpperCase();
+          const nameKey = (act.activity_name || act.course_name || act.title || '').trim().toLowerCase();
+          const uniqueKey = codeKey ? `code_${codeKey}` : `name_${nameKey}_${act.points || act.reward_points}`;
+          
+          if (!seenKeys.has(uniqueKey)) {
+            seenKeys.add(uniqueKey);
+            activities.push(act);
+          }
+        };
 
         const initialRaw = masterRecord?.initialPoints || selectedStudent.initialPoints || 0;
 
-        // 1. Student Verified Activities from database if available
-        const studentDbRecord = Array.isArray(STUDENTS_DATABASE)
-          ? STUDENTS_DATABASE.find(s => (s.id || '').toUpperCase() === roll)
-          : null;
+        // 1. Add granular individual event participation & P-Skill logs (Live Apps Script + Sheets)
+        let hasDirectPSLogs = false;
+        let hasDirectInitiativeLogs = false;
 
-        if (studentDbRecord && Array.isArray(studentDbRecord.history)) {
-          studentDbRecord.history.forEach((h, hIdx) => {
-            const pts = parseFloat(String(h.points || '0').replace(/[^0-9.]/g, '')) || 0;
-            activities.push({
-              id: `db-act-${hIdx}`,
-              activity_name: h.title,
-              course_name: h.title,
-              date: h.date || 'Academic Year 2024-2025',
-              activity_type: h.category || 'Event',
-              reward_points: pts.toLocaleString(),
-              type: 'positive'
-            });
-          });
-        }
-
-        // 1b. Carry-In / Previous Semester Verified Points
-        const initNum = parseFloat(String(initialRaw).replace(/,/g, '')) || 0;
-        if (initNum > 0) {
-          activities.push({
-            activity_name: "Carry-In / Previous Semester Verified Points",
-            course_name: "Carry-In Reward Points",
-            date: "Academic Year 2024-2025",
-            activity_type: "Carry-In",
-            reward_points: initNum.toLocaleString(),
-            type: "positive"
-          });
-        }
-
-
-
-        // 2. Individual Event Participation & Penalty Logs
         if (Array.isArray(eventLogs) && eventLogs.length > 0) {
           eventLogs.forEach(ev => {
             const isPS = ev.isPS !== undefined ? ev.isPS : ((ev.activity_type || '').toUpperCase().includes('P SKILL') || (ev.activity_name || '').toUpperCase().includes('LEVEL'));
-            activities.push({
+            if (isPS) hasDirectPSLogs = true;
+            if ((ev.activity_type || '').toUpperCase().includes('INITIATIVE')) hasDirectInitiativeLogs = true;
+
+            addModalActivity({
               id: ev.id,
               sl_no: ev.sl_no || '',
               code: ev.code || ev.activity_code || '',
@@ -3975,6 +4004,7 @@ export default function App() {
               activity_name: ev.activity_name || ev.name,
               course_name: ev.course_name || ev.name,
               date: ev.date || "Academic Year 2024-2025",
+              year: ev.year || ev.year_of_study || selectedStudent?.year || 'III',
               activity_type: ev.activity_type || (ev.points < 0 ? "Penalty" : (isPS ? "P Skill" : "Event")),
               reward_points: Math.abs(ev.points).toLocaleString(),
               points: ev.points,
@@ -3986,7 +4016,44 @@ export default function App() {
           });
         }
 
-        // 3. Add Master Sheet 8-Category Activities (for categories not covered by direct logs)
+        // 2. Student Verified Activities from database if available (deduplicated)
+        const studentDbRecord = Array.isArray(STUDENTS_DATABASE)
+          ? STUDENTS_DATABASE.find(s => (s.id || '').toUpperCase() === roll)
+          : null;
+
+        if (studentDbRecord && Array.isArray(studentDbRecord.history)) {
+          studentDbRecord.history.forEach((h, hIdx) => {
+            const pts = parseFloat(String(h.points || '0').replace(/[^0-9.]/g, '')) || 0;
+            addModalActivity({
+              id: `db-act-${hIdx}`,
+              activity_name: h.title,
+              course_name: h.title,
+              date: h.date || 'Academic Year 2024-2025',
+              year: selectedStudent?.year || 'III',
+              activity_type: h.category || 'Event',
+              reward_points: pts.toLocaleString(),
+              points: pts,
+              type: 'positive'
+            });
+          });
+        }
+
+        // 3. Carry-In / Previous Semester Verified Points (if any)
+        const initNum = parseFloat(String(initialRaw).replace(/,/g, '')) || 0;
+        if (initNum > 0) {
+          addModalActivity({
+            activity_name: "Carry-In / Previous Semester Verified Points",
+            course_name: "Carry-In Reward Points",
+            date: "Academic Year 2024-2025",
+            year: selectedStudent?.year || 'III',
+            activity_type: "Carry-In",
+            reward_points: initNum.toLocaleString(),
+            points: initNum,
+            type: "positive"
+          });
+        }
+
+        // 4. Add Master Sheet Categories only for categories without direct logs (strictly avoiding duplicates)
         if (masterRecord && Array.isArray(masterRecord.activityBreakdown)) {
           masterRecord.activityBreakdown.forEach((act) => {
             const pts = typeof act.points === 'number' ? act.points : parseFloat(String(act.points || '0').replace(/,/g, ''));
@@ -3995,30 +4062,28 @@ export default function App() {
               let actType = act.label.split(' ')[0] || 'Technical';
 
               if (act.id === 'pskill') {
+                if (hasDirectPSLogs) return; // omit summary duplicate
                 title = 'P-Skill';
                 actType = 'P Skill';
               } else if (act.id === 'initiatives') {
+                if (hasDirectInitiativeLogs) return; // omit summary duplicate
                 title = 'Student Initiatives & GP Challenge (BPI)';
                 actType = 'Initiative';
+              } else if (act.id === 'interview_extra') {
+                title = 'Interview & Extra-Curricular Assessment';
+                actType = 'Interview';
               }
 
-              const hasDirectLogs = eventLogs.some(ev => {
-                if (ev.points <= 0) return false;
-                if (act.id === 'pskill' && (ev.activity_type.toUpperCase().includes('P SKILL') || ev.activity_type.toUpperCase().includes('PSKILL'))) return true;
-                if (act.id === 'initiatives' && ev.activity_type.toUpperCase().includes('INITIATIVE')) return true;
-                return false;
+              addModalActivity({
+                activity_name: `${title}${act.count > 1 ? ` (${act.count} Events)` : ''}`,
+                course_name: title,
+                date: 'Academic Year 2024-2025',
+                year: selectedStudent?.year || 'III',
+                activity_type: actType,
+                reward_points: pts.toLocaleString(),
+                points: pts,
+                type: 'positive'
               });
-
-              if (!hasDirectLogs && !activities.some(a => a.activity_name.startsWith(title))) {
-                activities.push({
-                  activity_name: `${title}${act.count > 1 ? ` (${act.count} Events)` : ''}`,
-                  course_name: title,
-                  date: 'Academic Year 2024-2025',
-                  activity_type: actType,
-                  reward_points: pts.toLocaleString(),
-                  type: 'positive'
-                });
-              }
             }
           });
         }
@@ -4366,11 +4431,11 @@ export default function App() {
             <img 
               src="/bit-logo.png" 
               alt="Bannari Amman Institute of Technology" 
-              className="h-8 sm:h-10 object-contain rounded-md bg-white p-0.5 shadow-xs flex-shrink-0 cursor-pointer"
+              className="h-7 sm:h-10 object-contain rounded-md bg-white p-0.5 shadow-xs flex-shrink-0 cursor-pointer"
               onClick={() => setActiveNav('Dashboard')}
             />
-            <div className="cursor-pointer" onClick={() => setActiveNav('Dashboard')}>
-              <span className="text-sm sm:text-base md:text-lg font-black text-indigo-600 dark:text-indigo-400 tracking-tight block leading-tight">
+            <div className="cursor-pointer min-w-0" onClick={() => setActiveNav('Dashboard')}>
+              <span className="text-xs sm:text-base md:text-lg font-black text-indigo-600 dark:text-indigo-400 tracking-tight block leading-tight truncate max-w-[120px] sm:max-w-none">
                 Reward Points Site
               </span>
             </div>
@@ -4404,50 +4469,58 @@ export default function App() {
               />
               
               {searchQuery && (
-                <button 
-                  onClick={() => { setSearchQuery(''); setShowDropdown(false); }}
-                  className={`absolute right-3 p-1 rounded-md transition-colors ${
-                    isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
-                  }`}
-                  title="Clear search"
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 text-slate-400 hover:text-slate-200 p-1 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            {/* Desktop Suggestions Dropdown */}
+            {/* Live Search Autocomplete Dropdown */}
             {showDropdown && searchResults.length > 0 && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-                <div className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl border backdrop-blur-xl divide-y max-h-80 overflow-y-auto z-50 animate-fadeIn ${
-                  isDarkMode ? 'border-slate-800 bg-slate-900/98 text-slate-100 divide-slate-800' : 'border-slate-200 bg-white/98 text-slate-900 divide-slate-100'
+                <div 
+                  className="fixed inset-0 z-40 bg-transparent" 
+                  onClick={() => setShowDropdown(false)} 
+                />
+                <div className={`absolute top-full left-0 right-0 mt-2 rounded-2xl shadow-2xl border backdrop-blur-xl z-50 overflow-hidden divide-y max-h-96 overflow-y-auto animate-fadeIn ${
+                  isDarkMode 
+                    ? 'bg-slate-900/95 border-slate-700 divide-slate-800' 
+                    : 'bg-white/95 border-slate-200 divide-slate-100 shadow-indigo-500/10'
                 }`}>
-                  <div className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
-                    isDarkMode ? 'bg-slate-950/40 text-slate-400' : 'bg-slate-50 text-slate-500'
+                  <div className={`px-4 py-2 text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-between ${
+                    isDarkMode ? 'bg-slate-950/60 text-slate-400' : 'bg-slate-50 text-slate-500'
                   }`}>
-                    <span>Results ({searchResults.length})</span>
-                    <span className="normal-case font-normal">Click to select</span>
+                    <span>Matching Students ({searchResults.length})</span>
+                    <span className="text-[9px] font-normal lowercase">click to view profile</span>
                   </div>
                   {searchResults.map((item, idx) => (
                     <div
-                      key={`${item.roll_no}-${idx}`}
+                      key={item.id || idx}
                       onClick={() => handleSelectStudent(item)}
-                      className={`px-4 py-3 cursor-pointer flex items-center justify-between transition-colors ${
-                        isDarkMode ? 'hover:bg-slate-800/80 active:bg-slate-800' : 'hover:bg-slate-50 active:bg-slate-100'
+                      className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-colors ${
+                        isDarkMode 
+                          ? 'hover:bg-indigo-950/40 text-slate-200' 
+                          : 'hover:bg-indigo-50/70 text-slate-800'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0 pr-2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#38c4ee] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
-                          {(item.student_name || 'ST').slice(0, 2).toUpperCase()}
+                        <div className="w-8 h-8 rounded-full overflow-hidden shadow-xs border border-indigo-400/30 flex-shrink-0">
+                          <AvatarImage
+                            src={item.picture || item.photo_url}
+                            alt={item.name}
+                            initials={item.initials}
+                            fallbackBg={item.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className={`text-xs font-bold flex flex-wrap items-center gap-1.5 truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                            <span className="truncate">{item.student_name}</span>
-                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono flex-shrink-0 ${
-                              isDarkMode ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-300'
-                            }`}>
-                              {item.roll_no}
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs truncate leading-tight">{item.name}</span>
+                            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold shrink-0">
+                              {item.id}
                             </span>
                           </div>
                           <div className={`text-[11px] font-medium mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -4468,12 +4541,12 @@ export default function App() {
             )}
           </div>
 
-          {/* Right Action Icons & Developer Info */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* Live Sathyamangalam BIT Campus Weather Pill */}
+          {/* Right Action Icons & User Actions */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Live Sathyamangalam BIT Campus Weather Pill (Hidden on Mobile, Visible on Tablet/Desktop) */}
             {weatherData && (
               <div 
-                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all shadow-2xs ${
+                className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all shadow-2xs shrink-0 ${
                   isDarkMode 
                     ? 'bg-slate-900/90 border-slate-800 text-slate-200 hover:border-slate-700' 
                     : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
@@ -4488,22 +4561,12 @@ export default function App() {
               </div>
             )}
 
-            {/* Top Right Developer Details */}
-            <div className={`hidden lg:flex flex-col text-right pr-2 border-r mr-1 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-              <span className={`text-[11px] font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Developed by <span className="font-bold text-indigo-600 dark:text-indigo-400">Dharineesh V</span>
-              </span>
-              <span className={`text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                (Dept. of Computer Technology)
-              </span>
-            </div>
-
             {/* Live Notification Bell Icon with Red Badge */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setIsNotificationOpen(prev => !prev)}
-                className={`p-1.5 sm:p-2 rounded-full transition-all cursor-pointer relative ${
+                className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all cursor-pointer relative ${
                   isNotificationOpen
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
                     : isDarkMode 
@@ -4520,7 +4583,7 @@ export default function App() {
                 )}
 
                 {unreadNotificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-white dark:border-slate-950 shadow-sm animate-pulse">
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] sm:min-w-[17px] sm:h-[17px] px-1 rounded-full bg-rose-500 text-white text-[9px] sm:text-[10px] font-black flex items-center justify-center border-2 border-white dark:border-slate-950 shadow-sm animate-pulse">
                     {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
                   </span>
                 )}
@@ -4705,7 +4768,7 @@ export default function App() {
                             <div className="flex-1 min-w-0 pr-4">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <h4 className={`text-xs font-bold leading-snug truncate ${
-                                  !item.read ? 'text-indigo-600 dark:text-indigo-400' : isDarkMode ? 'text-slate-200' : 'text-slate-800'
+                                   !item.read ? 'text-indigo-600 dark:text-indigo-400' : isDarkMode ? 'text-slate-200' : 'text-slate-800'
                                 }`}>
                                   {item.title}
                                 </h4>
@@ -4753,7 +4816,7 @@ export default function App() {
             {/* Dark / Light Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className={`p-1.5 sm:p-2 rounded-full transition-colors cursor-pointer ${
+              className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer shrink-0 ${
                 isDarkMode 
                   ? 'hover:bg-slate-800 text-amber-400 hover:text-amber-300' 
                   : 'hover:bg-slate-100 text-slate-700 hover:text-indigo-600'
@@ -4767,12 +4830,13 @@ export default function App() {
               )}
             </button>
 
+            {/* User Profile Avatar */}
             <div 
               onClick={() => {
                 setSelectedStudent(currentUser);
                 setIsModalOpen(true);
               }}
-              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-indigo-400 transition-all cursor-pointer border shadow-xs flex-shrink-0 ${
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-indigo-400 transition-all cursor-pointer border shadow-xs shrink-0 flex items-center justify-center ${
                 isDarkMode ? 'border-slate-700' : 'border-slate-300'
               }`}
               title={`${currentUser.name} (${currentUser.email})`}
@@ -4785,14 +4849,16 @@ export default function App() {
               />
             </div>
 
+            {/* Dedicated Logout Button */}
             <button
               onClick={() => setShowLogoutModal(true)}
-              className={`p-1.5 sm:p-2 rounded-full transition-colors cursor-pointer ${
-                isDarkMode ? 'hover:bg-slate-800 text-rose-400 hover:text-rose-300' : 'hover:bg-slate-100 text-rose-600 hover:text-rose-700'
+              className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer shrink-0 ${
+                isDarkMode ? 'hover:bg-rose-500/20 text-rose-400 hover:text-rose-300' : 'hover:bg-rose-50 text-rose-600 hover:text-rose-700'
               }`}
               title="Logout to Login Screen"
+              aria-label="Logout"
             >
-              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -5026,6 +5092,20 @@ export default function App() {
             <span>Internal Mark</span>
           </button>
 
+          <button
+            onClick={() => { setActiveNav('Points to Marks'); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
+              activeNav === 'Points to Marks'
+                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
+                : isDarkMode
+                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Sliders className="w-5 h-5" strokeWidth={activeNav === 'Points to Marks' ? 2.2 : 1.8} />
+            <span>Marks Conversion</span>
+          </button>
+
           
 
           <button
@@ -5180,14 +5260,11 @@ export default function App() {
           {/* VIEW 1: DASHBOARD */}
           {activeNav === 'Dashboard' && (
             <>
-              {/* Top Title & Subtitle */}
+              {/* Top Title */}
               <div className="mb-6">
                 <h1 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                   Rewards Points Dashboard
                 </h1>
-                <p className={`text-sm mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Showing logged in profile for <span className="text-indigo-600 dark:text-indigo-400 font-bold">{currentUser.name}</span> ({currentUser.email}).
-                </p>
               </div>
 
               {/* Flipkart-style Featured Hero Banner Slider */}
@@ -5278,6 +5355,20 @@ export default function App() {
                             <span>Mentor: {student.mentor_name}</span>
                           </div>
                         )}
+                        {(() => {
+                          const track = getStudentTrack(student);
+                          const isUAL = track.code === 'UAL';
+                          return (
+                            <div className={`flex items-center gap-1.5 font-bold ${
+                              isUAL 
+                                ? (isDarkMode ? 'text-amber-400' : 'text-amber-700') 
+                                : (isDarkMode ? 'text-emerald-500' : 'text-emerald-700')
+                            }`}>
+                              <Award className="w-3.5 h-3.5 shrink-0" />
+                              <span>{track.label}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -5359,12 +5450,21 @@ export default function App() {
                           badgeStyle = isDarkMode ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/80' : 'bg-emerald-50 text-emerald-800 border-emerald-300';
                         }
 
+                        const displayYear = act.year ? (act.year.startsWith('Year') ? act.year : `Year ${act.year}`) : (displayedStudent?.year || 'Year III');
+
                         return (
-                          <div key={index} className={`py-4 px-3.5 sm:px-4 transition-colors space-y-1.5 ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
+                          <div key={index} className={`py-4 px-3.5 sm:px-4 transition-colors space-y-2 ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
                             <div className="flex items-start justify-between gap-3">
-                              <h4 className={`text-xs font-bold leading-snug flex-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                {act.activity_name || act.course_name || 'Academic Course Activity'}
-                              </h4>
+                              <div className="min-w-0 flex-1">
+                                {(act.code || act.activity_code) && (
+                                  <span className="inline-block font-mono text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-800/80 text-indigo-300 border border-indigo-700/60 mr-1.5 mb-1">
+                                    {act.code || act.activity_code}
+                                  </span>
+                                )}
+                                <h4 className={`text-xs font-bold leading-snug ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                  {act.activity_name || act.course_name || 'Academic Course Activity'}
+                                </h4>
+                              </div>
                               <span className={`text-xs font-black px-2.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${
                                 isPositive 
                                   ? 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800/70' 
@@ -5378,8 +5478,9 @@ export default function App() {
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeStyle}`}>
                                 {act.activity_type || 'General'}
                               </span>
-                              <span className="font-medium text-[10px]">
-                                {act.date || 'Recent'}
+                              <span className="font-semibold text-[11px] text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                <span>📅</span>
+                                <span>{act.date || 'Academic Year'}</span>
                               </span>
                             </div>
                           </div>
@@ -5395,8 +5496,8 @@ export default function App() {
                         <tr className={`border-b text-[11px] lg:text-xs font-extrabold uppercase tracking-wider ${
                           isDarkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'
                         }`}>
-                          <th className="py-3.5 px-3 lg:px-4 font-extrabold">COURSE NAME</th>
-                          <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">COMPLETED DATE</th>
+                          <th className="py-3.5 px-3 lg:px-4 font-extrabold">COURSE / ACTIVITY NAME</th>
+                          <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">DATE</th>
                           <th className="py-3.5 px-3 lg:px-4 font-extrabold whitespace-nowrap">ACTIVITY TYPE</th>
                           <th className="py-3.5 px-3 lg:px-4 font-extrabold text-right whitespace-nowrap">REWARD POINTS</th>
                         </tr>
@@ -5438,9 +5539,21 @@ export default function App() {
                             return (
                               <tr key={index} className={`transition-colors ${isDarkMode ? 'text-slate-200 hover:bg-slate-800/50' : 'text-slate-800 hover:bg-slate-50'}`}>
                                 <td className={`py-3.5 px-3 lg:px-4 font-bold text-xs lg:text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                  {act.activity_name || act.course_name || 'Academic Course Activity'}
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {(act.code || act.activity_code) && (
+                                      <span className="font-mono text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 border border-indigo-700/60 shrink-0">
+                                        {act.code || act.activity_code}
+                                      </span>
+                                    )}
+                                    <span>{act.activity_name || act.course_name || 'Academic Course Activity'}</span>
+                                  </div>
+                                  {act.organizer && (
+                                    <div className={`text-[10px] font-normal mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      Coordinator: {act.organizer}
+                                    </div>
+                                  )}
                                 </td>
-                                <td className={`py-3.5 px-3 lg:px-4 font-semibold whitespace-nowrap text-xs ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                <td className={`py-3.5 px-3 lg:px-4 font-bold whitespace-nowrap text-xs ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                                   {act.date || 'Recent'}
                                 </td>
                                 <td className="py-3.5 px-3 lg:px-4 whitespace-nowrap">
@@ -5938,6 +6051,19 @@ export default function App() {
                                           }`}>
                                             {st.roll_no}
                                           </span>
+                                          {(() => {
+                                            const track = getStudentTrack(st);
+                                            const isUAL = track.code === 'UAL';
+                                            return (
+                                              <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-md border flex-shrink-0 ${
+                                                isUAL 
+                                                  ? (isDarkMode ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-amber-50 text-amber-700 border-amber-300')
+                                                  : (isDarkMode ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-300')
+                                              }`}>
+                                                {track.code}
+                                              </span>
+                                            );
+                                          })()}
                                         </div>
                                         <div className={`flex items-center gap-1.5 text-[11px] truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                           <span className="font-bold text-indigo-600 dark:text-indigo-400 flex-shrink-0">{st.normalizedYear}</span>
@@ -5988,6 +6114,7 @@ export default function App() {
                                   <th className="py-3.5 px-3 lg:px-4">STUDENT NAME</th>
                                   <th className="py-3.5 px-3">ROLL NO</th>
                                   <th className="py-3.5 px-2.5 text-center">YEAR</th>
+                                  <th className="py-3.5 px-2.5 text-center">TRACK</th>
                                   <th className="py-3.5 px-3 lg:px-4">FACULTY MENTOR</th>
                                   <th className="py-3.5 px-3 lg:px-4 text-right">ACTIVE BALANCE</th>
                                   <th className="py-3.5 px-3 text-center">ACTION</th>
@@ -5996,7 +6123,7 @@ export default function App() {
                               <tbody className={`text-xs divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
                                 {filteredList.length === 0 ? (
                                   <tr>
-                                    <td colSpan="7" className={`py-10 text-center font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    <td colSpan="8" className={`py-10 text-center font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                       No students matching the selected year and search criteria.
                                     </td>
                                   </tr>
@@ -6047,6 +6174,21 @@ export default function App() {
                                             {st.normalizedYear}
                                           </span>
                                         </td>
+                                        <td className="py-3.5 px-2.5 text-center whitespace-nowrap">
+                                          {(() => {
+                                            const track = getStudentTrack(st);
+                                            const isUAL = track.code === 'UAL';
+                                            return (
+                                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                                isUAL 
+                                                  ? (isDarkMode ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-amber-50 text-amber-700 border-amber-300')
+                                                  : (isDarkMode ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-300')
+                                              }`}>
+                                                {track.code}
+                                              </span>
+                                            );
+                                          })()}
+                                        </td>
                                         <td className={`py-3.5 px-3 lg:px-4 font-medium text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                           <div className="truncate max-w-[140px] lg:max-w-[180px] xl:max-w-none">
                                             {st.mentor_name || 'N/A'}
@@ -6092,7 +6234,20 @@ export default function App() {
 
           {/* VIEW: REWARD POINTS & INTERNAL MARKS DISTRIBUTION (AWESOME TABLE & DATABASE) */}
           {activeNav === 'Internal Marks' && (
-            <InternalMarksView currentUser={currentUser} isDarkMode={isDarkMode} />
+            <InternalMarksView
+              currentUser={currentUser}
+              isDarkMode={isDarkMode}
+              onNavigateToSkew={() => setActiveNav('Points to Marks')}
+            />
+          )}
+
+          {/* VIEW: MARKS CUTOFF (SKEW & STATISTICAL CIE BENCHMARKS) */}
+          {activeNav === 'Points to Marks' && (
+            <PointsToMarksSkewView
+              currentUser={currentUser}
+              isDarkMode={isDarkMode}
+              onNavigateToMarks={() => setActiveNav('Internal Marks')}
+            />
           )}
 
           
@@ -8888,11 +9043,25 @@ export default function App() {
                   {selectedStudent.id} • {selectedStudent.department}
                 </p>
 
-                {/* Mentor & Email Info Badges without icons */}
+                {/* Mentor, Track & Email Info Badges */}
                 <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {(() => {
+                    const track = getStudentTrack(selectedStudent);
+                    const isUAL = track.code === 'UAL';
+                    return (
+                      <span className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
+                        isUAL 
+                          ? (isDarkMode ? 'bg-amber-950/40 text-amber-300 border-amber-800/50' : 'bg-amber-50 text-amber-800 border-amber-200')
+                          : (isDarkMode ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50' : 'bg-emerald-50 text-emerald-800 border-emerald-200')
+                      }`}>
+                        <span>Track:</span>
+                        <span className="font-extrabold">{track.label}</span>
+                      </span>
+                    );
+                  })()}
                   {selectedStudent.mentor_name && (
                     <span className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold px-2.5 py-0.5 rounded-lg border ${
-                      isDarkMode ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      isDarkMode ? 'bg-indigo-950/40 text-indigo-300 border-indigo-800/50' : 'bg-indigo-50 text-indigo-800 border-indigo-200'
                     }`}>
                       <span>Mentor:</span>
                       <span className="font-bold">{selectedStudent.mentor_name}</span>
@@ -8969,33 +9138,6 @@ export default function App() {
 
             {/* Reward Points Entry Sheet (Transaction-Level Log) */}
             <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2">
-                  <h4 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Reward Points Entry Sheet (Transaction Log)
-                  </h4>
-                  {loadingModalRewards && (
-                    <span className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1 animate-pulse">
-                      <RefreshCw className="w-3 h-3 animate-spin" /> Fetching live logs...
-                    </span>
-                  )}
-                </div>
-                {/* PS Count Tag if available */}
-                {(() => {
-                  const studentLogs = modalRewardsData.length > 0 ? modalRewardsData : (selectedStudent.history || []);
-                  const psEntries = studentLogs.filter(e => e.isPS || (e.activity_type || '').toUpperCase().includes('P SKILL') || (e.category || '').toUpperCase().includes('P SKILL'));
-                  const psPoints = psEntries.reduce((sum, e) => sum + (parseFloat(String(e.reward_points || e.points || 0).replace(/[^0-9.]/g, '')) || 0), 0);
-                  if (psEntries.length > 0) {
-                    return (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-                        🎯 {psEntries.length} PS Modules • +{psPoints.toLocaleString()} RP
-                      </span>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
-
               {/* Modal Category Filter & Search Bar */}
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
@@ -9149,8 +9291,9 @@ export default function App() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold border ${badgeStyle}`}>
                             {isPS ? '🎯 P-Skill' : (act.activity_type || act.category || 'Event')}
                           </span>
-                          <span className="font-medium">
-                            {act.date || 'Academic Year'}
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                            <span>📅</span>
+                            <span>{act.date || 'Academic Year'}</span>
                           </span>
                         </div>
                       </div>

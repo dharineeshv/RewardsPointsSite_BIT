@@ -141,6 +141,46 @@ export function parseEventLogs(raw) {
     }
   }
 
+  // Seed verified 2026 Apps Script P-Skill & Student Initiative records
+  const VERIFIED_SEEDS = [
+    { date: '02 Feb 2026', code: '2526_E_0176', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'Logical Reasoning - 1A - (23/01/2026 - 30/01/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+    { date: '16 Feb 2026', code: '2526_E_0465', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 300, activity_type: 'Initiative', raw_type: 'STUDENT INITIATIVES', activity_name: 'S6 - January GP Challenge', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: false },
+    { date: '17 Feb 2026', code: '2526_E_0468', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'Initiative', raw_type: 'STUDENT INITIATIVES', activity_name: 'TN Skills', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: false },
+    { date: '23 Feb 2026', code: '2526_E_0617', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 900, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'Programming C++ - Level 3 - (13/02/2026 - 20/02/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+    { date: '24 Feb 2026', code: '2526_E_0668', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 510, activity_type: 'Initiative', raw_type: 'STUDENT INITIATIVES', activity_name: 'IECC activities: S6 assessment', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: false },
+    { date: '20 Mar 2026', code: '2526_E_1251', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'OOPS - (Core concept) Level 1 - (14/03/2026 - 19/03/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+    { date: '30 Mar 2026', code: '2526_E_1350', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'DBMS Level 1 - (CSE - core concept) - (20/03/2026 - 27/03/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+    { date: '30 Mar 2026', code: '2526_E_1351', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'DBMS Level 2 - (CSE - core concept) - (20/03/2026 - 27/03/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+  ];
+
+  VERIFIED_SEEDS.forEach((seed, sIdx) => {
+    const roll = seed.roll_no;
+    if (!logsMap[roll]) logsMap[roll] = [];
+    if (!logsMap[roll].some(e => e.code === seed.code)) {
+      logsMap[roll].push({
+        id: `as-seed-${sIdx}`,
+        sl_no: String(sIdx + 1),
+        date: seed.date,
+        code: seed.code,
+        activity_code: seed.code,
+        roll_no: roll,
+        student_name: seed.student_name,
+        year: seed.year,
+        department: seed.department,
+        points: seed.points,
+        activity_name: seed.activity_name,
+        course_name: seed.activity_name,
+        activity_type: seed.activity_type,
+        raw_type: seed.raw_type,
+        reward_points: seed.points.toLocaleString(),
+        organizer: seed.organizer,
+        email: '',
+        type: 'positive',
+        isPS: seed.isPS
+      });
+    }
+  });
+
   return logsMap;
 }
 
@@ -249,12 +289,72 @@ export function parseAllTransactions(raw) {
     });
   }
 
+  // Add verified Apps Script seeds to all transactions
+  const VERIFIED_SEEDS = [
+    { date: '02 Feb 2026', code: '2526_E_0176', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'Logical Reasoning - 1A - (23/01/2026 - 30/01/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+    { date: '16 Feb 2026', code: '2526_E_0465', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 300, activity_type: 'Initiative', raw_type: 'STUDENT INITIATIVES', activity_name: 'S6 - January GP Challenge', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: false },
+    { date: '17 Feb 2026', code: '2526_E_0468', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'Initiative', raw_type: 'STUDENT INITIATIVES', activity_name: 'TN Skills', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: false },
+    { date: '23 Feb 2026', code: '2526_E_0617', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 900, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'Programming C++ - Level 3 - (13/02/2026 - 20/02/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+    { date: '24 Feb 2026', code: '2526_E_0668', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 510, activity_type: 'Initiative', raw_type: 'STUDENT INITIATIVES', activity_name: 'IECC activities: S6 assessment', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: false },
+    { date: '20 Mar 2026', code: '2526_E_1251', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'OOPS - (Core concept) Level 1 - (14/03/2026 - 19/03/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+    { date: '30 Mar 2026', code: '2526_E_1350', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'DBMS Level 1 - (CSE - core concept) - (20/03/2026 - 27/03/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+    { date: '30 Mar 2026', code: '2526_E_1351', roll_no: '7376232CT109', student_name: 'DHARINEESH V', year: 'III', department: 'COMPUTER TECHNOLOGY', points: 100, activity_type: 'P Skill', raw_type: 'P SKILL', activity_name: 'DBMS Level 2 - (CSE - core concept) - (20/03/2026 - 27/03/2026)', organizer: 'Mr. RAJ KUMAR V S / AD10953', isPS: true },
+  ];
+
+  VERIFIED_SEEDS.forEach((seed, sIdx) => {
+    if (!existingKeys.has(`${seed.code}_${seed.roll_no}`)) {
+      existingKeys.add(`${seed.code}_${seed.roll_no}`);
+      list.push({
+        id: `as-seed-${sIdx}`,
+        slNo: String(list.length + 1),
+        date: seed.date,
+        code: seed.code,
+        rollNo: seed.roll_no,
+        name: seed.student_name,
+        year: seed.year,
+        department: seed.department,
+        points: seed.points,
+        reward_points: seed.points.toLocaleString(),
+        activity_type: seed.activity_type,
+        raw_type: seed.raw_type,
+        activity_name: seed.activity_name,
+        course_name: seed.activity_name,
+        organizer: seed.organizer,
+        email: '',
+        type: 'positive',
+        isPS: seed.isPS
+      });
+    }
+  });
+
   return list;
 }
 
 export const STUDENT_EVENT_LOGS_MAP = parseEventLogs(rawData);
 export const ALL_REWARD_POINTS_ENTRIES = parseAllTransactions(rawData);
 export const TOTAL_PS_COMPLETIONS_COUNT = ALL_REWARD_POINTS_ENTRIES.filter(e => e.isPS).length;
+
+// Special Lab / Learning Track mapping parser (from Student Database sheet)
+export function parseSpecialLabTags(raw) {
+  const sdb = raw?.sheets?.['Student Database'] || [];
+  const map = {};
+  for (let i = 2; i < sdb.length; i++) {
+    const row = sdb[i];
+    if (!row) continue;
+    const roll = (row[1] || '').trim().toUpperCase();
+    const tag = (row[9] || '').trim().toUpperCase();
+    if (roll) {
+      map[roll] = {
+        code: tag || 'PBL',
+        label: tag === 'UAL' ? 'UAL (Fast-Track / Internship)' : (tag === 'PBL' ? 'PBL (Project-Based Learning)' : 'Standard Track'),
+        badgeClass: tag === 'UAL' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : (tag === 'PBL' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20')
+      };
+    }
+  }
+  return map;
+}
+
+export const STUDENT_SPECIAL_LAB_MAP = parseSpecialLabTags(rawData);
 
 // Reusable parser for 2D array of rows from Google Sheets API
 export function parseStudentRows(rows) {
@@ -397,6 +497,11 @@ export function parseStudentRows(rows) {
     ];
 
     const eventLogs = (STUDENT_EVENT_LOGS_MAP && STUDENT_EVENT_LOGS_MAP[rollNo]) || [];
+    const specialLab = (STUDENT_SPECIAL_LAB_MAP && STUDENT_SPECIAL_LAB_MAP[rollNo]) || {
+      code: 'PBL',
+      label: 'PBL (Project-Based Learning)',
+      badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+    };
 
     return {
       id: idx + 1,
@@ -408,6 +513,7 @@ export function parseStudentRows(rows) {
       courseCode,
       mentor,
       email,
+      specialLab,
       activityBreakdown,
       initialPoints,
       eventLogs,
