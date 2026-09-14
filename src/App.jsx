@@ -3205,7 +3205,9 @@ export default function App() {
       const saved = localStorage.getItem('bit_activity_logs');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.filter(l => l && !['log-1', 'log-2', 'log-3', 'log-4', 'log-5', 'log-6', 'log-7', 'log-8'].includes(l.id));
+        if (Array.isArray(parsed)) {
+          return parsed.filter(l => l && typeof l === 'object');
+        }
       }
     } catch (e) {}
     return [];
@@ -3294,57 +3296,87 @@ export default function App() {
     }
   };
 
-  // Fetch real-time logs from Firebase Database with student overriding/deduplication
+  // Fetch unified real-time and historical logs from Firebase Database
   const fetchFirebaseLogs = async (urlOverride) => {
     const targetUrl = (urlOverride || firebaseDbUrl || localStorage.getItem('bit_firebase_url') || DEFAULT_FIREBASE_DB_URL).trim().replace(/\/$/, '');
     if (!targetUrl || !targetUrl.startsWith('http')) return;
     
     setSheetSyncStatus('pinging');
     try {
-      // 1. First attempt to fetch from /active_users.json (unique per student)
-      let remoteList = [];
+      // 1. Fetch raw audit history from /logs.json
+      let cloudHistoryList = [];
+      try {
+        const res = await fetch(`${targetUrl}/logs.json`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === 'object') {
+            cloudHistoryList = Object.entries(data).map(([key, val]) => ({
+              ...val,
+              id: val.id || key,
+              source: val.source || 'cloud'
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn('Firebase logs fetch error:', e);
+      }
+
+      // 2. Fetch live presence from /active_users.json
+      let activeUsersList = [];
       try {
         const activeRes = await fetch(`${targetUrl}/active_users.json`);
         if (activeRes.ok) {
           const activeData = await activeRes.json();
           if (activeData && typeof activeData === 'object') {
-            remoteList = Object.entries(activeData).map(([key, val]) => ({
+            activeUsersList = Object.entries(activeData).map(([key, val]) => ({
               ...val,
-              id: val.id || key
+              id: val.id || `active-${key}`,
+              source: val.source || 'active_user'
             }));
           }
+        }
+      } catch (e) {
+        console.warn('Firebase active users fetch error:', e);
+      }
+
+      // 3. Load local cached logs
+      let localList = [];
+      try {
+        const saved = localStorage.getItem('bit_activity_logs');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) localList = parsed;
         }
       } catch (e) {}
 
-      // 2. If active_users is empty, fallback to /logs.json with deduplication by student identity
-      if (remoteList.length === 0) {
-        const res = await fetch(`${targetUrl}/logs.json`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && typeof data === 'object') {
-            const rawList = Object.entries(data).map(([key, val]) => ({
-              ...val,
-              id: val.id || key
-            }));
-            // Deduplicate: keep ONLY the newest event per student
-            const studentMap = new Map();
-            rawList.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-            for (const log of rawList) {
-              const k = (log.roll_no || log.email || log.name || '').toUpperCase().trim();
-              if (k && !studentMap.has(k)) {
-                studentMap.set(k, log);
-              }
-            }
-            remoteList = Array.from(studentMap.values());
-          }
+      // 4. Merge all sources: local + cloud history + active presence
+      // Deduplicate by unique log ID or (roll_no + action + timestamp)
+      const seenKeys = new Set();
+      const combined = [];
+
+      const allEntries = [...cloudHistoryList, ...activeUsersList, ...localList];
+
+      for (const log of allEntries) {
+        if (!log || typeof log !== 'object') continue;
+        const roll = (log.roll_no || log.id || '').toUpperCase().trim();
+        const action = (log.action || '').trim();
+        const ts = log.timestamp ? new Date(log.timestamp).getTime() : 0;
+        
+        const uniqueKey = log.id ? `${log.id}` : `${roll}_${action}_${Math.round(ts / 2000)}`;
+        if (!seenKeys.has(uniqueKey)) {
+          seenKeys.add(uniqueKey);
+          combined.push(log);
         }
       }
 
-      remoteList.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-      if (remoteList.length > 0) {
-        setActivityLogs(remoteList);
+      // Sort newest first
+      combined.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+      const finalizedList = combined.slice(0, 2000);
+
+      if (finalizedList.length > 0) {
+        setActivityLogs(finalizedList);
         try {
-          localStorage.setItem('bit_activity_logs', JSON.stringify(remoteList));
+          localStorage.setItem('bit_activity_logs', JSON.stringify(finalizedList));
         } catch (e) {}
       }
       setSheetSyncStatus('connected');
@@ -3363,7 +3395,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [activeNav]);
 
-  // Log activity helper (saves locally & overrides student presence in Firebase & Google Sheets)
+  // Log activity helper (saves locally & broadcasts to Firebase & Google Sheets without deleting past history)
   const logActivity = (student, action = 'Login') => {
     if (!student) return;
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
@@ -3375,27 +3407,25 @@ export default function App() {
     const studentName = student.name || student.student_name || 'BIT Student';
     const dept = student.department || student.dept || 'Computer Technology';
     const studentEmail = student.email || `${rollNo.toLowerCase()}@bitsathy.ac.in`;
+    const nowIso = new Date().toISOString();
+    const uniqueLogId = `log_${rollNo}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
     const newEntry = {
-      id: `student-${rollNo}`,
+      id: uniqueLogId,
       name: studentName,
       roll_no: rollNo,
       department: dept,
       email: studentEmail,
       action: action,
       device: deviceStr,
-      timestamp: new Date().toISOString(),
-      isOnline: action !== 'Logout' && action !== 'Session Expired'
+      timestamp: nowIso,
+      isOnline: action !== 'Logout' && action !== 'Session Expired',
+      source: 'live'
     };
 
-    // Override the student's entry in local state so same name is never duplicated
+    // Prepend new entry to activity logs while keeping the entire chronological history
     setActivityLogs(prev => {
-      const filtered = prev.filter(l => {
-        const existingRoll = (l.roll_no || l.id || '').toUpperCase().trim();
-        const existingName = (l.name || '').toUpperCase().trim();
-        return existingRoll !== rollNo && existingName !== studentName.toUpperCase().trim();
-      });
-      const updated = [newEntry, ...filtered].slice(0, 499);
+      const updated = [newEntry, ...prev.filter(l => l.id !== uniqueLogId)].slice(0, 2000);
       try {
         localStorage.setItem('bit_activity_logs', JSON.stringify(updated));
       } catch (e) {}
@@ -3408,14 +3438,14 @@ export default function App() {
       const cleanFUrl = fUrl.trim().replace(/\/$/, '');
       const sanitizedKey = (rollNo || studentEmail || studentName).replace(/[\.\#\$\/\[\]]/g, '_');
       try {
-        // Update/override unique student slot in active_users
+        // Update/override unique student slot in active_users for live presence
         fetch(`${cleanFUrl}/active_users/${encodeURIComponent(sanitizedKey)}.json`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newEntry)
         }).catch((err) => console.warn('Firebase active user update failed:', err));
 
-        // Also post to raw audit log
+        // Also post to raw chronological audit log for permanent history
         fetch(`${cleanFUrl}/logs.json`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -9093,64 +9123,108 @@ export default function App() {
                 <div className={`lg:col-span-8 rounded-3xl border overflow-hidden shadow-xl ${
                   isDarkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
                 }`}>
-                  {/* Table Header & Search Filter */}
-                  <div className={`p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  {/* Table Header & Search/Filters */}
+                  <div className={`p-4 sm:p-5 border-b space-y-3.5 ${
                     isDarkMode ? 'border-slate-800 bg-slate-950/60' : 'border-slate-100 bg-slate-50'
                   }`}>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className={`text-sm font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                          Live Student Activity Feed
-                        </h3>
-                        {(() => {
-                          const onlineCount = activityLogs.filter(l => {
-                            if (!l.timestamp) return false;
-                            const diffMins = (Date.now() - new Date(l.timestamp).getTime()) / 60000;
-                            return diffMins < 5 && l.action !== 'Logout' && l.action !== 'Session Expired';
-                          }).length;
-                          return (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                              {onlineCount} Online
-                            </span>
-                          );
-                        })()}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className={`text-sm font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                            Live & Historical Student Activity Feed
+                          </h3>
+                          {(() => {
+                            const onlineCount = activityLogs.filter(l => {
+                              if (!l.timestamp) return false;
+                              const diffMins = (Date.now() - new Date(l.timestamp).getTime()) / 60000;
+                              return diffMins < 5 && l.action !== 'Logout' && l.action !== 'Session Expired';
+                            }).length;
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                {onlineCount} Online
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <p className={`text-[11px] mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {activityLogs.length} total events tracked (All historical & real-time live events)
+                        </p>
                       </div>
-                      <p className={`text-[11px] mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {activityLogs.length} unique active students tracked in real time
-                      </p>
-                    </div>
 
-                    {/* Filter Input */}
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
+                      {/* Search Filter Input */}
+                      <div className="relative min-w-[220px]">
                         <Search className={`w-3.5 h-3.5 absolute left-3 top-2.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                         <input
                           type="text"
                           value={logFilterQuery}
                           onChange={(e) => setLogFilterQuery(e.target.value)}
-                          placeholder="Filter name, roll no, branch..."
-                          className={`pl-8 pr-3 py-1.5 rounded-xl text-xs border outline-none ${
-                            isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900 shadow-xs'
+                          placeholder="Filter name, roll, branch, action..."
+                          className={`w-full pl-8 pr-3 py-1.5 rounded-xl text-xs border outline-none ${
+                            isDarkMode ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 shadow-xs'
                           }`}
                         />
+                      </div>
+                    </div>
+
+                    {/* Filter Pills & Department Selector */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/50 dark:border-slate-800/60">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {[
+                          { id: 'ALL', label: 'All Activities' },
+                          { id: 'ONLINE', label: '🟢 Live Online' },
+                          { id: 'LOGIN', label: '🔑 Logins' },
+                          { id: 'SEARCH', label: '🔍 Searches' },
+                          { id: 'ARCHIVE', label: '📦 Historical Logs' }
+                        ].map(tab => (
+                          <button
+                            key={tab.id}
+                            onClick={() => setLogFilterAction(tab.id)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                              logFilterAction === tab.id
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : isDarkMode
+                                  ? 'bg-slate-800/70 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Department Filter Dropdown */}
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Dept:</span>
+                        <select
+                          value={logFilterDept}
+                          onChange={(e) => setLogFilterDept(e.target.value)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border outline-none cursor-pointer ${
+                            isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-800 shadow-xs'
+                          }`}
+                        >
+                          <option value="ALL">All Departments</option>
+                          {Array.from(new Set(activityLogs.map(l => l.department).filter(Boolean))).sort().map(d => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   </div>
 
                   {/* Table */}
-                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                  <div className="overflow-x-auto max-h-[460px] overflow-y-auto">
                     <table className="w-full text-left border-collapse">
                       <thead className={`text-[11px] uppercase tracking-wider sticky top-0 z-10 ${
-                        isDarkMode ? 'bg-slate-800/90 text-slate-400' : 'bg-slate-100 text-slate-600'
+                        isDarkMode ? 'bg-slate-800/95 text-slate-400 backdrop-blur-xs' : 'bg-slate-100 text-slate-600'
                       }`}>
                         <tr>
                           <th className="py-2.5 px-3.5">Student</th>
-                          <th className="py-2.5 px-3">Status</th>
+                          <th className="py-2.5 px-3">Live Presence</th>
                           <th className="py-2.5 px-3">Department</th>
-                          <th className="py-2.5 px-3">Latest Action</th>
+                          <th className="py-2.5 px-3">Action</th>
                           <th className="py-2.5 px-3">Device / OS</th>
-                          <th className="py-2.5 px-3 text-right">Last Active</th>
+                          <th className="py-2.5 px-3 text-right">Event Timestamp</th>
                         </tr>
                       </thead>
                       <tbody className={`text-xs divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-200'}`}>
@@ -9167,19 +9241,43 @@ export default function App() {
                         ) : (
                           activityLogs
                             .filter(l => {
-                              if (!logFilterQuery) return true;
-                              const q = logFilterQuery.toLowerCase();
-                              return (
-                                (l.name && l.name.toLowerCase().includes(q)) ||
-                                (l.roll_no && l.roll_no.toLowerCase().includes(q)) ||
-                                (l.department && l.department.toLowerCase().includes(q)) ||
-                                (l.action && l.action.toLowerCase().includes(q))
-                              );
+                              // 1. Text search filter
+                              if (logFilterQuery) {
+                                const q = logFilterQuery.toLowerCase();
+                                const match = (
+                                  (l.name && l.name.toLowerCase().includes(q)) ||
+                                  (l.roll_no && l.roll_no.toLowerCase().includes(q)) ||
+                                  (l.department && l.department.toLowerCase().includes(q)) ||
+                                  (l.action && l.action.toLowerCase().includes(q)) ||
+                                  (l.device && l.device.toLowerCase().includes(q))
+                                );
+                                if (!match) return false;
+                              }
+
+                              // 2. Department filter
+                              if (logFilterDept !== 'ALL' && l.department !== logFilterDept) {
+                                return false;
+                              }
+
+                              // 3. Action / Category Tab filter
+                              const diffMins = l.timestamp ? Math.floor((Date.now() - new Date(l.timestamp).getTime()) / 60000) : 999;
+                              if (logFilterAction === 'ONLINE') {
+                                return diffMins < 5 && l.action !== 'Logout' && l.action !== 'Session Expired';
+                              } else if (logFilterAction === 'LOGIN') {
+                                return l.action === 'Login';
+                              } else if (logFilterAction === 'SEARCH') {
+                                return l.action && l.action.startsWith('Search');
+                              } else if (logFilterAction === 'ARCHIVE') {
+                                return diffMins >= 60;
+                              }
+
+                              return true;
                             })
                             .map((log) => {
                               const diffMins = log.timestamp ? Math.floor((Date.now() - new Date(log.timestamp).getTime()) / 60000) : 999;
                               const isOnline = diffMins < 5 && log.action !== 'Logout' && log.action !== 'Session Expired';
-                              const isIdle = diffMins >= 5 && diffMins < 20 && log.action !== 'Logout' && log.action !== 'Session Expired';
+                              const isIdle = diffMins >= 5 && diffMins < 30 && log.action !== 'Logout' && log.action !== 'Session Expired';
+                              const isRecent = diffMins < 60;
 
                               let actionBadge = 'bg-indigo-950/80 text-indigo-300 border-indigo-800';
                               if (log.action === 'Login') {
@@ -9188,38 +9286,49 @@ export default function App() {
                                 actionBadge = 'bg-rose-950/80 text-rose-300 border-rose-800';
                               } else if (log.action === 'Session Expired') {
                                 actionBadge = 'bg-amber-950/80 text-amber-300 border-amber-800';
-                              } else if (log.action.startsWith('Search')) {
+                              } else if (log.action && log.action.startsWith('Search')) {
                                 actionBadge = 'bg-cyan-950/80 text-cyan-300 border-cyan-800';
                               }
 
                               return (
-                                <tr key={log.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
+                                <tr key={log.id || `${log.roll_no}_${log.timestamp}`} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
                                   <td className="py-3 px-3.5">
                                     <div className="font-bold truncate max-w-[140px] sm:max-w-[180px]">{log.name}</div>
-                                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
-                                      isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-300'
-                                    }`}>
-                                      {log.roll_no}
-                                    </span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                                        isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
+                                      }`}>
+                                        {log.roll_no}
+                                      </span>
+                                      {diffMins < 5 && (
+                                        <span className="text-[9px] font-black px-1 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                          LIVE
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="py-3 px-3">
                                     {isOnline ? (
                                       <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                        Online
+                                        Online Now
                                       </span>
                                     ) : isIdle ? (
                                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                                         Idle ({diffMins}m)
                                       </span>
+                                    ) : isRecent ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-300 bg-slate-800/60 px-2 py-0.5 rounded-full border border-slate-700">
+                                        Recent ({diffMins}m)
+                                      </span>
                                     ) : (
                                       <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 bg-slate-800/40 px-2 py-0.5 rounded-full border border-slate-700/60">
-                                        Offline
+                                        📦 Archive
                                       </span>
                                     )}
                                   </td>
-                                  <td className={`py-3 px-3 text-[11px] truncate max-w-[120px] ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  <td className={`py-3 px-3 text-[11px] truncate max-w-[120px] ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                                     {log.department}
                                   </td>
                                   <td className="py-3 px-3">
@@ -9227,11 +9336,26 @@ export default function App() {
                                       {log.action}
                                     </span>
                                   </td>
-                                  <td className={`py-3 px-3 text-[11px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  <td className={`py-3 px-3 text-[11px] font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                                     {log.device}
                                   </td>
                                   <td className={`py-3 px-3 text-right text-[10px] whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    {diffMins === 0 ? 'Just now' : diffMins < 60 ? `${diffMins}m ago` : new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {log.timestamp ? (
+                                      <div>
+                                        <div className="font-semibold text-slate-300 dark:text-slate-200">
+                                          {diffMins === 0
+                                            ? 'Just now'
+                                            : diffMins < 60
+                                              ? `${diffMins}m ago`
+                                              : new Date(log.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </div>
+                                        <div className="text-[9px] text-slate-500">
+                                          {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      '—'
+                                    )}
                                   </td>
                                 </tr>
                               );
