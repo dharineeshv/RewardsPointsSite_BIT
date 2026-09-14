@@ -296,46 +296,117 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
     loadLiveDepartmentData(selectedDept, false);
   }, [selectedDept, loadLiveDepartmentData]);
 
-  // Extract studentwise skew list from master sheet
+  // Extract student list from master Studentwise Reward Points sheet
   const studentSkewList = useMemo(() => {
-    const rawRows = rawData?.sheets?.['Studentwise Skew'] || [];
-    const list = [];
-    for (let i = 3; i < rawRows.length; i++) {
-      const row = rawRows[i];
-      if (!row || !row[1]) continue;
-      const roll = String(row[1]).trim().toUpperCase();
-      if (!/^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) continue;
+    const masterRows = rawData?.sheets?.['Studentwise Reward Points'] || [];
+    const skewRows = rawData?.sheets?.['Studentwise Skew'] || [];
 
-      const name = String(row[3] || '').trim();
-      const yr = String(row[5] || 'IV').trim();
-      const dept = String(row[6] || '').trim();
-      const bal = parseFloat(String(row[7] || '0').replace(/,/g, '')) || 0;
-      const courses = [];
-      for (let c = 8; c <= 16; c++) {
-        if (row[c] && row[c].trim() && row[c].trim() !== '0') {
-          courses.push(row[c].trim());
-        }
-      }
-
-      const specialLab = (STUDENT_SPECIAL_LAB_MAP && STUDENT_SPECIAL_LAB_MAP[roll]) || {
-        code: 'PBL',
-        label: 'PBL (Project-Based Learning)',
-        badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+    // Lookup map of skew metadata (theory count, lab count, ratio)
+    const skewMap = {};
+    for (let i = 3; i < skewRows.length; i++) {
+      const r = skewRows[i];
+      if (!r || !r[1]) continue;
+      const roll = String(r[1]).trim().toUpperCase();
+      skewMap[roll] = {
+        theoryCount: r[17] || '0',
+        labCount: r[18] || '0',
+        ratio: r[19] || '0'
       };
+    }
 
-      list.push({
-        id: `skew-${i}`,
-        rollNo: roll,
-        name: name || roll,
-        year: yr,
-        department: dept,
-        specialLab,
-        balancePoints: bal,
-        courses,
-        theoryCount: row[17] || '0',
-        labCount: row[18] || '0',
-        ratio: row[19] || '0'
-      });
+    const list = [];
+
+    if (masterRows.length > 2) {
+      for (let i = 2; i < masterRows.length; i++) {
+        const row = masterRows[i];
+        if (!row || !row[1]) continue;
+        const roll = String(row[1]).trim().toUpperCase();
+        if (!/^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) continue;
+
+        const name = String(row[3] || '').trim();
+        const yr = String(row[5] || 'IV').trim();
+        const dept = String(row[6] || '').trim();
+        const bal = parseFloat(String(row[39] || '0').replace(/,/g, '')) || 0;
+        const cum = parseFloat(String(row[37] || '0').replace(/,/g, '')) || 0;
+        const red = parseFloat(String(row[38] || '0').replace(/,/g, '')) || 0;
+
+        const courses = [];
+        // TS1 to TS9: indices 40 to 48
+        for (let c = 40; c <= 48; c++) {
+          if (row[c] && String(row[c]).trim() && String(row[c]).trim() !== '0') {
+            courses.push(String(row[c]).trim());
+          }
+        }
+        // LS1 to LS2: indices 49 to 50
+        for (let c = 49; c <= 50; c++) {
+          if (row[c] && String(row[c]).trim() && String(row[c]).trim() !== '0') {
+            courses.push(String(row[c]).trim());
+          }
+        }
+
+        const specialLab = (STUDENT_SPECIAL_LAB_MAP && STUDENT_SPECIAL_LAB_MAP[roll]) || {
+          code: 'PBL',
+          label: 'PBL (Project-Based Learning)',
+          badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+        };
+
+        const skewMeta = skewMap[roll] || {};
+
+        list.push({
+          id: `master-${i}`,
+          rollNo: roll,
+          name: name || roll,
+          year: yr,
+          department: dept,
+          specialLab,
+          balancePoints: bal,
+          cumulativePoints: cum,
+          redeemedPoints: red,
+          courses,
+          theoryCount: skewMeta.theoryCount || String(courses.length),
+          labCount: skewMeta.labCount || '0',
+          ratio: skewMeta.ratio || '0'
+        });
+      }
+    } else {
+      // Fallback to Studentwise Skew
+      for (let i = 3; i < skewRows.length; i++) {
+        const row = skewRows[i];
+        if (!row || !row[1]) continue;
+        const roll = String(row[1]).trim().toUpperCase();
+        if (!/^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) continue;
+
+        const name = String(row[3] || '').trim();
+        const yr = String(row[5] || 'IV').trim();
+        const dept = String(row[6] || '').trim();
+        const bal = parseFloat(String(row[7] || '0').replace(/,/g, '')) || 0;
+        const courses = [];
+        for (let c = 8; c <= 16; c++) {
+          if (row[c] && row[c].trim() && row[c].trim() !== '0') {
+            courses.push(row[c].trim());
+          }
+        }
+
+        const specialLab = (STUDENT_SPECIAL_LAB_MAP && STUDENT_SPECIAL_LAB_MAP[roll]) || {
+          code: 'PBL',
+          label: 'PBL (Project-Based Learning)',
+          badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+        };
+
+        list.push({
+          id: `skew-${i}`,
+          rollNo: roll,
+          name: name || roll,
+          year: yr,
+          department: dept,
+          specialLab,
+          balancePoints: bal,
+          courses,
+          theoryCount: row[17] || '0',
+          labCount: row[18] || '0',
+          ratio: row[19] || '0'
+        });
+      }
     }
     return list;
   }, []);

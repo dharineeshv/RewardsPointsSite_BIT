@@ -324,7 +324,24 @@ export async function fetchDepartmentSheetData(department = 'CT', useCache = tru
     } catch (e) {}
   }
 
-  // 1. Try Backend Proxy /api/points/sheet-data
+  // 1. Try Live Apps Script Web App Connector for complete department student list (0ms direct cloud connector)
+  if (APPS_SCRIPT_SHEET_URL) {
+    try {
+      const url = `${APPS_SCRIPT_SHEET_URL}?department=${encodeURIComponent(tabName)}&_t=${Date.now()}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.success && Array.isArray(json.students) && json.students.length > 0) {
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), students: json.students }));
+          } catch (e) {}
+          return json.students;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. Try Backend Proxy /api/points/sheet-data
   try {
     const res = await fetch(`/api/points/sheet-data?tab=${encodeURIComponent(tabName)}&gid=${targetGid}`);
     if (res.ok) {
@@ -338,7 +355,7 @@ export async function fetchDepartmentSheetData(department = 'CT', useCache = tru
     }
   } catch (e) {}
 
-  // 2. Try Direct JSONP by GID (fast, no CORS, carries Google session cookies)
+  // 3. Try Direct JSONP by GID (fast, no CORS, carries Google session cookies)
   try {
     const payload = await fetchGVizJsonp(SPREADSHEET_ID, null, targetGid);
     if (payload && payload.table) {
@@ -574,7 +591,8 @@ export async function fetchStudentRewardPointsFromSheet(rollNo, department = 'CT
   // 1. Query live Apps Script Web App Connector directly with department hint for sub-second execution
   if (APPS_SCRIPT_SHEET_URL) {
     try {
-      const res = await fetch(`${APPS_SCRIPT_SHEET_URL}?rollNo=${encodeURIComponent(cleanRoll)}&dept=${encodeURIComponent(targetDept)}`);
+      const url = `${APPS_SCRIPT_SHEET_URL}?rollNo=${encodeURIComponent(cleanRoll)}&dept=${encodeURIComponent(targetDept)}&_t=${Date.now()}`;
+      const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const result = await res.json();
         if (result && result.success && result.data) {

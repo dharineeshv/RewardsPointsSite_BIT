@@ -48,7 +48,7 @@ function doGet(e) {
     }
 
     if (rollNo) {
-      const studentData = findStudentByRoll(ss, rollNo);
+      const studentData = findStudentByRoll(ss, rollNo, department);
       if (studentData) {
         return createJsonResponse({
           success: true,
@@ -228,14 +228,54 @@ function findAveragesTableInSheet(ss) {
   return null;
 }
 
-function findStudentByRoll(ss, targetRoll) {
+function findStudentByRoll(ss, targetRoll, targetDept = '') {
   const cleanRoll = String(targetRoll).trim().toUpperCase();
-  const sheets = ss.getSheets();
+  
+  // Deduce department code from roll e.g. 7376232CT142 -> CT, 7376222IT101 -> IT, 7376231CS102 -> CSE
+  let deptHint = targetDept ? String(targetDept).trim().toUpperCase() : '';
+  if (!deptHint || deptHint === 'ALL') {
+    if (cleanRoll.includes('CT')) deptHint = 'CT';
+    else if (cleanRoll.includes('CS') || cleanRoll.includes('CSE')) deptHint = 'CSE';
+    else if (cleanRoll.includes('IT')) deptHint = 'IT';
+    else if (cleanRoll.includes('AD') || cleanRoll.includes('AIDS')) deptHint = 'AI&DS';
+    else if (cleanRoll.includes('AL') || cleanRoll.includes('AIML')) deptHint = 'AIML';
+    else if (cleanRoll.includes('EC') || cleanRoll.includes('ECE')) deptHint = 'ECE';
+    else if (cleanRoll.includes('EE') || cleanRoll.includes('EEE')) deptHint = 'EEE';
+    else if (cleanRoll.includes('ME') || cleanRoll.includes('MECH')) deptHint = 'MECH';
+    else if (cleanRoll.includes('BT')) deptHint = 'BT';
+    else if (cleanRoll.includes('BM')) deptHint = 'BIOMEDICAL';
+    else if (cleanRoll.includes('AG')) deptHint = 'AGRI';
+    else if (cleanRoll.includes('CE')) deptHint = 'CIVIL';
+    else if (cleanRoll.includes('FD')) deptHint = 'FD';
+    else if (cleanRoll.includes('FT')) deptHint = 'FT';
+    else if (cleanRoll.includes('EI')) deptHint = 'EIE';
+    else if (cleanRoll.includes('IS') || cleanRoll.includes('SE')) deptHint = 'ISE';
+    else if (cleanRoll.includes('MZ') || cleanRoll.includes('MT') || cleanRoll.includes('MC')) deptHint = 'MTRS';
+  }
 
-  for (let i = 0; i < sheets.length; i++) {
-    const sheet = sheets[i];
+  // Build sheet list prioritizing department sheet first, then Studentwise Reward Points, then others
+  const allSheets = ss.getSheets();
+  const sortedSheets = [];
+  
+  // 1. Department tab first (e.g. 'CT', 'CSE')
+  if (deptHint) {
+    const deptSheet = ss.getSheetByName(deptHint) || allSheets.find(s => s.getName().toUpperCase() === deptHint);
+    if (deptSheet) sortedSheets.push(deptSheet);
+  }
+  
+  // 2. Master Studentwise Reward Points sheet second
+  const masterSheet = ss.getSheetByName('Studentwise Reward Points');
+  if (masterSheet && !sortedSheets.includes(masterSheet)) sortedSheets.push(masterSheet);
+  
+  // 3. Other sheets
+  allSheets.forEach(s => {
+    if (!sortedSheets.includes(s)) sortedSheets.push(s);
+  });
+
+  for (let i = 0; i < sortedSheets.length; i++) {
+    const sheet = sortedSheets[i];
     const sheetName = sheet.getName();
-    if (sheetName === 'INDEX' || sheetName === 'Statistics') continue;
+    if (sheetName === 'INDEX' || sheetName === 'Statistics' || sheetName === 'Template' || sheetName === 'Mail' || sheetName === 'Dashboard') continue;
 
     const data = sheet.getDataRange().getValues();
     if (!data || data.length < 2) continue;
@@ -457,29 +497,60 @@ function findStudentByRoll(ss, targetRoll) {
   return null;
 }
 
-function getDepartmentStudents(ss, dept) {
-  const sheet = ss.getSheetByName(dept) || ss.getSheetByName(dept.toUpperCase());
+function getDepartmentStudents(ss, deptInput) {
+  let dept = String(deptInput || '').trim().toUpperCase();
+  if (dept.includes('COMPUTER TECH') || dept === 'CT') dept = 'CT';
+  else if (dept.includes('COMPUTER SCI') || dept === 'CSE' || dept === 'CS') dept = 'CSE';
+  else if (dept.includes('ELECTRONICS & COMM') || dept.includes('ELECTRONICS AND COMM') || dept === 'ECE' || dept === 'EC') dept = 'ECE';
+  else if (dept.includes('INFORMATION TECH') || dept === 'IT') dept = 'IT';
+  else if (dept.includes('ARTIFICIAL INTELLIGENCE & DATA') || dept.includes('AI & DS') || dept.includes('AI&DS') || dept === 'AD') dept = 'AI&DS';
+  else if (dept.includes('ARTIFICIAL INTELLIGENCE & MACHINE') || dept.includes('AIML') || dept === 'AM') dept = 'AIML';
+  else if (dept.includes('MECHANICAL') || dept === 'MECH' || dept === 'ME') dept = 'MECH';
+  else if (dept.includes('ELECTRICAL & ELECTRONICS') || dept.includes('EEE') || dept === 'EE') dept = 'EEE';
+  else if (dept.includes('DESIGN') || dept === 'CSD') dept = 'CSD';
+  else if (dept.includes('BUSINESS') || dept === 'CSBS' || dept === 'CB') dept = 'CSBS';
+  else if (dept.includes('BIOTECH') || dept === 'BT') dept = 'BT';
+  else if (dept.includes('BIOMEDICAL') || dept === 'BM') dept = 'BIOMEDICAL';
+  else if (dept.includes('AGRICULTURE') || dept.includes('AGRI') || dept === 'AG') dept = 'AGRI';
+  else if (dept.includes('CIVIL') || dept === 'CE') dept = 'CIVIL';
+  else if (dept.includes('FASHION') || dept === 'FD') dept = 'FD';
+  else if (dept.includes('FOOD') || dept === 'FT') dept = 'FT';
+  else if (dept.includes('INSTRUMENTATION') || dept === 'EIE' || dept === 'EI') dept = 'EIE';
+  else if (dept.includes('INFORMATION SCI') || dept === 'ISE' || dept === 'IS') dept = 'ISE';
+  else if (dept.includes('MECHATRONICS') || dept === 'MTRS' || dept === 'MC') dept = 'MTRS';
+
+  const allSheets = ss.getSheets();
+  let sheet = ss.getSheetByName(dept) || allSheets.find(s => s.getName().toUpperCase() === dept || s.getName().toUpperCase().includes(dept));
   if (!sheet) return [];
 
   const data = sheet.getDataRange().getValues();
   const students = [];
 
   let headerIdx = -1;
-  let rollCol = -1, nameCol = -1, balCol = -1, cumCol = -1, redCol = -1;
+  let rollCol = -1, nameCol = -1, balCol = -1, cumCol = -1, redCol = -1, mentorCol = -1, yearCol = -1;
 
   for (let r = 0; r < Math.min(data.length, 6); r++) {
-    const row = data[r].map(c => String(c || '').trim().toUpperCase());
+    const row = data[r].map(c => String(c || '').trim().toUpperCase().replace(/\s+/g, ' '));
     const rIdx = row.findIndex(c => c.includes('ROLL') || c.includes('REGISTER'));
     const nIdx = row.findIndex(c => c.includes('NAME') || c.includes('STUDENT'));
     if (rIdx !== -1 && nIdx !== -1) {
       headerIdx = r;
       rollCol = rIdx;
       nameCol = nIdx;
-      balCol = row.findIndex(c => c.includes('BALANCE') || c.includes('REMAINING') || c.includes('AVAILABLE'));
-      if (balCol === -1) balCol = 9;
+      yearCol = row.findIndex(c => c === 'YEAR' || c.includes('YR') || c.includes('BATCH'));
+      mentorCol = row.findIndex(c => c.includes('MENTOR') || c.includes('FACULTY'));
+      
+      let lastBalIdx = -1;
+      for (let c = row.length - 1; c >= 0; c--) {
+        if (row[c].includes('BALANCE') || row[c].includes('REMAINING') || row[c].includes('AVAILABLE')) {
+          lastBalIdx = c;
+          break;
+        }
+      }
+      balCol = lastBalIdx !== -1 ? lastBalIdx : 9;
       cumCol = row.findIndex(c => c.includes('CUMULATIVE') || c.includes('TOTAL'));
       if (cumCol === -1) cumCol = 7;
-      redCol = row.findIndex(c => c.includes('REDEEM'));
+      redCol = row.findIndex(c => c.includes('REEDEM') || c.includes('REDEEM') || c.includes('UTILIZ') || c.includes('CLAIM'));
       if (redCol === -1) redCol = 8;
       break;
     }
@@ -496,14 +567,25 @@ function getDepartmentStudents(ss, dept) {
     const bal = parseNum(row[balCol !== -1 ? balCol : 9]);
     const cum = parseNum(row[cumCol !== -1 ? cumCol : 7]);
     const red = parseNum(row[redCol !== -1 ? redCol : 8]);
+    const mentor = mentorCol !== -1 && row[mentorCol] ? String(row[mentorCol]).trim() : '';
+    const yr = yearCol !== -1 && row[yearCol] ? String(row[yearCol]).trim() : 'IV';
 
     students.push({
       roll_no: roll,
+      rollNo: roll,
+      id: roll,
       name: name,
+      student_name: name,
+      year: yr,
       department: dept,
+      mentor: mentor,
       balance_points: bal,
+      currentPoints: String(bal),
+      points: bal,
       cumulative_points: cum,
-      redeemed_points: red
+      cumulativePoints: String(cum),
+      redeemed_points: red,
+      redeemedPoints: String(red)
     });
   }
 
