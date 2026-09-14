@@ -1,0 +1,506 @@
+/**
+ * BIT Reward Points - Google Apps Script Dynamic Sheet Connector
+ * Spreadsheet: https://docs.google.com/spreadsheets/d/1t5uHtrRMSXQkxrFRUudDpwuN23A6K61PhdrjDNZFaV8/edit?gid=829636275#gid=829636275
+ * 
+ * -----------------------------------------------------------------------------------
+ * INSTRUCTIONS TO UPDATE (Takes 30 seconds):
+ * -----------------------------------------------------------------------------------
+ * 1. Open https://script.google.com/ and open your "BIT Reward Points Live Sheet API" project.
+ * 2. Replace the code with this updated version and click Save (Ctrl + S).
+ * 3. Click "Deploy" (top right) -> "Manage deployments".
+ * 4. Click the Edit (pencil) icon next to the active deployment.
+ * 5. Under "Version", select "New version" and click "Deploy".
+ * -----------------------------------------------------------------------------------
+ */
+
+const SPREADSHEET_ID = '1t5uHtrRMSXQkxrFRUudDpwuN23A6K61PhdrjDNZFaV8';
+
+function doGet(e) {
+  try {
+    const params = e && e.parameter ? e.parameter : {};
+    const action = (params.action || '').trim().toLowerCase();
+    const rollNo = (params.rollNo || params.roll || params.id || '').trim().toUpperCase();
+    const department = (params.department || params.dept || params.tab || '').trim().toUpperCase();
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    if (action === 'debug_sheets' || action === 'tabs') {
+      const sheetNames = ss.getSheets().map(s => ({
+        name: s.getName(),
+        gid: s.getSheetId(),
+        rows: s.getLastRow(),
+        cols: s.getLastColumn()
+      }));
+      return createJsonResponse({ success: true, sheets: sheetNames });
+    }
+
+    if (action === 'averages' || action === 'benchmarks' || (!rollNo && !department)) {
+      const sheetAverages = findAveragesTableInSheet(ss);
+      if (sheetAverages) {
+        return createJsonResponse({
+          success: true,
+          source: 'Google Sheet (Given in Sheet Table)',
+          averages: sheetAverages.averages,
+          foundIn: sheetAverages.foundIn,
+          rawTable: sheetAverages.rawTable
+        });
+      }
+    }
+
+    if (rollNo) {
+      const studentData = findStudentByRoll(ss, rollNo);
+      if (studentData) {
+        return createJsonResponse({
+          success: true,
+          source: 'Google Sheet (Dynamic Live Sync)',
+          data: studentData
+        });
+      } else {
+        return createJsonResponse({
+          success: false,
+          message: 'Student with roll number ' + rollNo + ' not found in sheet.',
+          data: null
+        });
+      }
+    }
+
+    if (department) {
+      const deptStudents = getDepartmentStudents(ss, department);
+      return createJsonResponse({
+        success: true,
+        department: department,
+        count: deptStudents.length,
+        students: deptStudents
+      });
+    }
+
+    const allData = getAllDepartmentsSummary(ss);
+    return createJsonResponse({
+      success: true,
+      timestamp: new Date().toISOString(),
+      ...allData
+    });
+
+  } catch (err) {
+    return createJsonResponse({
+      success: false,
+      error: err.toString()
+    });
+  }
+}
+
+function findAveragesTableInSheet(ss) {
+  // Priority 1: Direct extraction from the 'Details' sheet (gid: 847680829)
+  const detailsSheet = ss.getSheetByName('Details') || 
+    ss.getSheets().find(s => s.getSheetId() == 847680829 || String(s.getSheetId()) === '847680829') ||
+    ss.getSheetByName('DETAILS') || 
+    ss.getSheetByName('Details & Benchmarks');
+  if (detailsSheet) {
+    const data = detailsSheet.getDataRange().getValues();
+    if (data && data.length > 0) {
+      let yearICols = [];
+      let yearIICols = [];
+      let yearIIICols = [];
+      let yearIVCols = [];
+
+      // Detect column positions of I YEAR, II YEAR, III YEAR, IV YEAR
+      for (let r = 0; r < Math.min(data.length, 12); r++) {
+        const row = data[r];
+        for (let c = 0; c < row.length; c++) {
+          const cell = String(row[c] || '').trim().toUpperCase();
+          if (cell === 'I YEAR' || cell === '1ST YEAR' || cell === 'YEAR I' || cell === 'I') {
+            yearICols.push(c);
+          } else if (cell === 'II YEAR' || cell === '2ND YEAR' || cell === 'YEAR II' || cell === 'II') {
+            yearIICols.push(c);
+          } else if (cell === 'III YEAR' || cell === '3RD YEAR' || cell === 'YEAR III' || cell === 'III') {
+            yearIIICols.push(c);
+          } else if (cell === 'IV YEAR' || cell === '4TH YEAR' || cell === 'FINAL YEAR' || cell === 'YEAR IV' || cell === 'IV') {
+            yearIVCols.push(c);
+          }
+        }
+      }
+
+      // Find the row labeled "AVERAGE REWARD POINT" or "AVERAGE"
+      for (let r = 0; r < data.length; r++) {
+        const row = data[r];
+        const rowText = row.map(c => String(c || '').trim().toUpperCase()).join(' ');
+        
+        if (rowText.includes('AVERAGE REWARD POINT') || rowText.includes('AVERAGE') || rowText.includes('AVG')) {
+          let y1 = 0, y2 = 0, y3 = 0, y4 = 0;
+          
+          if (yearICols.length > 0) {
+            for (const c of yearICols) {
+              const v = parseNum(row[c]);
+              if (v > 0) { y1 = v; break; }
+            }
+          }
+          if (yearIICols.length > 0) {
+            for (const c of yearIICols) {
+              const v = parseNum(row[c]);
+              if (v > 0) { y2 = v; break; }
+            }
+          }
+          if (yearIIICols.length > 0) {
+            for (const c of yearIIICols) {
+              const v = parseNum(row[c]);
+              if (v > 0) { y3 = v; break; }
+            }
+          }
+          if (yearIVCols.length > 0) {
+            for (const c of yearIVCols) {
+              const v = parseNum(row[c]);
+              if (v > 0) { y4 = v; break; }
+            }
+          }
+
+          // Fallback if specific column indexes were merged
+          if (!y1 && !y2 && !y3 && !y4) {
+            const numbers = [];
+            row.forEach((cell, idx) => {
+              const num = parseNum(cell);
+              if (num > 0) numbers.push({ col: idx, val: num });
+            });
+            if (numbers.length >= 4) {
+              y1 = numbers[0].val;
+              y2 = numbers[1].val;
+              y3 = numbers[2].val;
+              y4 = numbers[3].val;
+            } else if (numbers.length > 0) {
+              numbers.forEach((n, i) => {
+                if (i === 0) y1 = n.val;
+                if (i === 1) y2 = n.val;
+                if (i === 2) y3 = n.val;
+                if (i === 3) y4 = n.val;
+              });
+            }
+          }
+
+          if (y1 > 0 || y2 > 0 || y3 > 0 || y4 > 0) {
+            return {
+              foundIn: 'Details Sheet (Row ' + (r + 1) + ')',
+              averages: {
+                year_1: y1,
+                year_2: y2,
+                year_3: y3,
+                year_4: y4
+              },
+              rawRow: row.filter(c => c !== '')
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Priority 2: Inspect other tabs and embedded chart ranges
+  const allSheets = ss.getSheets();
+  for (let i = 0; i < allSheets.length; i++) {
+    const sheet = allSheets[i];
+    const sheetName = sheet.getName();
+    if (sheetName === 'Details') continue;
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length === 0) continue;
+
+    for (let r = 0; r < data.length; r++) {
+      const row = data[r];
+      const rowText = row.map(c => String(c || '').trim().toUpperCase()).join(' ');
+      if (rowText.includes('AVERAGE REWARD POINT') || rowText.includes('AVERAGE')) {
+        const numbers = [];
+        row.forEach(cell => {
+          const num = parseNum(cell);
+          if (num > 0) numbers.push(num);
+        });
+        if (numbers.length >= 3) {
+          return {
+            foundIn: sheetName + ' (Row ' + (r + 1) + ')',
+            averages: {
+              year_1: numbers[0] || 0,
+              year_2: numbers[1] || 0,
+              year_3: numbers[2] || 0,
+              year_4: numbers[3] || 0
+            }
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function findStudentByRoll(ss, targetRoll) {
+  const cleanRoll = String(targetRoll).trim().toUpperCase();
+  const sheets = ss.getSheets();
+
+  for (let i = 0; i < sheets.length; i++) {
+    const sheet = sheets[i];
+    const sheetName = sheet.getName();
+    if (sheetName === 'INDEX' || sheetName === 'Statistics') continue;
+
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length < 2) continue;
+
+    let headerIdx = -1;
+    let rollCol = -1, nameCol = -1, yearCol = -1, deptCol = -1, mentorCol = -1;
+    let balCol = -1, cumCol = -1, redCol = -1;
+
+    // Detect header row and exact column indexes
+    for (let r = 0; r < Math.min(data.length, 6); r++) {
+      const row = data[r].map(c => String(c || '').trim().toUpperCase().replace(/\s+/g, ' '));
+      const rIdx = row.findIndex(c => c.includes('ROLL') || c.includes('REGISTER'));
+      const nIdx = row.findIndex(c => c.includes('NAME') || c.includes('STUDENT'));
+      
+      if (rIdx !== -1 && nIdx !== -1) {
+        headerIdx = r;
+        rollCol = rIdx;
+        nameCol = nIdx;
+        yearCol = row.findIndex(c => c === 'YEAR' || c.includes('YR') || c.includes('BATCH'));
+        deptCol = row.findIndex(c => c.includes('DEPT') || c.includes('DEPARTMENT') || c.includes('BRANCH'));
+        mentorCol = row.findIndex(c => c.includes('MENTOR') || c.includes('FACULTY'));
+        
+        // Match Cumulative (e.g. "CUMULATIVE REWARD POINTS")
+        cumCol = row.findIndex(c => c.includes('CUMULATIVE') || c.includes('TOTAL REWARD') || c.includes('TOTAL POINT'));
+        
+        // Match Redeemed - note handles the sheet typo "REEDEMED POINTS" and "REDEEMED POINTS"
+        redCol = row.findIndex(c => c.includes('REEDEM') || c.includes('REDEEM') || c.includes('UTILIZ') || c.includes('CLAIM'));
+        
+        // Match Balance - find the LAST/rightmost column with "BALANCE" (Col 9 in the sheet)
+        let lastBalIdx = -1;
+        for (let c = row.length - 1; c >= 0; c--) {
+          if (row[c].includes('BALANCE') || row[c].includes('REMAINING') || row[c].includes('AVAILABLE')) {
+            lastBalIdx = c;
+            break;
+          }
+        }
+        balCol = lastBalIdx !== -1 ? lastBalIdx : (row.length > 9 ? 9 : -1);
+
+        // Fallbacks based on exact sheet layout: [SL, YEAR, ROLL, NAME, BAL_OPT, DEPT, MENTOR, CUMULATIVE, REEDEMED, BALANCE]
+        if (rollCol === -1) rollCol = 2;
+        if (nameCol === -1) nameCol = 3;
+        if (yearCol === -1) yearCol = 1;
+        if (deptCol === -1) deptCol = 5;
+        if (mentorCol === -1) mentorCol = 6;
+        if (cumCol === -1) cumCol = 7;
+        if (redCol === -1) redCol = 8;
+        if (balCol === -1) balCol = 9;
+        break;
+      }
+    }
+
+    const startRow = headerIdx !== -1 ? headerIdx + 1 : 1;
+
+    for (let r = startRow; r < data.length; r++) {
+      const row = data[r];
+      let rowRoll = '';
+      let rowName = '';
+      let rowYear = '';
+      let rowDept = sheetName;
+      let rowMentor = '';
+      let rowBal = 0;
+      let rowCum = 0;
+      let rowRed = 0;
+
+      if (headerIdx !== -1 && rollCol !== -1) {
+        rowRoll = String(row[rollCol] || '').trim().toUpperCase();
+        rowName = String(row[nameCol] || '').trim();
+        rowYear = yearCol !== -1 ? String(row[yearCol] || '').trim() : '';
+        rowDept = deptCol !== -1 && row[deptCol] ? String(row[deptCol]).trim() : sheetName;
+        rowMentor = mentorCol !== -1 ? String(row[mentorCol] || '').trim() : '';
+        
+        // Exact values from columns: Col 7 = Cumulative, Col 8 = Redeemed, Col 9 = Balance
+        rowCum = cumCol !== -1 ? parseNum(row[cumCol]) : parseNum(row[7]);
+        rowRed = redCol !== -1 ? parseNum(row[redCol]) : parseNum(row[8]);
+        
+        // If Col 9 has a value, use it. Otherwise compute Cumulative - Redeemed
+        const col9Val = balCol !== -1 ? row[balCol] : row[9];
+        if (col9Val !== undefined && col9Val !== null && String(col9Val).trim() !== '') {
+          rowBal = parseNum(col9Val);
+        } else if (rowCum > 0 || rowRed > 0) {
+          rowBal = Math.max(0, rowCum - rowRed);
+        }
+      } else {
+        for (let c = 0; c < Math.min(row.length, 5); c++) {
+          const val = String(row[c] || '').trim().toUpperCase();
+          if (val.length >= 8 && /^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(val)) {
+            rowRoll = val;
+            if (c === 2) {
+              rowYear = String(row[1] || '').trim();
+              rowName = String(row[3] || '').trim();
+              rowMentor = String(row[6] || '').trim();
+              rowCum = parseNum(row[7]);
+              rowRed = parseNum(row[8]);
+              rowBal = parseNum(row[9]);
+            } else {
+              rowName = String(row[c + 1] || '').trim();
+              rowBal = parseNum(row[c + 2]);
+              rowCum = rowBal;
+            }
+            break;
+          }
+        }
+      }
+
+      if (rowRoll === cleanRoll || rowRoll.includes(cleanRoll)) {
+        return {
+          roll_no: rowRoll,
+          rollNo: rowRoll,
+          id: rowRoll,
+          name: rowName || ('Student (' + rowRoll + ')'),
+          student_name: rowName || ('Student (' + rowRoll + ')'),
+          year: rowYear || 'IV',
+          department: rowDept || sheetName,
+          mentor: rowMentor || '',
+          mentor_name: rowMentor || '',
+          balance_points: rowBal,
+          currentPoints: String(rowBal),
+          points: rowBal,
+          cumulative_points: rowCum,
+          cumulativePoints: String(rowCum),
+          redeemed_points: rowRed,
+          redeemedPoints: String(rowRed),
+          sheetTab: sheetName,
+          fetchedAt: new Date().toISOString()
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function getDepartmentStudents(ss, dept) {
+  const sheet = ss.getSheetByName(dept) || ss.getSheetByName(dept.toUpperCase());
+  if (!sheet) return [];
+
+  const data = sheet.getDataRange().getValues();
+  const students = [];
+
+  let headerIdx = -1;
+  let rollCol = -1, nameCol = -1, balCol = -1, cumCol = -1, redCol = -1;
+
+  for (let r = 0; r < Math.min(data.length, 6); r++) {
+    const row = data[r].map(c => String(c || '').trim().toUpperCase());
+    const rIdx = row.findIndex(c => c.includes('ROLL') || c.includes('REGISTER'));
+    const nIdx = row.findIndex(c => c.includes('NAME') || c.includes('STUDENT'));
+    if (rIdx !== -1 && nIdx !== -1) {
+      headerIdx = r;
+      rollCol = rIdx;
+      nameCol = nIdx;
+      balCol = row.findIndex(c => c.includes('BALANCE') || c.includes('REMAINING') || c.includes('AVAILABLE'));
+      if (balCol === -1) balCol = 9;
+      cumCol = row.findIndex(c => c.includes('CUMULATIVE') || c.includes('TOTAL'));
+      if (cumCol === -1) cumCol = 7;
+      redCol = row.findIndex(c => c.includes('REDEEM'));
+      if (redCol === -1) redCol = 8;
+      break;
+    }
+  }
+
+  const startRow = headerIdx !== -1 ? headerIdx + 1 : 1;
+
+  for (let r = startRow; r < data.length; r++) {
+    const row = data[r];
+    const roll = String(row[rollCol !== -1 ? rollCol : 2] || '').trim().toUpperCase();
+    if (!roll || !/^[0-9]{5,7}[A-Z]{2,4}[0-9]{2,4}/.test(roll)) continue;
+
+    const name = String(row[nameCol !== -1 ? nameCol : 3] || '').trim();
+    const bal = parseNum(row[balCol !== -1 ? balCol : 9]);
+    const cum = parseNum(row[cumCol !== -1 ? cumCol : 7]);
+    const red = parseNum(row[redCol !== -1 ? redCol : 8]);
+
+    students.push({
+      roll_no: roll,
+      name: name,
+      department: dept,
+      balance_points: bal,
+      cumulative_points: cum,
+      redeemed_points: red
+    });
+  }
+
+  return students;
+}
+
+function getAllDepartmentsSummary(ss) {
+  const sheets = ss.getSheets();
+  let totalStudents = 0;
+  const yearStats = {
+    year_1: { sum: 0, count: 0 },
+    year_2: { sum: 0, count: 0 },
+    year_3: { sum: 0, count: 0 },
+    year_4: { sum: 0, count: 0 }
+  };
+
+  sheets.forEach(sheet => {
+    const name = sheet.getName();
+    if (name === 'INDEX' || name === 'Statistics') return;
+
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length < 2) return;
+
+    let balCol = -1;
+    let yrCol = -1;
+    for (let r = 0; r < Math.min(data.length, 5); r++) {
+      const row = data[r].map(c => String(c || '').trim().toUpperCase());
+      for (let c = row.length - 1; c >= 0; c--) {
+        if (row[c].includes('BALANCE') || row[c].includes('REMAINING')) {
+          balCol = c;
+          break;
+        }
+      }
+      yrCol = row.findIndex(c => c === 'YEAR' || c.includes('YR') || c.includes('BATCH'));
+      if (balCol !== -1 && yrCol !== -1) break;
+    }
+    if (balCol === -1) balCol = 9;
+    if (yrCol === -1) yrCol = 1;
+
+    for (let r = 1; r < data.length; r++) {
+      const row = data[r];
+      const roll = String(row[2] || row[0] || '').trim().toUpperCase();
+      if (!roll || roll.length < 8) continue;
+
+      totalStudents++;
+      // Read YEAR directly from the sheet's YEAR column
+      const sheetYear = normalizeYear(row[yrCol]);
+
+      const pts = parseNum(row[balCol] || row[9] || 0);
+      if (pts > 0) {
+        if (sheetYear === 'I') { yearStats.year_1.sum += pts; yearStats.year_1.count++; }
+        else if (sheetYear === 'II') { yearStats.year_2.sum += pts; yearStats.year_2.count++; }
+        else if (sheetYear === 'III') { yearStats.year_3.sum += pts; yearStats.year_3.count++; }
+        else if (sheetYear === 'IV') { yearStats.year_4.sum += pts; yearStats.year_4.count++; }
+      }
+    }
+  });
+
+  return {
+    totalStudents: totalStudents,
+    averages: {
+      year_1: yearStats.year_1.count > 0 ? parseFloat((yearStats.year_1.sum / yearStats.year_1.count).toFixed(2)) : 0,
+      year_2: yearStats.year_2.count > 0 ? parseFloat((yearStats.year_2.sum / yearStats.year_2.count).toFixed(2)) : 0,
+      year_3: yearStats.year_3.count > 0 ? parseFloat((yearStats.year_3.sum / yearStats.year_3.count).toFixed(2)) : 0,
+      year_4: yearStats.year_4.count > 0 ? parseFloat((yearStats.year_4.sum / yearStats.year_4.count).toFixed(2)) : 0
+    }
+  };
+}
+
+function normalizeYear(raw) {
+  const s = String(raw || '').trim().toUpperCase();
+  if (s === 'I' || s === '1' || s === '1ST' || s.includes('YEAR 1') || s.includes('YEAR I') || s.includes('1ST YEAR') || s.includes('FIRST')) return 'I';
+  if (s === 'II' || s === '2' || s === '2ND' || s.includes('YEAR 2') || s.includes('YEAR II') || s.includes('2ND YEAR') || s.includes('SECOND')) return 'II';
+  if (s === 'III' || s === '3' || s === '3RD' || s.includes('YEAR 3') || s.includes('YEAR III') || s.includes('3RD YEAR') || s.includes('THIRD')) return 'III';
+  if (s === 'IV' || s === '4' || s === '4TH' || s.includes('YEAR 4') || s.includes('YEAR IV') || s.includes('4TH YEAR') || s.includes('FINAL')) return 'IV';
+  return s || 'IV';
+}
+
+function parseNum(val) {
+  if (val === null || val === undefined || val === '') return 0;
+  const clean = String(val).replace(/,/g, '').trim();
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : Math.round(n);
+}
+
+function createJsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}

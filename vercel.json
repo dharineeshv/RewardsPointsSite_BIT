@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/points/(.*)",
+      "destination": "/api/points?path=$1"
+    },
+    {
+      "source": "/api/points",
+      "destination": "/api/points"
+    },
+    {
       "source": "/api/bitcentral/(.*)",
       "destination": "/api/bitcentral?path=$1"
     },

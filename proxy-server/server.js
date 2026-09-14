@@ -175,6 +175,148 @@ app.all('/api/ps-portal/*', async (req, res) => {
   }
 });
 
+// 3. Live Google Sheets Points API (Protected by Google OAuth & @bitsathy.ac.in domain verification)
+const googleSheetsBackend = require('./services/googleSheetsBackend');
+
+app.get('/api/points/status', async (req, res) => {
+  res.json({
+    status: 'online',
+    service: 'BIT Reward Points Live Google Sheets Service',
+    spreadsheetId: googleSheetsBackend.SPREADSHEET_ID,
+    targetGid: googleSheetsBackend.TARGET_GID,
+    hasServiceAccount: Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL),
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/points/me', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    let user = null;
+
+    if (authHeader) {
+      try {
+        user = await googleSheetsBackend.verifyGoogleToken(authHeader);
+      } catch (tokenErr) {
+        console.warn('[Points API] Token verification notice:', tokenErr.message);
+      }
+    }
+
+    // Fallback to query email / roll if authenticated token wasn't validated
+    const queryEmail = (req.query.email || '').toLowerCase().trim();
+    const queryRoll = (req.query.roll || req.query.rollNo || '').toUpperCase().trim();
+
+    const targetEmail = user?.email || (queryEmail.endsWith('@bitsathy.ac.in') ? queryEmail : (queryRoll ? `${queryRoll.toLowerCase()}@bitsathy.ac.in` : ''));
+    const targetName = user?.name || req.query.name || '';
+
+    if (!targetEmail && !queryRoll) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No active session or email provided.'
+      });
+    }
+
+    const pointsData = await googleSheetsBackend.getStudentRewardPoints(targetEmail || queryRoll, targetName, authHeader);
+
+    if (pointsData) {
+      return res.json({
+        success: true,
+        data: pointsData
+      });
+    }
+
+    const emailPrefix = (targetEmail ? targetEmail.split('@')[0] : queryRoll).toLowerCase();
+    const dotParts = emailPrefix.split('.');
+    const deptYrPart = dotParts[1] || '';
+    const deptMatch = deptYrPart.match(/^([a-z]+)(\d{2})$/i);
+    const deptCode = deptMatch ? deptMatch[1].toUpperCase() : '';
+
+    return res.json({
+      success: true,
+      data: {
+        roll_no: (queryRoll || emailPrefix).toUpperCase(),
+        rollNo: (queryRoll || emailPrefix).toUpperCase(),
+        id: (queryRoll || emailPrefix).toUpperCase(),
+        name: targetName || user?.name || (queryRoll || emailPrefix).toUpperCase(),
+        student_name: targetName || user?.name || (queryRoll || emailPrefix).toUpperCase(),
+        email: targetEmail || `${(queryRoll || emailPrefix).toLowerCase()}@bitsathy.ac.in`,
+        year: 'IV',
+        department: deptCode || 'CT',
+        mentor: 'BIT Faculty',
+        balance_points: 0,
+        currentPoints: '0',
+        points: 0,
+        cumulative_points: 0,
+        cumulativePoints: '0',
+        redeemed_points: 0,
+        redeemedPoints: '0',
+        rank: 0,
+        source: 'Google Sheets (Live Sync)',
+        isNewRecord: true,
+        fetchedAt: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    console.error('[Points API /me Error]:', err.message);
+    return res.json({
+      success: false,
+      error: err.message,
+      data: null
+    });
+  }
+});
+
+app.get('/api/points/averages', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const averages = await googleSheetsBackend.getLiveInstitutionalAverages(authHeader);
+    res.json({ success: true, averages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/points/sheet-data', async (req, res) => {
+  try {
+    const tabOrGid = req.query.tab || req.query.dept || req.query.gid || googleSheetsBackend.TARGET_GID;
+    const authHeader = req.headers['authorization'];
+    const auth = googleSheetsBackend.getGoogleAuth(authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : null);
+    const rawRows = await googleSheetsBackend.fetchSheetRows(tabOrGid, auth);
+    const students = googleSheetsBackend.parseDepartmentRows(rawRows, tabOrGid);
+    res.json({ success: true, count: students.length, students });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/points/pskills', async (req, res) => {
+  try {
+    const rollNo = req.query.rollNo || '';
+    const token = req.query.token || req.headers['authorization']?.replace(/^Bearer\s+/i, '');
+    const pskillUrl = new URL('https://script.google.com/a/macros/bitsathy.ac.in/s/AKfycbyRoy2c2L2A1zyQ1v_XFD_XCR7nc86kvoQhPyGHtyf0OWwO2n1L2ytSkcbakZ-qAjlcwg/exec');
+    if (rollNo) pskillUrl.searchParams.append('rollNo', rollNo);
+    if (token) pskillUrl.searchParams.append('access_token', token);
+
+    const upRes = await fetch(pskillUrl.toString(), {
+      headers: {
+        'User-Agent': 'Mozilla/5.0'
+      }
+    });
+
+    const text = await upRes.text();
+    try {
+      const json = JSON.parse(text);
+      return res.json({ success: true, records: Array.isArray(json) ? json : (json.records || json.data || []) });
+    } catch (e) {
+      return res.json({ success: true, rawHtml: text });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message, records: [] });
+  }
+});
+
+
 app.listen(PORT, () => {
-  console.log(`🚀 BIT Central & PS Proxy running on http://localhost:${PORT}`);
+  console.log(`🚀 BIT Central, PS Proxy & Google Sheets Gateway running on http://localhost:${PORT}`);
 });

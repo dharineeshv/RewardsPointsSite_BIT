@@ -61,7 +61,7 @@ const YEAR_THEMES = {
 };
 
 export default function AveragePointsBarChart({
-  yearlyAverages = { year_1: 0, year_2: 216, year_3: 332, year_4: 192 },
+  yearlyAverages = null,
   currentUser = null,
   student = null,
   userYearLabel = 'Year IV',
@@ -87,22 +87,22 @@ export default function AveragePointsBarChart({
   }, []);
 
   const activeStudent = student || currentUser;
-  const studentPoints = Math.round(
-    Number(
-      activeStudent?.balancePoints ??
-      activeStudent?.numBalance ??
-      activeStudent?.currentPoints ??
-      activeStudent?.cumulativePoints ??
-      activeStudent?.totalPoints ??
-      0
-    )
-  );
+  const rawScore = activeStudent?.balance_points ??
+    activeStudent?.balancePoints ??
+    activeStudent?.currentPoints ??
+    activeStudent?.points ??
+    activeStudent?.cumulative_reward_points ??
+    activeStudent?.cumulativePoints ??
+    activeStudent?.totalPoints ??
+    activeStudent?.numBalance ??
+    0;
+  const studentPoints = Math.round(parseFloat(String(rawScore).replace(/[^0-9.-]+/g, '')) || 0);
 
   const yearsData = [
-    { key: 'year_1', label: 'Year I', theme: YEAR_THEMES.year_1, value: Math.round(Number(yearlyAverages.year_1) || 0) },
-    { key: 'year_2', label: 'Year II', theme: YEAR_THEMES.year_2, value: Math.round(Number(yearlyAverages.year_2) || 0) },
-    { key: 'year_3', label: 'Year III', theme: YEAR_THEMES.year_3, value: Math.round(Number(yearlyAverages.year_3) || 0) },
-    { key: 'year_4', label: 'Year IV', theme: YEAR_THEMES.year_4, value: Math.round(Number(yearlyAverages.year_4) || 0) },
+    { key: 'year_1', label: 'Year I', theme: YEAR_THEMES.year_1, value: Math.round(parseFloat(String(yearlyAverages?.year_1 || 0).replace(/[^0-9.-]+/g, '')) || 0) },
+    { key: 'year_2', label: 'Year II', theme: YEAR_THEMES.year_2, value: Math.round(parseFloat(String(yearlyAverages?.year_2 || 0).replace(/[^0-9.-]+/g, '')) || 0) },
+    { key: 'year_3', label: 'Year III', theme: YEAR_THEMES.year_3, value: Math.round(parseFloat(String(yearlyAverages?.year_3 || 0).replace(/[^0-9.-]+/g, '')) || 0) },
+    { key: 'year_4', label: 'Year IV', theme: YEAR_THEMES.year_4, value: Math.round(parseFloat(String(yearlyAverages?.year_4 || 0).replace(/[^0-9.-]+/g, '')) || 0) },
   ];
 
   // Dynamic max value ceiling for clean scaling

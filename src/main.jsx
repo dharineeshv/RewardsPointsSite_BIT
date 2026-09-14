@@ -50,13 +50,20 @@ class ErrorBoundary extends Component {
   }
 }
 
-// Register PWA Service Worker for Mobile Installation
+// Register PWA Service Worker for Mobile Installation in Production only
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.log('SW registration failed:', err);
+  if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
     });
-  });
+  } else {
+    // Unregister any active service worker during local development
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+    }).catch(() => {});
+  }
 }
 
 createRoot(document.getElementById('root')).render(

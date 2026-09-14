@@ -8,5 +8,20 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false
+      },
+      '/google-sheets-proxy': {
+        target: 'https://docs.google.com/spreadsheets',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/google-sheets-proxy/, '')
+      }
+    }
+  }
 })
 

@@ -5,8 +5,9 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import placementData from './data/placementData.json';
+import studentMentorData from './data/studentMentorMapping.json';
 import InternalMarksView from './components/InternalMarksView';
-import { fetchDepartmentSheetData, fetchStudentRewardPointsFromSheet, fetchInstitutionalAveragesFromSheet, fetchLiveStudentEventLogs, fetchLiveMasterSpreadsheet, AVERAGE_CHART_URL, SPREADSHEET_ID } from './services/googleSheetsService';
+import { fetchDepartmentSheetData, fetchStudentRewardPointsFromSheet, fetchAuthenticatedStudentPoints, fetchInstitutionalAveragesFromSheet, calculateDynamicAveragesFromStudents, fetchAllLiveDepartmentsAndAverages, fetchLiveStudentEventLogs, fetchLiveMasterSpreadsheet, getCachedStudentPoints, cacheStudentPoints, AVERAGE_CHART_URL, SPREADSHEET_ID } from './services/googleSheetsService';
 import { COLLEGE_HOLIDAYS_AND_LEAVES } from './data/collegeLeaves';
 import { savePdfDocumentToDB, loadAllPdfDocumentsFromDB, removePdfDocumentFromDB } from './services/pdfStorageService';
 import { getCampusMessMenu } from './data/messMenuData';
@@ -254,15 +255,62 @@ function GoogleIcon({ className = "w-5 h-5" }) {
   );
 }
 
+export const AVATAR_PALETTES = [
+  'from-blue-600 to-indigo-600',
+  'from-purple-600 to-pink-600',
+  'from-emerald-500 to-teal-600',
+  'from-amber-500 to-orange-600',
+  'from-cyan-500 to-blue-600',
+  'from-rose-500 to-pink-600',
+  'from-violet-600 to-purple-600',
+  'from-teal-500 to-emerald-600',
+  'from-indigo-500 to-cyan-600',
+  'from-sky-500 to-indigo-500'
+];
+
+export function getStudentAvatarBg(str = '') {
+  const s = String(str || '').trim();
+  if (!s) return 'from-[#38c4ee] to-[#0ea5e9]';
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = (hash << 5) - hash + s.charCodeAt(i);
+    hash |= 0;
+  }
+  const index = Math.abs(hash) % AVATAR_PALETTES.length;
+  return AVATAR_PALETTES[index];
+}
+
+export function getStudentInitials(name = '', roll = '') {
+  const cleanName = String(name || '').replace(/^(Mr\.|Ms\.|Mrs\.|Dr\.)\s+/i, '').trim();
+  if (cleanName && cleanName.toUpperCase() !== String(roll || '').toUpperCase().trim()) {
+    const parts = cleanName.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    } else if (parts.length === 1 && parts[0].length >= 2) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+  }
+  if (roll) {
+    const cleanRoll = String(roll).trim().toUpperCase();
+    const letters = cleanRoll.match(/[A-Z]+/g);
+    if (letters && letters.length > 0) {
+      return letters.join('').slice(0, 2);
+    }
+    return cleanRoll.slice(-2);
+  }
+  return 'ST';
+}
+
 // Resilient Avatar Image Component
-function AvatarImage({ src, alt = "Avatar", initials = "ST", className = "w-full h-full", fallbackBg = "from-[#38c4ee] to-[#0ea5e9]" }) {
+function AvatarImage({ src, alt = "Avatar", initials = "", className = "w-full h-full", fallbackBg = null }) {
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     setHasError(false);
   }, [src]);
 
-  const cleanInitials = (initials || (alt ? alt.split(/\s+/).map(n => n[0]).join('') : 'ST')).slice(0, 2).toUpperCase();
+  const computedInitials = (initials || (alt && alt !== "Avatar" ? getStudentInitials(alt) : 'ST')).slice(0, 2).toUpperCase();
+  const bgGradient = fallbackBg || getStudentAvatarBg(alt || initials || 'BIT');
 
   if (src && !hasError) {
     return (
@@ -278,8 +326,8 @@ function AvatarImage({ src, alt = "Avatar", initials = "ST", className = "w-full
   }
 
   return (
-    <div className={`w-full h-full bg-gradient-to-br ${fallbackBg} text-white flex items-center justify-center font-black select-none`}>
-      {cleanInitials}
+    <div className={`w-full h-full bg-gradient-to-br ${bgGradient} text-white flex items-center justify-center font-black select-none text-xs`}>
+      {computedInitials}
     </div>
   );
 }
@@ -319,15 +367,48 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
   const emailPrefix = isEmail ? cleanInput.split('@')[0] : cleanInput;
   const cleanName = (googleName || '').trim().toLowerCase();
 
+  const dotParts = emailPrefix.split('.');
+  const namePart = dotParts[0] || '';
+  const deptYrPart = dotParts[1] || '';
+  const deptMatch = deptYrPart.match(/^([a-z]+)(\d{2})$/i);
+  const deptCode = deptMatch ? deptMatch[1].toUpperCase() : '';
+  const batchYr = deptMatch ? deptMatch[2] : '';
+
   let rollId = '';
   let studentRecord = null;
+  let mentorInfo = null;
 
   // 1. Check if input is directly a valid roll number format
   if (/^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(cleanUpper) || /^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(emailPrefix)) {
     rollId = (/^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(cleanUpper) ? cleanUpper : emailPrefix.toUpperCase());
   }
 
-  // 2. Match in comprehensive official student database (STUDENTS_INTERNAL_MARKS_LIST)
+  // 2. Match in official studentMentorData directory (all registered college students)
+  if (Array.isArray(studentMentorData) && studentMentorData.length > 0) {
+    const matchedMentor = studentMentorData.find(s => {
+      const sRoll = (s.rollNo || '').toUpperCase();
+      const sName = (s.studentName || '').toLowerCase();
+      if (rollId && sRoll === rollId) return true;
+      if (sRoll.toLowerCase() === emailPrefix) return true;
+      if (deptCode && (s.deptCode === deptCode || sRoll.includes(deptCode))) {
+        if (batchYr && sRoll.includes(batchYr)) {
+          if (cleanName && sName.includes(cleanName)) return true;
+          if (namePart && sName.includes(namePart)) return true;
+        }
+      }
+      if (cleanName && sName.length > 3 && (sName.includes(cleanName) || cleanName.includes(sName))) {
+        if (!batchYr || sRoll.includes(batchYr)) return true;
+      }
+      return false;
+    });
+
+    if (matchedMentor) {
+      mentorInfo = matchedMentor;
+      if (!rollId) rollId = matchedMentor.rollNo;
+    }
+  }
+
+  // 3. Match in comprehensive official student database (STUDENTS_INTERNAL_MARKS_LIST)
   if (Array.isArray(STUDENTS_INTERNAL_MARKS_LIST) && STUDENTS_INTERNAL_MARKS_LIST.length > 0) {
     if (rollId) {
       studentRecord = STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || '').toUpperCase() === rollId);
@@ -341,15 +422,8 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
       }
     }
 
-    // Name + department prefix matching from email (e.g. kavya.ec23@bitsathy.ac.in -> KAVYA + EC23)
+    // Name + department prefix matching from email
     if (!studentRecord) {
-      const dotParts = emailPrefix.split('.');
-      const namePart = dotParts[0] || '';
-      const deptYrPart = dotParts[1] || '';
-      const deptMatch = deptYrPart.match(/^([a-z]+)(\d{2})$/i);
-      const deptCode = deptMatch ? deptMatch[1].toUpperCase() : '';
-      const batchYr = deptMatch ? deptMatch[2] : '';
-
       studentRecord = STUDENTS_INTERNAL_MARKS_LIST.find(st => {
         const sName = (st.name || '').toLowerCase();
         const sRoll = (st.rollNo || '').toUpperCase();
@@ -368,74 +442,124 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
     }
   }
 
-  // 3. Match in STUDENTS_DATABASE fallback
+  // 4. Match in STUDENTS_DATABASE fallback
   if (!studentRecord && Array.isArray(STUDENTS_DATABASE)) {
     studentRecord = STUDENTS_DATABASE.find(s => 
       (s.id && s.id.toUpperCase() === rollId) || 
       (isEmail && s.email && s.email.toLowerCase() === cleanInput) ||
       (cleanName && s.name && s.name.toLowerCase().includes(cleanName))
     );
-    if (studentRecord && studentRecord.id) {
+    if (studentRecord && studentRecord.id && !rollId) {
       rollId = studentRecord.id;
     }
   }
 
-  // 4. Default fallback to uppercase prefix if nothing else found
+  // 5. Default fallback to uppercase prefix if nothing else found
   if (!rollId) {
     rollId = emailPrefix.toUpperCase();
   }
 
-  let profileApiData = studentRecord ? {
-    roll_no: studentRecord.rollNo || studentRecord.id || rollId,
-    register_no: studentRecord.rollNo || studentRecord.id || rollId,
-    student_name: studentRecord.name || googleName,
-    department: studentRecord.department || 'Engineering',
-    mentor_name: studentRecord.mentor || 'BIT Faculty',
-    year: studentRecord.year || 'IV',
-    email: studentRecord.email || cleanInput,
-    activityBreakdown: studentRecord.activityBreakdown || [],
-    theoryCourses: studentRecord.theoryCourses || [],
-    labCourses: studentRecord.labCourses || [],
-    addonCourses: studentRecord.addonCourses || [],
-    grandTotal: studentRecord.grandTotal || '0.00',
-    balance_points: studentRecord.balancePoints !== undefined ? String(studentRecord.balancePoints) : '0',
-    cumulative_reward_points: studentRecord.cumulativePoints !== undefined ? String(studentRecord.cumulativePoints) : '0',
-    redeemed_points: studentRecord.redeemedPoints !== undefined ? String(studentRecord.redeemedPoints) : '0'
-  } : null;
+  // Resolve verified event points from local verified seeds / log map
+  const eventLogs = (STUDENT_EVENT_LOGS_MAP && STUDENT_EVENT_LOGS_MAP[rollId]) || studentRecord?.eventLogs || [];
+  let calculatedPoints = 0;
+  if (Array.isArray(eventLogs) && eventLogs.length > 0) {
+    calculatedPoints = eventLogs.reduce((acc, ev) => acc + (parseFloat(ev.points) || 0), 0);
+  }
 
-  // Real-time live synchronization with Google Sheets
+  const resolvedName = studentRecord?.name || mentorInfo?.studentName || googleName || rollId;
+  const resolvedDept = studentRecord?.department || mentorInfo?.department || (deptCode ? `B. TECH. - ${deptCode}` : 'Engineering');
+  const resolvedMentor = mentorInfo?.mentorName || studentRecord?.mentor || 'Dr. ANANDAKUMAR K ISE';
+  const resolvedYear = mentorInfo?.year || studentRecord?.year || 'IV';
+  const resolvedEmail = studentRecord?.email || (cleanInput.includes('@') ? cleanInput : `${rollId.toLowerCase()}@bitsathy.ac.in`);
+
+  let initialBalance = studentRecord?.balancePoints !== undefined ? studentRecord.balancePoints : (calculatedPoints > 0 ? calculatedPoints : 0);
+  let initialCumulative = studentRecord?.cumulativePoints !== undefined ? studentRecord.cumulativePoints : (calculatedPoints > 0 ? calculatedPoints : initialBalance);
+  let initialRedeemed = studentRecord?.redeemedPoints !== undefined ? studentRecord.redeemedPoints : 0;
+
+  let profileApiData = {
+    roll_no: rollId,
+    register_no: rollId,
+    student_name: resolvedName,
+    name: resolvedName,
+    department: resolvedDept,
+    mentor_name: resolvedMentor,
+    mentor: resolvedMentor,
+    mentor_email: mentorInfo?.mentorEmail || 'anandakumark@bitsathy.ac.in',
+    year: resolvedYear,
+    email: resolvedEmail,
+    activityBreakdown: studentRecord?.activityBreakdown || [],
+    theoryCourses: studentRecord?.theoryCourses || [],
+    labCourses: studentRecord?.labCourses || [],
+    addonCourses: studentRecord?.addonCourses || [],
+    grandTotal: studentRecord?.grandTotal || '0.00',
+    balance_points: String(initialBalance),
+    currentPoints: String(initialBalance),
+    cumulative_reward_points: String(initialCumulative),
+    cumulativePoints: String(initialCumulative),
+    redeemed_points: String(initialRedeemed),
+    redeemedPoints: String(initialRedeemed)
+  };
+
+  // 1. Real-time dynamic Google Sheets API via backend /api/points/me
+  try {
+    const liveBackendStudent = await fetchAuthenticatedStudentPoints(null, cleanInput, googleName);
+    if (liveBackendStudent) {
+      if (liveBackendStudent.name && liveBackendStudent.name !== rollId) {
+        profileApiData.student_name = liveBackendStudent.name;
+        profileApiData.name = liveBackendStudent.name;
+      }
+      if (liveBackendStudent.department) {
+        profileApiData.department = liveBackendStudent.department;
+      }
+      if (liveBackendStudent.mentor && liveBackendStudent.mentor !== 'BIT Faculty') {
+        profileApiData.mentor_name = liveBackendStudent.mentor;
+        profileApiData.mentor = liveBackendStudent.mentor;
+      }
+      if (liveBackendStudent.year) {
+        profileApiData.year = liveBackendStudent.year;
+      }
+      if (liveBackendStudent.balance_points !== undefined && liveBackendStudent.balance_points !== null) {
+        profileApiData.balance_points = String(liveBackendStudent.balance_points);
+        profileApiData.currentPoints = String(liveBackendStudent.balance_points);
+        profileApiData.points = Number(liveBackendStudent.balance_points);
+      }
+      if (liveBackendStudent.cumulative_points !== undefined && liveBackendStudent.cumulative_points !== null) {
+        profileApiData.cumulative_reward_points = String(liveBackendStudent.cumulative_points);
+        profileApiData.cumulativePoints = String(liveBackendStudent.cumulative_points);
+      }
+      if (liveBackendStudent.redeemed_points !== undefined && liveBackendStudent.redeemed_points !== null) {
+        profileApiData.redeemed_points = String(liveBackendStudent.redeemed_points);
+        profileApiData.redeemedPoints = String(liveBackendStudent.redeemed_points);
+      }
+      if (liveBackendStudent.rank) {
+        profileApiData.rank = liveBackendStudent.rank;
+      }
+    }
+  } catch (backendErr) {
+    console.warn('[LiveBackendSync] /api/points/me query notice:', backendErr);
+  }
+
+  // 2. Direct client-side Google Sheets synchronization fallback
   if (rollId) {
     try {
-      const deptName = studentRecord?.department || 'CT';
+      const deptName = studentRecord?.department || mentorInfo?.deptCode || 'CT';
       const liveSheetStudent = await fetchStudentRewardPointsFromSheet(rollId, deptName);
       if (liveSheetStudent) {
-        if (!profileApiData) {
-          profileApiData = {
-            roll_no: rollId,
-            register_no: rollId,
-            student_name: liveSheetStudent.name || googleName || rollId,
-            department: liveSheetStudent.department || deptName,
-            mentor_name: liveSheetStudent.mentor || 'BIT Faculty',
-            year: liveSheetStudent.year || 'IV',
-            email: cleanInput.includes('@') ? cleanInput : `${rollId.toLowerCase()}@bitsathy.ac.in`,
-            activityBreakdown: [],
-            theoryCourses: [],
-            labCourses: [],
-            addonCourses: [],
-            grandTotal: '0.00'
-          };
+        if (liveSheetStudent.name && liveSheetStudent.name !== rollId) {
+          profileApiData.student_name = liveSheetStudent.name;
         }
-        if (liveSheetStudent.balance_points !== undefined) {
-          profileApiData.balance_points = String(liveSheetStudent.balance_points);
-        }
-        if (liveSheetStudent.cumulative_points !== undefined) {
-          profileApiData.cumulative_reward_points = String(liveSheetStudent.cumulative_points);
-        }
-        if (liveSheetStudent.redeemed_points !== undefined) {
-          profileApiData.redeemed_points = String(liveSheetStudent.redeemed_points);
-        }
-        if (liveSheetStudent.mentor) {
+        if (liveSheetStudent.mentor && liveSheetStudent.mentor !== 'BIT Faculty') {
           profileApiData.mentor_name = liveSheetStudent.mentor;
+        }
+        const sheetBal = parseFloat(String(liveSheetStudent.balance_points || '0').replace(/,/g, '')) || 0;
+        if (sheetBal > 0) {
+          profileApiData.balance_points = String(sheetBal);
+          profileApiData.currentPoints = String(sheetBal);
+        }
+        const sheetCum = parseFloat(String(liveSheetStudent.cumulative_points || '0').replace(/,/g, '')) || 0;
+        if (sheetCum > 0) {
+          profileApiData.cumulative_reward_points = String(sheetCum);
+          profileApiData.cumulativePoints = String(sheetCum);
         }
       }
     } catch (liveErr) {
@@ -1223,6 +1347,7 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
 
   const triggerGoogleLogin = useGoogleLogin({
     flow: 'implicit',
+    scope: 'openid email profile',
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       setAuthError('');
@@ -1465,38 +1590,58 @@ function transformApiStudent(apiItem) {
   if (!apiItem) return null;
   const rollNo = String(apiItem.roll_no || apiItem.rollNo || apiItem.id || '').toUpperCase().trim();
 
-  // Find corresponding rich record in Master Spreadsheet dataset
+  // Find corresponding rich record in Master Spreadsheet dataset or studentMentorData
   const masterRecord = Array.isArray(STUDENTS_INTERNAL_MARKS_LIST)
     ? STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || '').toUpperCase() === rollNo)
     : null;
 
-  const name = String(masterRecord?.name || apiItem.student_name || apiItem.name || 'STUDENT').toUpperCase();
-  const initials = name.split(' ').map(w => w[0]).filter(Boolean).join('').slice(0, 2) || 'ST';
+  const mentorRecord = Array.isArray(studentMentorData)
+    ? studentMentorData.find(s => (s.rollNo || '').toUpperCase() === rollNo)
+    : null;
 
-  const balanceRaw = apiItem.balance_points !== undefined && apiItem.balance_points !== null
-    ? String(apiItem.balance_points).replace(/,/g, '')
-    : (masterRecord ? String(masterRecord.balancePoints || 0) : '0');
+  const resolvedRawName = masterRecord?.name || mentorRecord?.studentName || apiItem.student_name || apiItem.name || rollNo;
+  const name = String(resolvedRawName).replace(/^(Mr\.|Ms\.|Mrs\.|Dr\.)\s+/i, '').trim().toUpperCase();
+  const initials = getStudentInitials(name, rollNo);
+  const avatarBg = getStudentAvatarBg(rollNo || name);
+  const photoUrl = apiItem.picture || apiItem.photo_url || masterRecord?.picture || masterRecord?.photo_url || `https://ips.bitsathy.ac.in/assets/images/${rollNo}.jpg`;
+
+  const cachedLive = getCachedStudentPoints(rollNo);
+
+  const balanceRaw = cachedLive?.balance_points !== undefined
+    ? String(cachedLive.balance_points).replace(/,/g, '')
+    : (apiItem.balance_points !== undefined && apiItem.balance_points !== null
+      ? String(apiItem.balance_points).replace(/,/g, '')
+      : (masterRecord ? String(masterRecord.balancePoints || 0) : '0'));
   const balancePts = (parseFloat(balanceRaw) || 0).toLocaleString();
 
-  const cumulativeRaw = apiItem.cumulative_reward_points !== undefined && apiItem.cumulative_reward_points !== null
-    ? String(apiItem.cumulative_reward_points).replace(/,/g, '')
-    : (apiItem.cumulative_points !== undefined ? String(apiItem.cumulative_points).replace(/,/g, '') : (masterRecord ? String(masterRecord.cumulativePoints || balanceRaw) : balanceRaw));
+  const cumulativeRaw = cachedLive?.cumulative_points !== undefined
+    ? String(cachedLive.cumulative_points).replace(/,/g, '')
+    : (apiItem.cumulative_reward_points !== undefined && apiItem.cumulative_reward_points !== null
+      ? String(apiItem.cumulative_reward_points).replace(/,/g, '')
+      : (apiItem.cumulative_points !== undefined ? String(apiItem.cumulative_points).replace(/,/g, '') : (masterRecord ? String(masterRecord.cumulativePoints || balanceRaw) : balanceRaw)));
   const cumulativePts = (parseFloat(cumulativeRaw) || 0).toLocaleString();
 
-  const redeemedRaw = apiItem.redeemed_points !== undefined && apiItem.redeemed_points !== null
-    ? String(apiItem.redeemed_points).replace(/,/g, '')
-    : (masterRecord ? String(masterRecord.redeemedPoints || 0) : '0');
+  const redeemedRaw = cachedLive?.redeemed_points !== undefined
+    ? String(cachedLive.redeemed_points).replace(/,/g, '')
+    : (apiItem.redeemed_points !== undefined && apiItem.redeemed_points !== null
+      ? String(apiItem.redeemed_points).replace(/,/g, '')
+      : (masterRecord ? String(masterRecord.redeemedPoints || 0) : '0'));
   const redeemedPts = (parseFloat(redeemedRaw) || 0).toLocaleString();
 
-  const mentorName = masterRecord?.mentor || apiItem.mentor_name || apiItem.mentor || "BIT Faculty";
-  const deptName = masterRecord?.department || apiItem.department || "COMPUTER TECHNOLOGY";
+  const mentorName = masterRecord?.mentor || mentorRecord?.mentorName || apiItem.mentor_name || apiItem.mentor || "BIT Faculty";
+  const deptName = masterRecord?.department || mentorRecord?.department || apiItem.department || "COMPUTER TECHNOLOGY";
   const courseCode = masterRecord?.courseCode || apiItem.course_code || "B. Tech.";
-  const yr = masterRecord?.year || apiItem.year || "IV";
+  const yr = masterRecord?.year || mentorRecord?.year || apiItem.year || "IV";
 
   return {
     id: rollNo || "7376232CT109",
+    rollNo: rollNo || "7376232CT109",
+    roll_no: rollNo || "7376232CT109",
     name: name,
+    student_name: name,
     initials: initials,
+    picture: photoUrl,
+    photo_url: photoUrl,
     department: deptName,
     course_code: courseCode,
     year: yr ? (String(yr).startsWith('Year') ? String(yr) : `Year ${yr}`) : "Year IV",
@@ -1510,7 +1655,7 @@ function transformApiStudent(apiItem) {
     currentPoints: balancePts,
     cumulativePoints: cumulativePts,
     redeemedPoints: redeemedPts,
-    avatarBg: "from-[#38c4ee] to-[#0ea5e9]",
+    avatarBg: avatarBg,
     badge: "Verified BIT Student",
     email: masterRecord?.email || `${(rollNo || 'student').toLowerCase()}@bitsathy.ac.in`,
     cgpa: "8.92",
@@ -2861,12 +3006,12 @@ export default function App() {
     setDeferredPrompt(null);
   };
   
-  // Dynamic API state for yearly averages (Official BIT Batch Benchmarks)
+  // Dynamic state for yearly averages (Fetched dynamically from official Google Sheet)
   const [yearlyAverages, setYearlyAverages] = useState({
     year_1: 0,
-    year_2: 2173,
-    year_3: 3333,
-    year_4: 1923
+    year_2: 0,
+    year_3: 0,
+    year_4: 0
   });
   const [loadingAverages, setLoadingAverages] = useState(true);
 
@@ -4169,21 +4314,16 @@ export default function App() {
     fetchInitialStudent();
   }, []);
 
-  // Fetch averages from official Google Sheet benchmarks and live index
+  // Fetch averages dynamically from official Google Sheet benchmarks tab
   useEffect(() => {
     async function fetchAverages() {
       try {
         const averages = await fetchInstitutionalAveragesFromSheet();
         if (averages) {
-          setYearlyAverages({
-            year_1: Number(averages.year_1) || 0,
-            year_2: Number(averages.year_2) || 0,
-            year_3: Number(averages.year_3) || 0,
-            year_4: Number(averages.year_4) || 0,
-          });
+          setYearlyAverages(averages);
         }
       } catch (err) {
-        console.error('Error fetching averages:', err);
+        console.warn('Live sheet averages sync notice:', err);
       } finally {
         setLoadingAverages(false);
       }
@@ -4252,43 +4392,173 @@ export default function App() {
 
     // Query 4,824 students database
     const combinedList = Array.isArray(STUDENTS_INTERNAL_MARKS_LIST) ? STUDENTS_INTERNAL_MARKS_LIST : [];
-    const matched = combinedList.filter(s => {
+    const seenRolls = new Set();
+    const matched = [];
+
+    // 1. First search comprehensive students internal marks list
+    for (const s of combinedList) {
       const r = (s.rollNo || s.id || '').toUpperCase();
       const n = (s.name || s.student_name || '').toUpperCase();
       const d = (s.department || '').toUpperCase();
       const e = (s.email || '').toUpperCase();
-      return r.includes(clean) || n.includes(clean) || d.includes(clean) || e.includes(clean);
-    }).slice(0, 15);
+      if (r.includes(clean) || n.includes(clean) || d.includes(clean) || e.includes(clean)) {
+        if (!seenRolls.has(r)) {
+          seenRolls.add(r);
+          matched.push(s);
+          if (matched.length >= 20) break;
+        }
+      }
+    }
 
-    const formattedResults = matched.map(s => ({
-      roll_no: s.rollNo || s.id,
-      student_name: s.name || s.student_name,
-      department: s.department,
-      year: s.year,
-      mentor_name: s.mentor || 'BIT Faculty',
-      balance_points: (s.balancePoints !== undefined ? s.balancePoints : (s.currentPoints || 0)).toString(),
-      cumulative_reward_points: (s.cumulativePoints !== undefined ? s.cumulativePoints : (s.cumulativePoints || 0)).toString(),
-      redeemed_points: (s.redeemedPoints !== undefined ? s.redeemedPoints : (s.redeemedPoints || 0)).toString(),
-      email: s.email,
-      activityBreakdown: s.activityBreakdown || []
-    }));
+    // 2. Also search student-mentor database if needed
+    if (matched.length < 15 && Array.isArray(studentMentorData)) {
+      for (const m of studentMentorData) {
+        const r = (m.rollNo || '').toUpperCase();
+        const n = (m.studentName || '').toUpperCase();
+        const d = (m.department || m.deptCode || '').toUpperCase();
+        if (r.includes(clean) || n.includes(clean) || d.includes(clean)) {
+          if (!seenRolls.has(r)) {
+            seenRolls.add(r);
+            matched.push({
+              rollNo: m.rollNo,
+              name: m.studentName,
+              department: m.department || m.deptCode,
+              year: m.year,
+              mentor: m.mentorName,
+              balancePoints: 0,
+              cumulativePoints: 0,
+              redeemedPoints: 0
+            });
+            if (matched.length >= 20) break;
+          }
+        }
+      }
+    }
+
+    const formattedResults = matched.map(s => {
+      const rollNo = (s.rollNo || s.id || '').toUpperCase().trim();
+      const mentorRec = Array.isArray(studentMentorData) ? studentMentorData.find(m => (m.rollNo || '').toUpperCase() === rollNo) : null;
+      const rawName = s.name || s.student_name || s.studentName || mentorRec?.studentName || rollNo;
+      const name = String(rawName).replace(/^(Mr\.|Ms\.|Mrs\.|Dr\.)\s+/i, '').trim().toUpperCase();
+      const initials = getStudentInitials(name, rollNo);
+      const avatarBg = getStudentAvatarBg(rollNo || name);
+      const photoUrl = s.picture || s.photo_url || `https://ips.bitsathy.ac.in/assets/images/${rollNo}.jpg`;
+      const dept = s.department || mentorRec?.department || 'Engineering';
+      const yr = s.year || mentorRec?.year || 'IV';
+      const cachedLive = getCachedStudentPoints(rollNo);
+      const balStr = cachedLive?.balance_points !== undefined 
+        ? String(cachedLive.balance_points) 
+        : (s.balancePoints !== undefined ? s.balancePoints : (s.currentPoints || 0)).toString();
+      const cumStr = cachedLive?.cumulative_points !== undefined
+        ? String(cachedLive.cumulative_points)
+        : (s.cumulativePoints !== undefined ? s.cumulativePoints : (s.cumulativePoints || balStr)).toString();
+      const redStr = cachedLive?.redeemed_points !== undefined
+        ? String(cachedLive.redeemed_points)
+        : (s.redeemedPoints !== undefined ? s.redeemedPoints : (s.redeemedPoints || 0)).toString();
+
+      return {
+        id: rollNo,
+        rollNo: rollNo,
+        roll_no: rollNo,
+        name: name,
+        student_name: name,
+        initials: initials,
+        avatarBg: avatarBg,
+        picture: photoUrl,
+        photo_url: photoUrl,
+        department: dept,
+        year: yr,
+        mentor_name: s.mentor || mentorRec?.mentorName || 'BIT Faculty',
+        mentor: s.mentor || mentorRec?.mentorName || 'BIT Faculty',
+        balance_points: balStr,
+        cumulative_reward_points: cumStr,
+        redeemed_points: redStr,
+        email: s.email || `${rollNo.toLowerCase()}@bitsathy.ac.in`,
+        activityBreakdown: s.activityBreakdown || []
+      };
+    });
 
     setSearchResults(formattedResults);
     setShowDropdown(formattedResults.length > 0);
     setIsSearching(false);
   }, [searchQuery]);
 
-  const handleSelectStudent = (apiItem) => {
+  const handleSelectStudent = async (apiItem) => {
+    setShowDropdown(false);
+    const rollNo = String(apiItem?.roll_no || apiItem?.rollNo || apiItem?.id || '').toUpperCase().trim();
+    if (!rollNo) return;
+
+    setSearchQuery(rollNo);
+    logActivity(currentUser, `Search (${rollNo})`);
+
+    // 1. Transform initial local state immediately for instant feedback
     const transformed = transformApiStudent(apiItem);
     setDisplayedStudent(transformed);
-    setShowDropdown(false);
-    setSearchQuery(apiItem.roll_no || apiItem.student_name);
-    logActivity(currentUser, `Search (${apiItem.roll_no || apiItem.student_name})`);
+
+    // 2. Fetch live data from official Google Sheet immediately
+    try {
+      const liveData = await fetchStudentRewardPointsFromSheet(rollNo, apiItem.department);
+      if (liveData && (liveData.balance_points !== undefined || liveData.points !== undefined || liveData.currentPoints !== undefined)) {
+        const liveBal = parseFloat(String(liveData.balance_points ?? liveData.points ?? liveData.currentPoints ?? 0).replace(/,/g, '')) || 0;
+        const liveCum = parseFloat(String(liveData.cumulative_points ?? liveData.cumulativePoints ?? liveBal).replace(/,/g, '')) || liveBal;
+        const liveRed = parseFloat(String(liveData.redeemed_points ?? liveData.redeemedPoints ?? 0).replace(/,/g, '')) || 0;
+        const liveName = String(liveData.name || liveData.student_name || transformed.name).replace(/^(Mr\.|Ms\.|Mrs\.|Dr\.)\s+/i, '').trim().toUpperCase();
+        const initials = getStudentInitials(liveName, rollNo);
+        const avatarBg = getStudentAvatarBg(rollNo || liveName);
+
+        const photoUrl = liveData.picture || liveData.photo_url || `https://ips.bitsathy.ac.in/assets/images/${rollNo}.jpg`;
+        const studentEmail = liveData.email || transformed.email || `${rollNo.toLowerCase()}@bitsathy.ac.in`;
+
+        setDisplayedStudent({
+          ...transformed,
+          id: rollNo,
+          rollNo: rollNo,
+          roll_no: rollNo,
+          name: liveName,
+          student_name: liveName,
+          initials: initials,
+          avatarBg: avatarBg,
+          picture: photoUrl,
+          photo_url: photoUrl,
+          email: studentEmail,
+          mentor_name: liveData.mentor || liveData.mentor_name || transformed.mentor_name,
+          mentor: liveData.mentor || liveData.mentor_name || transformed.mentor,
+          department: liveData.department || transformed.department,
+          year: liveData.year ? (String(liveData.year).startsWith('Year') ? String(liveData.year) : `Year ${liveData.year}`) : transformed.year,
+          balance_points: liveBal,
+          balancePoints: liveBal,
+          points: liveBal,
+          rawPoints: liveBal,
+          currentPoints: liveBal.toLocaleString(),
+          cumulative_points: liveCum,
+          cumulativePoints: liveCum.toLocaleString(),
+          cumulative_reward_points: liveCum.toLocaleString(),
+          redeemed_points: liveRed,
+          redeemedPoints: liveRed.toLocaleString(),
+          history: [
+            { id: 1, title: "Cumulative RP Earned", date: "Academic Year 2024-2025", points: `+${liveCum.toLocaleString()} RP`, category: "Activities", icon: Trophy, color: "text-amber-500 bg-amber-50" },
+            { id: 2, title: "Redeemed Points", date: "Benefits & Vouchers", points: `-${liveRed.toLocaleString()} RP`, category: "Redemption", icon: Gift, color: "text-indigo-500 bg-indigo-50" },
+            { id: 3, title: "Net Active Balance", date: "Current Academic Standing", points: `${liveBal.toLocaleString()} RP`, category: "Balance", icon: Award, color: "text-emerald-500 bg-emerald-50" }
+          ],
+          breakdown: [
+            { label: "Active Net Balance", pts: liveBal, percent: liveCum > 0 ? Math.round((liveBal / liveCum) * 100) : 100, color: "bg-[#4f46e5]" },
+            { label: "Cumulative Points", pts: liveCum, percent: 100, color: "bg-[#22d3ee]" },
+            { label: "Redeemed Points", pts: liveRed, percent: liveCum > 0 ? Math.round((liveRed / liveCum) * 100) : 0, color: "bg-amber-500" },
+          ]
+        });
+      }
+    } catch (e) {
+      console.warn('[LiveStudentSync] Error fetching live student:', e);
+    }
   };
 
   const handleSearchKeyDown = (e) => {
-    if (e.key === 'Enter' && searchResults.length > 0) {
-      handleSelectStudent(searchResults[0]);
+    if (e.key === 'Enter') {
+      if (searchResults.length > 0) {
+        handleSelectStudent(searchResults[0]);
+      } else if (searchQuery.trim()) {
+        handleSelectStudent({ roll_no: searchQuery.trim().toUpperCase() });
+      }
     }
   };
 
@@ -4296,10 +4566,10 @@ export default function App() {
 
   // Compute progress bar relative to highest average
   const maxYearAvg = Math.max(
-    yearlyAverages.year_1,
-    yearlyAverages.year_2,
-    yearlyAverages.year_3,
-    yearlyAverages.year_4,
+    Number(yearlyAverages?.year_1) || 0,
+    Number(yearlyAverages?.year_2) || 0,
+    Number(yearlyAverages?.year_3) || 0,
+    Number(yearlyAverages?.year_4) || 0,
     1
   );
 
@@ -4499,7 +4769,7 @@ export default function App() {
                   </div>
                   {searchResults.map((item, idx) => (
                     <div
-                      key={item.id || idx}
+                      key={item.id || item.roll_no || idx}
                       onClick={() => handleSelectStudent(item)}
                       className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-colors ${
                         isDarkMode 
@@ -4511,16 +4781,18 @@ export default function App() {
                         <div className="w-8 h-8 rounded-full overflow-hidden shadow-xs border border-indigo-400/30 flex-shrink-0">
                           <AvatarImage
                             src={item.picture || item.photo_url}
-                            alt={item.name}
+                            alt={item.name || item.student_name}
                             initials={item.initials}
-                            fallbackBg={item.avatarBg || "from-[#38c4ee] to-[#0ea5e9]"}
+                            fallbackBg={item.avatarBg}
                           />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs truncate leading-tight">{item.name}</span>
+                            <span className="font-bold text-xs truncate leading-tight">
+                              {item.name || item.student_name || 'STUDENT'}
+                            </span>
                             <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold shrink-0">
-                              {item.id}
+                              {item.id || item.roll_no}
                             </span>
                           </div>
                           <div className={`text-[11px] font-medium mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -4530,7 +4802,7 @@ export default function App() {
                       </div>
                       <div className="text-right flex-shrink-0 pl-2">
                         <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 block whitespace-nowrap">
-                          +{item.balance_points ? parseFloat(item.balance_points.replace(/,/g, '')).toLocaleString() : '0'} RP
+                          +{item.balance_points ? parseFloat(String(item.balance_points).replace(/,/g, '')).toLocaleString() : '0'} RP
                         </span>
                         <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Balance</span>
                       </div>
@@ -4920,23 +5192,28 @@ export default function App() {
                 </div>
                 {searchResults.map((item, idx) => (
                   <div
-                    key={`${item.roll_no}-${idx}`}
+                    key={`${item.roll_no || item.id}-${idx}`}
                     onClick={() => handleSelectStudent(item)}
                     className={`px-3.5 py-3 cursor-pointer flex items-center justify-between transition-colors ${
                       isDarkMode ? 'hover:bg-slate-800/80 active:bg-slate-800' : 'hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#38c4ee] to-[#0ea5e9] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
-                        {(item.student_name || 'ST').slice(0, 2).toUpperCase()}
+                      <div className="w-8 h-8 rounded-full overflow-hidden shadow-xs border border-indigo-400/30 flex-shrink-0">
+                        <AvatarImage
+                          src={item.picture || item.photo_url}
+                          alt={item.name || item.student_name}
+                          initials={item.initials}
+                          fallbackBg={item.avatarBg}
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className={`text-xs font-bold flex flex-wrap items-center gap-1.5 truncate ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                          <span className="truncate">{item.student_name}</span>
+                          <span className="truncate">{item.name || item.student_name || 'STUDENT'}</span>
                           <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono flex-shrink-0 ${
                             isDarkMode ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-300'
                           }`}>
-                            {item.roll_no}
+                            {item.roll_no || item.id}
                           </span>
                         </div>
                         <div className={`text-[10px] font-medium mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -4946,7 +5223,7 @@ export default function App() {
                     </div>
                     <div className="text-right flex-shrink-0 pl-2">
                       <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 block whitespace-nowrap">
-                        +{item.balance_points ? parseFloat(item.balance_points.replace(/,/g, '')).toLocaleString() : '0'} RP
+                        +{item.balance_points ? parseFloat(String(item.balance_points).replace(/,/g, '')).toLocaleString() : '0'} RP
                       </span>
                       <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Balance</span>
                     </div>
@@ -5285,7 +5562,7 @@ export default function App() {
                   <h2 className={`text-[11px] font-bold tracking-wider uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     STUDENT PROFILE & POINTS
                   </h2>
-                  {student.email === currentUser.email && (
+                  {currentUser && (student.id === currentUser.id || student.roll_no === currentUser.roll_no) && (
                     <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
                       isDarkMode 
                         ? 'text-indigo-400 bg-indigo-950/80 border border-indigo-800' 
@@ -5349,12 +5626,18 @@ export default function App() {
                             <span>{student.email}</span>
                           </div>
                         )}
-                        {student.mentor_name && student.mentor_name !== 'N/A' && (
-                          <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
-                            <User className="w-3.5 h-3.5" />
-                            <span>Mentor: {student.mentor_name}</span>
-                          </div>
-                        )}
+                        {(() => {
+                          let mentorDisplayName = student.mentor_name && student.mentor_name !== 'N/A' && student.mentor_name !== 'BIT Faculty' 
+                            ? student.mentor_name 
+                            : (studentMentorData?.find(m => (m.rollNo || '').toUpperCase() === String(student.id || student.roll_no || '').toUpperCase())?.mentorName || student.mentor_name || 'BIT Faculty');
+                          mentorDisplayName = String(mentorDisplayName).replace(/^Mentor:\s*/i, '');
+                          return (
+                            <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
+                              <User className="w-3.5 h-3.5" />
+                              <span>Mentor: {mentorDisplayName}</span>
+                            </div>
+                          );
+                        })()}
                         {(() => {
                           const track = getStudentTrack(student);
                           const isUAL = track.code === 'UAL';
