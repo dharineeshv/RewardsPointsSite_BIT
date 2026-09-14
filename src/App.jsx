@@ -466,15 +466,35 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
     calculatedPoints = eventLogs.reduce((acc, ev) => acc + (parseFloat(ev.points) || 0), 0);
   }
 
-  const resolvedName = studentRecord?.name || mentorInfo?.studentName || googleName || rollId;
-  const resolvedDept = studentRecord?.department || mentorInfo?.department || (deptCode ? `B. TECH. - ${deptCode}` : 'Engineering');
-  const resolvedMentor = mentorInfo?.mentorName || studentRecord?.mentor || 'Dr. ANANDAKUMAR K ISE';
-  const resolvedYear = mentorInfo?.year || studentRecord?.year || 'IV';
-  const resolvedEmail = studentRecord?.email || (cleanInput.includes('@') ? cleanInput : `${rollId.toLowerCase()}@bitsathy.ac.in`);
+  let resolvedName = studentRecord?.name || mentorInfo?.studentName || googleName || rollId;
+  let resolvedDept = studentRecord?.department || mentorInfo?.department || (deptCode ? `B. TECH. - ${deptCode}` : 'Engineering');
+  let resolvedMentor = mentorInfo?.mentorName || studentRecord?.mentor || 'BIT Faculty';
+  let resolvedYear = mentorInfo?.year || studentRecord?.year || 'IV';
+  let resolvedEmail = studentRecord?.email || (cleanInput.includes('@') ? cleanInput : `${rollId.toLowerCase()}@bitsathy.ac.in`);
 
   let initialBalance = studentRecord?.balancePoints !== undefined ? studentRecord.balancePoints : (calculatedPoints > 0 ? calculatedPoints : 0);
   let initialCumulative = studentRecord?.cumulativePoints !== undefined ? studentRecord.cumulativePoints : (calculatedPoints > 0 ? calculatedPoints : initialBalance);
   let initialRedeemed = studentRecord?.redeemedPoints !== undefined ? studentRecord.redeemedPoints : 0;
+
+  // Check instant live cache first
+  const cachedLive = getCachedStudentPoints(rollId);
+  if (cachedLive) {
+    if (cachedLive.balance_points !== undefined) {
+      initialBalance = cachedLive.balance_points;
+    }
+    if (cachedLive.cumulative_points !== undefined) {
+      initialCumulative = cachedLive.cumulative_points;
+    }
+    if (cachedLive.redeemed_points !== undefined) {
+      initialRedeemed = cachedLive.redeemed_points;
+    }
+    if (cachedLive.name && cachedLive.name !== rollId) {
+      resolvedName = cachedLive.name;
+    }
+    if (cachedLive.mentor && cachedLive.mentor !== 'BIT Faculty') {
+      resolvedMentor = cachedLive.mentor;
+    }
+  }
 
   let profileApiData = {
     roll_no: rollId,
@@ -500,75 +520,11 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
     redeemedPoints: String(initialRedeemed)
   };
 
-  // 1. Real-time dynamic Google Sheets API via backend /api/points/me
-  try {
-    const liveBackendStudent = await fetchAuthenticatedStudentPoints(null, cleanInput, googleName);
-    if (liveBackendStudent) {
-      if (liveBackendStudent.name && liveBackendStudent.name !== rollId) {
-        profileApiData.student_name = liveBackendStudent.name;
-        profileApiData.name = liveBackendStudent.name;
-      }
-      if (liveBackendStudent.department) {
-        profileApiData.department = liveBackendStudent.department;
-      }
-      if (liveBackendStudent.mentor && liveBackendStudent.mentor !== 'BIT Faculty') {
-        profileApiData.mentor_name = liveBackendStudent.mentor;
-        profileApiData.mentor = liveBackendStudent.mentor;
-      }
-      if (liveBackendStudent.year) {
-        profileApiData.year = liveBackendStudent.year;
-      }
-      if (liveBackendStudent.balance_points !== undefined && liveBackendStudent.balance_points !== null) {
-        profileApiData.balance_points = String(liveBackendStudent.balance_points);
-        profileApiData.currentPoints = String(liveBackendStudent.balance_points);
-        profileApiData.points = Number(liveBackendStudent.balance_points);
-      }
-      if (liveBackendStudent.cumulative_points !== undefined && liveBackendStudent.cumulative_points !== null) {
-        profileApiData.cumulative_reward_points = String(liveBackendStudent.cumulative_points);
-        profileApiData.cumulativePoints = String(liveBackendStudent.cumulative_points);
-      }
-      if (liveBackendStudent.redeemed_points !== undefined && liveBackendStudent.redeemed_points !== null) {
-        profileApiData.redeemed_points = String(liveBackendStudent.redeemed_points);
-        profileApiData.redeemedPoints = String(liveBackendStudent.redeemed_points);
-      }
-      if (liveBackendStudent.rank) {
-        profileApiData.rank = liveBackendStudent.rank;
-      }
-    }
-  } catch (backendErr) {
-    console.warn('[LiveBackendSync] /api/points/me query notice:', backendErr);
-  }
-
-  // 2. Direct client-side Google Sheets synchronization fallback
-  if (rollId) {
-    try {
-      const deptName = studentRecord?.department || mentorInfo?.deptCode || 'CT';
-      const liveSheetStudent = await fetchStudentRewardPointsFromSheet(rollId, deptName);
-      if (liveSheetStudent) {
-        if (liveSheetStudent.name && liveSheetStudent.name !== rollId) {
-          profileApiData.student_name = liveSheetStudent.name;
-        }
-        if (liveSheetStudent.mentor && liveSheetStudent.mentor !== 'BIT Faculty') {
-          profileApiData.mentor_name = liveSheetStudent.mentor;
-        }
-        const sheetBal = parseFloat(String(liveSheetStudent.balance_points || '0').replace(/,/g, '')) || 0;
-        if (sheetBal > 0) {
-          profileApiData.balance_points = String(sheetBal);
-          profileApiData.currentPoints = String(sheetBal);
-        }
-        const sheetCum = parseFloat(String(liveSheetStudent.cumulative_points || '0').replace(/,/g, '')) || 0;
-        if (sheetCum > 0) {
-          profileApiData.cumulative_reward_points = String(sheetCum);
-          profileApiData.cumulativePoints = String(sheetCum);
-        }
-      }
-    } catch (liveErr) {
-      console.warn('[LiveSheetSync] Fallback to cached student data:', liveErr);
-    }
-  }
+  // Trigger non-blocking live sheet fetch in background to warm cache
+  const deptName = studentRecord?.department || mentorInfo?.deptCode || 'CT';
+  fetchStudentRewardPointsFromSheet(rollId, deptName, false).catch(() => {});
 
   const searchApiData = profileApiData;
-
   return { rollId, profileApiData, searchApiData };
 }
 
