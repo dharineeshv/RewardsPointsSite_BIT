@@ -17,6 +17,47 @@ import {
   BIT_SPREADSHEET_CONFIG,
   parseStudentRows
 } from '../data/rp_distribution';
+import { fetchStudentRewardPointsFromSheet, APPS_SCRIPT_SHEET_URL } from '../services/googleSheetsService';
+import studentMentorData from '../data/studentMentorMapping.json';
+
+const DEPT_CODE_TO_NAME = {
+  'CT': 'COMPUTER TECHNOLOGY',
+  'IT': 'INFORMATION TECHNOLOGY',
+  'CS': 'COMPUTER SCIENCE AND ENGINEERING',
+  'CSE': 'COMPUTER SCIENCE AND ENGINEERING',
+  'EC': 'ELECTRONICS AND COMMUNICATION ENGINEERING',
+  'ECE': 'ELECTRONICS AND COMMUNICATION ENGINEERING',
+  'EE': 'ELECTRICAL AND ELECTRONICS ENGINEERING',
+  'EEE': 'ELECTRICAL AND ELECTRONICS ENGINEERING',
+  'AD': 'ARTIFICIAL INTELLIGENCE AND DATA SCIENCE',
+  'AM': 'ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING',
+  'ME': 'MECHANICAL ENGINEERING',
+  'MECH': 'MECHANICAL ENGINEERING',
+  'IS': 'INFORMATION SCIENCE AND ENGINEERING',
+  'ISE': 'INFORMATION SCIENCE AND ENGINEERING',
+  'CB': 'COMPUTER SCIENCE AND BUSINESS SYSTEMS',
+  'CSBS': 'COMPUTER SCIENCE AND BUSINESS SYSTEMS',
+  'CD': 'COMPUTER SCIENCE AND DESIGN',
+  'CSD': 'COMPUTER SCIENCE AND DESIGN',
+  'BT': 'BIOTECHNOLOGY',
+  'BM': 'BIOMEDICAL ENGINEERING',
+  'AG': 'AGRICULTURAL ENGINEERING',
+  'CE': 'CIVIL ENGINEERING',
+  'FD': 'FASHION TECHNOLOGY',
+  'FT': 'FOOD TECHNOLOGY',
+  'EI': 'ELECTRONICS AND INSTRUMENTATION ENGINEERING',
+  'MC': 'MECHATRONICS ENGINEERING'
+};
+
+function resolveStudentDepartment(roll = '', defaultDept = '') {
+  if (defaultDept && defaultDept !== 'N/A' && defaultDept !== 'Engineering') return defaultDept;
+  const cleanRoll = String(roll || '').trim().toUpperCase();
+  const mentorRec = Array.isArray(studentMentorData) ? studentMentorData.find(m => (m.rollNo || '').toUpperCase() === cleanRoll) : null;
+  if (mentorRec?.department) return mentorRec.department;
+  const letters = (cleanRoll.match(/[A-Z]+/g) || []).join('');
+  if (letters && DEPT_CODE_TO_NAME[letters]) return DEPT_CODE_TO_NAME[letters];
+  return 'ENGINEERING';
+}
 
 export default function InternalMarksView({ currentUser, isDarkMode, onNavigateToSkew }) {
   const [studentsData, setStudentsData] = useState(() => {
@@ -52,110 +93,128 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Dynamic Live Sync function from Google Sheets API
-  const fetchLiveGoogleSheetData = useCallback(async (isManual = false) => {
-    setSyncStatus('syncing');
-
-    // Retrieve active Google OAuth Bearer token
-    let token = null;
-    try {
-      token =
-        currentUser?.accessToken ||
-        currentUser?.token ||
-        currentUser?.idToken ||
-        localStorage.getItem('google_auth_token') ||
-        sessionStorage.getItem('google_auth_token');
-    } catch {
-      // ignore
-    }
-
-    // Default fallback token or proxy if student signed in
-    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-
-    try {
-      const endpoint = BIT_SPREADSHEET_CONFIG.getEndpoint();
-      const res = await fetch(endpoint, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders
-        }
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        const rows = json.values || [];
-        if (rows.length > 2) {
-          const parsed = parseStudentRows(rows);
-          if (parsed.length > 0) {
-            setStudentsData(parsed);
-            const now = new Date();
-            setLastSyncTime(now);
-            setSyncStatus('live');
-            try {
-              localStorage.setItem(
-                'bit_live_internal_marks',
-                JSON.stringify({ students: parsed, time: now.toISOString() })
-              );
-            } catch {
-              // ignore storage limit
-            }
-            return;
-          }
-        }
-      }
-      // If token expired or not authorized, keep using current / snapshot dataset
-      setSyncStatus(lastSyncTime ? 'live' : 'ready');
-    } catch (err) {
-      console.warn('Live Google Sheet fetch notice:', err);
-      setSyncStatus('ready');
-    }
-  }, [currentUser, lastSyncTime]);
-
-  // Attempt background sync on component mount
-  useEffect(() => {
-    fetchLiveGoogleSheetData(false);
-  }, []);
-
-  // Detect logged-in student roll or default
+  // Detect logged-in student roll or dynamic default from master sheet
   const defaultRoll = useMemo(() => {
-    const raw = (currentUser?.id || currentUser?.roll_no || '7376232CT109').trim().toUpperCase();
-    return raw.includes('@') ? raw.split('@')[0].toUpperCase() : raw;
-  }, [currentUser]);
+    const raw = (currentUser?.id || currentUser?.roll_no || currentUser?.rollNo || currentUser?.username || '').trim().toUpperCase();
+    if (raw) {
+      return raw.includes('@') ? raw.split('@')[0].toUpperCase() : raw;
+    }
+    return (studentsData[0]?.rollNo || '').toUpperCase();
+  }, [currentUser, studentsData]);
 
   // Selected student roll
   const [selectedRoll, setSelectedRoll] = useState(defaultRoll);
 
-  // Active student object
+  // Sync selectedRoll if defaultRoll changes (e.g. upon user login)
+  useEffect(() => {
+    if (defaultRoll && !selectedRoll) {
+      setSelectedRoll(defaultRoll);
+    }
+  }, [defaultRoll]);
+
+  // Active student object dynamically looked up from Master Sheet / datasets
   const activeStudent = useMemo(() => {
-    return (
-      studentsData.find(s => s.rollNo === selectedRoll) ||
-      studentsData.find(s => s.rollNo.includes(selectedRoll)) ||
-      studentsData.find(s => s.rollNo === defaultRoll) ||
-      studentsData[0] || {
-        rollNo: '7376232CT109',
-        name: 'DHARINEESH V',
-        year: 'IV',
-        department: 'COMPUTER TECHNOLOGY',
-        courseCode: 'B. Tech.',
-        mentor: 'Dr. ANANDAKUMAR K ISE',
-        activityBreakdown: [],
-        theoryCourses: [
-          { slot: 'TS1', code: '22CT701', ip1: '14.00', ip2: '', total: '14.00' },
-          { slot: 'TS2', code: '22CT702', ip1: '13.00', ip2: '', total: '13.00' },
-          { slot: 'TS3', code: '22CT021', ip1: '13.50', ip2: '', total: '13.50' }
-        ],
-        addonCourses: [],
-        labCourses: [],
-        totalTheoryCount: 3,
-        totalLabCount: 0,
-        totalSubjectsCount: 3,
-        ip1Total: '40.50',
-        ip2Total: '0.00',
-        grandTotal: '40.50'
+    const targetRoll = (selectedRoll || defaultRoll || studentsData[0]?.rollNo || '').trim().toUpperCase();
+
+    // 1. Match from master sheet internal marks dataset
+    const matched = studentsData.find(s => (s.rollNo || s.id || '').toUpperCase() === targetRoll) ||
+      studentsData.find(s => (s.rollNo || s.id || '').toUpperCase().includes(targetRoll));
+
+    if (matched) return matched;
+
+    // 2. Dynamic resolution from institute student mentor directory
+    const mentorRec = Array.isArray(studentMentorData)
+      ? studentMentorData.find(m => (m.rollNo || '').toUpperCase() === targetRoll)
+      : null;
+
+    const dynamicDept = resolveStudentDepartment(targetRoll, mentorRec?.department || currentUser?.department);
+    const dynamicName = mentorRec?.name || currentUser?.name || targetRoll || 'Student';
+    const dynamicMentor = mentorRec?.mentorName || mentorRec?.mentor || currentUser?.mentor || '';
+    const dynamicYear = mentorRec?.year || currentUser?.year || 'IV';
+
+    return {
+      rollNo: targetRoll,
+      name: dynamicName,
+      year: dynamicYear,
+      department: dynamicDept,
+      courseCode: 'B. E.',
+      mentor: dynamicMentor,
+      activityBreakdown: [],
+      theoryCourses: [],
+      addonCourses: [],
+      labCourses: [],
+      totalTheoryCount: 0,
+      totalLabCount: 0,
+      totalSubjectsCount: 0,
+      ip1Total: '0.00',
+      ip2Total: '0.00',
+      grandTotal: '0.00'
+    };
+  }, [studentsData, selectedRoll, defaultRoll, currentUser]);
+
+  // Dynamic Live Sync function from Google Sheets API
+  const fetchLiveGoogleSheetData = useCallback(async (isManual = false) => {
+    const rollToFetch = (selectedRoll || defaultRoll || currentUser?.id || currentUser?.roll_no || '').trim().toUpperCase();
+    if (!rollToFetch) return;
+
+    setSyncStatus('syncing');
+
+    try {
+      const dept = resolveStudentDepartment(rollToFetch);
+      const liveStudent = await fetchStudentRewardPointsFromSheet(rollToFetch, dept);
+
+      if (liveStudent) {
+        setStudentsData(prevList => {
+          const cleanRoll = String(rollToFetch).toUpperCase();
+          const existingIdx = prevList.findIndex(s => (s.rollNo || s.id || '').toUpperCase() === cleanRoll);
+
+          const updatedRecord = {
+            ...(existingIdx !== -1 ? prevList[existingIdx] : {}),
+            rollNo: cleanRoll,
+            id: cleanRoll,
+            name: liveStudent.name || (existingIdx !== -1 ? prevList[existingIdx].name : cleanRoll),
+            mentor: liveStudent.mentor || (existingIdx !== -1 ? prevList[existingIdx].mentor : ''),
+            department: liveStudent.department || (existingIdx !== -1 ? prevList[existingIdx].department : dept),
+            year: liveStudent.year || (existingIdx !== -1 ? prevList[existingIdx].year : 'IV'),
+            balancePoints: liveStudent.balance_points ?? (existingIdx !== -1 ? prevList[existingIdx].balancePoints : 0),
+            cumulativePoints: liveStudent.cumulative_points ?? (existingIdx !== -1 ? prevList[existingIdx].cumulativePoints : 0),
+            redeemedPoints: liveStudent.redeemed_points ?? (existingIdx !== -1 ? prevList[existingIdx].redeemedPoints : 0),
+            theoryCourses: (liveStudent.theoryCourses && liveStudent.theoryCourses.length > 0) ? liveStudent.theoryCourses : (existingIdx !== -1 ? (prevList[existingIdx].theoryCourses || []) : []),
+            addonCourses: (liveStudent.addonCourses && liveStudent.addonCourses.length > 0) ? liveStudent.addonCourses : (existingIdx !== -1 ? (prevList[existingIdx].addonCourses || []) : []),
+            labCourses: (liveStudent.labCourses && liveStudent.labCourses.length > 0) ? liveStudent.labCourses : (existingIdx !== -1 ? (prevList[existingIdx].labCourses || []) : []),
+            activityBreakdown: (liveStudent.activityBreakdown && liveStudent.activityBreakdown.length > 0) ? liveStudent.activityBreakdown : (existingIdx !== -1 ? (prevList[existingIdx].activityBreakdown || []) : []),
+            eventLogs: (liveStudent.eventLogs && liveStudent.eventLogs.length > 0) ? liveStudent.eventLogs : (existingIdx !== -1 ? (prevList[existingIdx].eventLogs || []) : []),
+            ip1Total: liveStudent.ip1Total || (existingIdx !== -1 ? prevList[existingIdx].ip1Total : '0.00'),
+            ip2Total: liveStudent.ip2Total || (existingIdx !== -1 ? prevList[existingIdx].ip2Total : '0.00'),
+            grandTotal: liveStudent.grandTotal || (existingIdx !== -1 ? prevList[existingIdx].grandTotal : '0.00'),
+          };
+
+          const newList = [...prevList];
+          if (existingIdx !== -1) {
+            newList[existingIdx] = updatedRecord;
+          } else {
+            newList.unshift(updatedRecord);
+          }
+          return newList;
+        });
+
+        const now = new Date();
+        setLastSyncTime(now);
+        setSyncStatus('live');
+        return;
       }
-    );
-  }, [studentsData, selectedRoll, defaultRoll]);
+
+      setSyncStatus('live');
+    } catch (err) {
+      console.warn('Live Google Sheet fetch notice:', err);
+      setSyncStatus('ready');
+    }
+  }, [currentUser, selectedRoll, defaultRoll]);
+
+  // Background sync on component mount and roll change
+  useEffect(() => {
+    fetchLiveGoogleSheetData(false);
+  }, [selectedRoll, defaultRoll]);
 
   // Search filter results (up to 8 matches)
   const searchResults = useMemo(() => {
@@ -479,7 +538,7 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
                 <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
                   isDarkMode ? 'text-white' : 'text-slate-950'
                 }`}>
-                  THEORY COURSES - ({activeStudent.totalTheoryCount} COURSES)
+                  THEORY COURSES - ({activeStudent.totalTheoryCount || (activeStudent.theoryCourses || []).length || 0} COURSES)
                 </td>
                 <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
                   isDarkMode ? 'text-slate-300' : 'text-slate-900'
@@ -499,7 +558,7 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
               </tr>
 
               {/* Theory Course Rows */}
-              {activeStudent.theoryCourses.map((tc, idx) => (
+              {(activeStudent.theoryCourses || []).map((tc, idx) => (
                 <tr key={idx} className="transition-colors">
                   <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
                     {tc.code}
@@ -547,8 +606,8 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
               </tr>
 
               {/* Add-on Course Rows (if any) */}
-              {activeStudent.addonCourses.length > 0 &&
-                activeStudent.addonCourses.map((ac, idx) => (
+              {(activeStudent.addonCourses || []).length > 0 &&
+                (activeStudent.addonCourses || []).map((ac, idx) => (
                   <tr key={idx} className="transition-colors">
                     <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
                       {ac.code}
@@ -576,7 +635,7 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
                 <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
                   isDarkMode ? 'text-white' : 'text-slate-950'
                 }`}>
-                  LAB. COURSES - ({activeStudent.totalLabCount} COURSES)
+                  LAB. COURSES - ({activeStudent.totalLabCount || (activeStudent.labCourses || []).length || 0} COURSES)
                 </td>
                 <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
                   isDarkMode ? 'text-slate-300' : 'text-slate-900'
@@ -596,8 +655,8 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
               </tr>
 
               {/* Lab Course Rows (if any) */}
-              {activeStudent.labCourses.length > 0 &&
-                activeStudent.labCourses.map((lc, idx) => (
+              {(activeStudent.labCourses || []).length > 0 &&
+                (activeStudent.labCourses || []).map((lc, idx) => (
                   <tr key={idx} className="transition-colors">
                     <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
                       {lc.code}

@@ -341,6 +341,89 @@ function findStudentByRoll(ss, targetRoll) {
       }
 
       if (rowRoll === cleanRoll || rowRoll.includes(cleanRoll)) {
+        // Extract live courses and marks if present in sheet
+        const theoryCourses = [];
+        const addonCourses = [];
+        const labCourses = [];
+        let ip1Total = '';
+        let ip2Total = '';
+        let grandTotal = '';
+
+        if (headerIdx !== -1) {
+          const headerRow = data[headerIdx].map(c => String(c || '').trim().toUpperCase());
+          
+          for (let i = 1; i <= 7; i++) {
+            const tsIdx = headerRow.findIndex(h => h === 'TS' + i || h === 'TS ' + i);
+            if (tsIdx !== -1 && row[tsIdx]) {
+              const code = String(row[tsIdx]).trim();
+              if (code && code !== '0') {
+                const ip1Idx = headerRow.findIndex(h => h === 'IP1TS' + i + 'M' || h.includes('IP1TS' + i));
+                const ip2Idx = headerRow.findIndex(h => h === 'IP2TS' + i + 'M' || h.includes('IP2TS' + i));
+                const totIdx = headerRow.findIndex(h => h === 'TS' + i + 'M' || h === 'TS' + i + ' M');
+                
+                const ip1Val = ip1Idx !== -1 ? String(row[ip1Idx] || '').trim() : '';
+                const ip2Val = ip2Idx !== -1 ? String(row[ip2Idx] || '').trim() : '';
+                const totVal = totIdx !== -1 ? String(row[totIdx] || '').trim() : (ip1Val || '0.00');
+
+                theoryCourses.push({
+                  slot: 'TS' + i,
+                  code: code,
+                  ip1: ip1Val && ip1Val !== '0.00' ? ip1Val : (ip1Val === '0.00' ? '0.00' : ''),
+                  ip2: ip2Val && ip2Val !== '0.00' ? ip2Val : '',
+                  total: totVal || ip1Val || '0.00'
+                });
+              }
+            }
+          }
+
+          for (let i = 8; i <= 9; i++) {
+            const tsIdx = headerRow.findIndex(h => h === 'TS' + i || h === 'TS ' + i);
+            if (tsIdx !== -1 && row[tsIdx]) {
+              const code = String(row[tsIdx]).trim();
+              if (code && code !== '0') {
+                const ip1Idx = headerRow.findIndex(h => h === 'IP1TS' + i + 'M');
+                const ip2Idx = headerRow.findIndex(h => h === 'IP2TS' + i + 'M');
+                const totIdx = headerRow.findIndex(h => h === 'TS' + i + 'M');
+                addonCourses.push({
+                  slot: 'TS' + i,
+                  code: code,
+                  ip1: ip1Idx !== -1 ? String(row[ip1Idx] || '').trim() : '',
+                  ip2: ip2Idx !== -1 ? String(row[ip2Idx] || '').trim() : '',
+                  total: totIdx !== -1 ? String(row[totIdx] || '').trim() : '0.00'
+                });
+              }
+            }
+          }
+
+          for (let i = 1; i <= 3; i++) {
+            const lsIdx = headerRow.findIndex(h => h === 'LS' + i || h === 'LS ' + i);
+            if (lsIdx !== -1 && row[lsIdx]) {
+              const code = String(row[lsIdx]).trim();
+              if (code && code !== '0') {
+                const ip1Idx = headerRow.findIndex(h => h === 'IP1LS' + i + 'M');
+                const ip2Idx = headerRow.findIndex(h => h === 'IP2LS' + i + 'M');
+                const totIdx = headerRow.findIndex(h => h === 'LS' + i + 'M');
+                labCourses.push({
+                  slot: 'LS' + i,
+                  code: code,
+                  ip1: ip1Idx !== -1 ? String(row[ip1Idx] || '').trim() : '',
+                  ip2: ip2Idx !== -1 ? String(row[ip2Idx] || '').trim() : '',
+                  total: totIdx !== -1 ? String(row[totIdx] || '').trim() : '0.00'
+                });
+              }
+            }
+          }
+
+          const ip1TotalIdx = headerRow.findIndex(h => h === 'IP1M' || h === 'IP1 TOTAL');
+          const ip2TotalIdx = headerRow.findIndex(h => h === 'IP2M' || h === 'IP2 TOTAL');
+          const grandTotalIdx = headerRow.findIndex(h => h === 'IPM' || h === 'GRAND TOTAL');
+
+          if (ip1TotalIdx !== -1 && row[ip1TotalIdx]) ip1Total = String(row[ip1TotalIdx]).trim();
+          if (ip2TotalIdx !== -1 && row[ip2TotalIdx]) ip2Total = String(row[ip2TotalIdx]).trim();
+          if (grandTotalIdx !== -1 && row[grandTotalIdx]) grandTotal = String(row[grandTotalIdx]).trim();
+          else if (ip1Total) grandTotal = ip1Total;
+        }
+
         return {
           roll_no: rowRoll,
           rollNo: rowRoll,
@@ -358,6 +441,12 @@ function findStudentByRoll(ss, targetRoll) {
           cumulativePoints: String(rowCum),
           redeemed_points: rowRed,
           redeemedPoints: String(rowRed),
+          theoryCourses: theoryCourses,
+          addonCourses: addonCourses,
+          labCourses: labCourses,
+          ip1Total: ip1Total,
+          ip2Total: ip2Total,
+          grandTotal: grandTotal,
           sheetTab: sheetName,
           fetchedAt: new Date().toISOString()
         };

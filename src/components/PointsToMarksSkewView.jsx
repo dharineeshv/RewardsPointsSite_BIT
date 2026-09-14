@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Calculator,
   Search,
@@ -17,10 +17,12 @@ import {
   BarChart2,
   Percent,
   FileSpreadsheet,
-  FlaskConical
+  FlaskConical,
+  RefreshCw
 } from 'lucide-react';
 import rawData from '../data/rp_distribution_raw.json';
 import { STUDENT_SPECIAL_LAB_MAP } from '../data/rp_distribution';
+import { fetchStudentRewardPointsFromSheet, fetchDepartmentSheetData, getDepartmentTabName } from '../services/googleSheetsService';
 
 // Benchmark point cutoffs per internal mark (out of 15) for each year
 export const YEAR_SKEW_BENCHMARKS = {
@@ -184,7 +186,115 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
   const [searchStudent, setSearchStudent] = useState('');
   const [activeTabSection, setActiveTabSection] = useState('benchmarks'); // 'benchmarks' | 'students'
 
-  const currentRoll = useMemo(() => (currentUser?.roll_no || currentUser?.rollNo || currentUser?.roll || '').toUpperCase(), [currentUser]);
+  // Live Sync State for Logged-In Student
+  const [livePoints, setLivePoints] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('ready'); // 'ready' | 'syncing' | 'live' | 'fallback'
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+
+  // Live Department Students Points Mapping from Google Sheets
+  const [liveStudentPointsMap, setLiveStudentPointsMap] = useState({});
+  const [isLoadingLiveDept, setIsLoadingLiveDept] = useState(false);
+
+  const currentRoll = useMemo(() => {
+    return (
+      currentUser?.roll_no ||
+      currentUser?.rollNo ||
+      currentUser?.roll ||
+      currentUser?.register_no ||
+      currentUser?.id ||
+      currentUser?.username ||
+      ''
+    ).toUpperCase().trim();
+  }, [currentUser]);
+
+  // Accurate matcher for whether a given roll matches the current student
+  const isStudentCurrentUser = useCallback((stRoll) => {
+    if (!currentRoll || !stRoll) return false;
+    const s1 = String(stRoll).trim().toUpperCase();
+    const s2 = String(currentRoll).trim().toUpperCase();
+    if (s1 === s2) return true;
+    
+    // Check short roll without 7376 prefix (e.g. 7376232CT109 -> CT109)
+    const short1 = s1.replace(/^7376\d{2,3}/, '');
+    const short2 = s2.replace(/^7376\d{2,3}/, '');
+    if (short1 && short2 && short1 === short2) return true;
+    if (s1.includes(s2) || s2.includes(s1)) return true;
+    return false;
+  }, [currentRoll]);
+
+  // Live Student Data Fetching from Master Sheet / Apps Script API
+  const syncLiveStudentData = useCallback(async (force = false) => {
+    if (!currentRoll) return;
+    setIsSyncing(true);
+    setSyncStatus('syncing');
+    try {
+      const liveData = await fetchStudentRewardPointsFromSheet(currentRoll, userDepartment, !force);
+      if (liveData) {
+        const rawPts = liveData.balance_points ?? liveData.balancePoints ?? liveData.currentPoints ?? liveData.points;
+        if (rawPts !== undefined && rawPts !== null) {
+          const num = parseInt(String(rawPts).replace(/,/g, ''), 10);
+          if (!isNaN(num)) {
+            setLivePoints(num);
+            setSyncStatus('live');
+            setLastSyncTime(new Date());
+          }
+        }
+      } else {
+        setSyncStatus('ready');
+      }
+    } catch (err) {
+      console.warn('[PointsToMarksSkewView] Error syncing live student points:', err);
+      setSyncStatus('fallback');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [currentRoll, userDepartment]);
+
+  // Live Department Data Fetching for all students in the selected department
+  const loadLiveDepartmentData = useCallback(async (dept, force = false) => {
+    if (!dept || dept === 'ALL') {
+      // If ALL is selected, load user's department first
+      dept = userDepartment;
+    }
+    if (!dept) return;
+    setIsLoadingLiveDept(true);
+    try {
+      const tabName = getDepartmentTabName(dept);
+      const students = await fetchDepartmentSheetData(tabName, !force);
+      if (Array.isArray(students) && students.length > 0) {
+        setLiveStudentPointsMap(prev => {
+          const next = { ...prev };
+          students.forEach(st => {
+            const rFull = String(st.rollNo || st.roll_no || st.id || '').trim().toUpperCase();
+            const pts = st.balance_points ?? st.balancePoints ?? st.currentPoints ?? st.points;
+            if (rFull && pts !== undefined && pts !== null) {
+              const num = parseInt(String(pts).replace(/,/g, ''), 10);
+              if (!isNaN(num)) {
+                next[rFull] = num;
+                const shortCode = rFull.replace(/^7376\d{2,3}/, '');
+                if (shortCode) next[shortCode] = num;
+              }
+            }
+          });
+          return next;
+        });
+      }
+    } catch (err) {
+      console.warn('[PointsToMarksSkewView] Error loading live department sheet:', err);
+    } finally {
+      setIsLoadingLiveDept(false);
+    }
+  }, [userDepartment]);
+
+  useEffect(() => {
+    syncLiveStudentData(false);
+  }, [syncLiveStudentData]);
+
+  // Load live department student points on mount and when department changes
+  useEffect(() => {
+    loadLiveDepartmentData(selectedDept, false);
+  }, [selectedDept, loadLiveDepartmentData]);
 
   // Extract studentwise skew list from master sheet
   const studentSkewList = useMemo(() => {
@@ -244,6 +354,52 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
     }));
   }, [studentSkewList]);
 
+  // Current year benchmark data
+  const currentYearData = YEAR_SKEW_BENCHMARKS[selectedYear] || YEAR_SKEW_BENCHMARKS['IV'];
+
+  // Current student's actual points (live synced or fallback)
+  const studentPts = useMemo(() => {
+    if (livePoints !== null && livePoints !== undefined) {
+      return livePoints;
+    }
+    const rawPts = currentUser?.currentPoints ?? currentUser?.balance_points ?? currentUser?.points;
+    if (rawPts !== undefined && rawPts !== null) {
+      const num = parseInt(String(rawPts).replace(/,/g, ''), 10);
+      if (!isNaN(num)) return num;
+    }
+    if (currentRoll && liveStudentPointsMap[currentRoll] !== undefined) {
+      return liveStudentPointsMap[currentRoll];
+    }
+    const short = currentRoll ? currentRoll.replace(/^7376\d{2,3}/, '') : '';
+    if (short && liveStudentPointsMap[short] !== undefined) {
+      return liveStudentPointsMap[short];
+    }
+    return 0;
+  }, [currentUser, livePoints, currentRoll, liveStudentPointsMap]);
+
+  // Helper to dynamically obtain up-to-date points for ANY student
+  const getEffectivePoints = useCallback((st) => {
+    if (!st) return 0;
+    const roll = String(st.rollNo || '').trim().toUpperCase();
+    const shortRoll = roll.replace(/^7376\d{2,3}/, '');
+
+    // 1. Is this the current student? Use real-time studentPts
+    if (isStudentCurrentUser(roll)) {
+      return studentPts;
+    }
+
+    // 2. Check live Google Sheet department dataset
+    if (liveStudentPointsMap[roll] !== undefined) {
+      return liveStudentPointsMap[roll];
+    }
+    if (shortRoll && liveStudentPointsMap[shortRoll] !== undefined) {
+      return liveStudentPointsMap[shortRoll];
+    }
+
+    // 3. Fallback to static balance points
+    return st.balancePoints || 0;
+  }, [isStudentCurrentUser, studentPts, liveStudentPointsMap]);
+
   // Filtered student list (defaults to logged-in student's department)
   const filteredStudents = useMemo(() => {
     let list = studentSkewList;
@@ -263,24 +419,16 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
     // Sort so that the current logged-in user is at the top if present
     if (currentRoll) {
       list = [...list].sort((a, b) => {
-        if (a.rollNo === currentRoll) return -1;
-        if (b.rollNo === currentRoll) return 1;
+        const aIsUser = isStudentCurrentUser(a.rollNo);
+        const bIsUser = isStudentCurrentUser(b.rollNo);
+        if (aIsUser && !bIsUser) return -1;
+        if (!aIsUser && bIsUser) return 1;
         return 0;
       });
     }
 
     return list;
-  }, [studentSkewList, searchStudent, selectedDept, currentRoll]);
-
-  // Current year benchmark data
-  const currentYearData = YEAR_SKEW_BENCHMARKS[selectedYear] || YEAR_SKEW_BENCHMARKS['IV'];
-
-  // Current student's actual points
-  const studentPts = useMemo(() => {
-    const rawPts = currentUser?.currentPoints ?? currentUser?.balance_points ?? currentUser?.points ?? 0;
-    const num = parseInt(String(rawPts).replace(/,/g, ''), 10);
-    return isNaN(num) ? 0 : num;
-  }, [currentUser]);
+  }, [studentSkewList, searchStudent, selectedDept, currentRoll, isStudentCurrentUser]);
 
   // Determine the student's earned benchmark tier for the currently selected year
   const studentBenchmark = useMemo(() => {
@@ -506,8 +654,9 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
 
                     <div>
                       {isCurrentTarget ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-500/25 text-indigo-300 border border-indigo-500/40">
-                          🎯 Current Tier
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-500/25 text-indigo-300 border border-indigo-500/40">
+                          <Sparkles className="w-3 h-3 text-indigo-300 shrink-0" />
+                          <span>Current Tier</span>
                         </span>
                       ) : isUnlocked ? (
                         <span className="inline-flex items-center gap-1 text-emerald-400 text-[10px] font-bold">
@@ -618,8 +767,9 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
                       {/* Status / Requirement */}
                       <td className="py-3.5 px-4 text-right">
                         {isCurrentTarget ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 shadow-xs">
-                            🎯 Current Tier ({item.mark}/15)
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-indigo-500/25 text-indigo-300 border border-indigo-500/40 shadow-xs">
+                            <Sparkles className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
+                            <span>Current Tier ({item.mark}/15)</span>
                           </span>
                         ) : isUnlocked ? (
                           <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px] font-bold">
@@ -663,8 +813,26 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
               </p>
             </div>
 
-            {/* Department Dropdown & Search Input */}
+            {/* Department Dropdown & Search Input & Refresh Button */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              {/* Refresh Live Points Button */}
+              <button
+                onClick={() => {
+                  syncLiveStudentData(true);
+                  loadLiveDepartmentData(selectedDept, true);
+                }}
+                disabled={isSyncing || isLoadingLiveDept}
+                title="Sync latest live reward points from Google Sheets"
+                className={`p-2 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  isDarkMode
+                    ? 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white hover:border-indigo-500'
+                    : 'bg-slate-50 border-slate-300 text-slate-700 hover:text-slate-900 hover:border-indigo-600'
+                } ${isSyncing || isLoadingLiveDept ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${isSyncing || isLoadingLiveDept ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline text-[11px]">Sync Live</span>
+              </button>
+
               {/* Department Dropdown */}
               <div className="relative w-full sm:w-64">
                 <select
@@ -712,11 +880,12 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
               </div>
             ) : (
               filteredStudents.map((st) => {
-                const isCurrentUser = currentRoll && st.rollNo === currentRoll;
+                const isCurrentUser = isStudentCurrentUser(st.rollNo);
+                const effectivePoints = getEffectivePoints(st);
                 const stYearData = YEAR_SKEW_BENCHMARKS[st.year] || YEAR_SKEW_BENCHMARKS['IV'];
                 let stPredictedMark = 0;
                 for (const cut of stYearData.cutoffs) {
-                  if (st.balancePoints >= cut.points) {
+                  if (effectivePoints >= cut.points) {
                     stPredictedMark = cut.mark;
                     break;
                   }
@@ -758,7 +927,7 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
                           {stPredictedMark} / 15 CIE
                         </span>
                         <span className="text-[10px] font-mono text-indigo-400 font-bold block mt-0.5">
-                          {st.balancePoints.toLocaleString()} RP
+                          {effectivePoints.toLocaleString()} RP
                         </span>
                       </div>
                     </div>
@@ -806,11 +975,12 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
               </thead>
               <tbody className="divide-y divide-slate-800/40 text-xs">
                 {filteredStudents.map((st) => {
-                  const isCurrentUser = currentRoll && st.rollNo === currentRoll;
+                  const isCurrentUser = isStudentCurrentUser(st.rollNo);
+                  const effectivePoints = getEffectivePoints(st);
                   const stYearData = YEAR_SKEW_BENCHMARKS[st.year] || YEAR_SKEW_BENCHMARKS['IV'];
                   let stPredictedMark = 0;
                   for (const cut of stYearData.cutoffs) {
-                    if (st.balancePoints >= cut.points) {
+                    if (effectivePoints >= cut.points) {
                       stPredictedMark = cut.mark;
                       break;
                     }
@@ -847,7 +1017,7 @@ export default function PointsToMarksSkewView({ currentUser, isDarkMode = true, 
                         <div className="text-[11px] text-slate-500">Year {st.year}</div>
                       </td>
                       <td className="py-3 px-4 font-mono font-black text-indigo-400">
-                        {st.balancePoints.toLocaleString()} RP
+                        {effectivePoints.toLocaleString()} RP
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1 max-w-xs">

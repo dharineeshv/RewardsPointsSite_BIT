@@ -191,23 +191,30 @@ export async function fetchInstitutionalAveragesFromSheet(forceRefresh = false) 
       if (res.ok) {
         const json = await res.json();
         if (json && json.success && json.averages) {
-          const computed = {
-            year_1: json.averages.year_1 !== undefined && json.averages.year_1 !== null ? Number(json.averages.year_1) : 0,
-            year_2: json.averages.year_2 !== undefined && json.averages.year_2 !== null ? Number(json.averages.year_2) : 0,
-            year_3: json.averages.year_3 !== undefined && json.averages.year_3 !== null ? Number(json.averages.year_3) : 0,
-            year_4: json.averages.year_4 !== undefined && json.averages.year_4 !== null ? Number(json.averages.year_4) : 0,
-            totalStudents: json.totalStudents || 0,
-            isLive: true,
-            source: json.source || 'Google Sheet Live Connector',
-            lastUpdated: json.timestamp || new Date().toISOString()
-          };
-          try {
-            localStorage.setItem(cacheKey, JSON.stringify({
-              timestamp: Date.now(),
-              averages: computed
-            }));
-          } catch (e) {}
-          return computed;
+          const y1 = Number(json.averages.year_1) || 0;
+          const y2 = Number(json.averages.year_2) || 0;
+          const y3 = Number(json.averages.year_3) || 0;
+          const y4 = Number(json.averages.year_4) || 0;
+
+          if (y1 > 0 || y2 > 0 || y3 > 0 || y4 > 0) {
+            const computed = {
+              year_1: y1,
+              year_2: y2,
+              year_3: y3,
+              year_4: y4,
+              totalStudents: json.totalStudents || 0,
+              isLive: true,
+              source: json.source || 'Google Sheet Live Connector',
+              lastUpdated: json.timestamp || new Date().toISOString()
+            };
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify({
+                timestamp: Date.now(),
+                averages: computed
+              }));
+            } catch (e) {}
+            return computed;
+          }
         }
       }
     } catch (e) {}
@@ -219,23 +226,30 @@ export async function fetchInstitutionalAveragesFromSheet(forceRefresh = false) 
     if (res.ok) {
       const json = await res.json();
       if (json && json.success && json.averages) {
-        const computed = {
-          year_1: json.averages.year_1 !== undefined && json.averages.year_1 !== null ? Number(json.averages.year_1) : 0,
-          year_2: json.averages.year_2 !== undefined && json.averages.year_2 !== null ? Number(json.averages.year_2) : 0,
-          year_3: json.averages.year_3 !== undefined && json.averages.year_3 !== null ? Number(json.averages.year_3) : 0,
-          year_4: json.averages.year_4 !== undefined && json.averages.year_4 !== null ? Number(json.averages.year_4) : 0,
-          totalStudents: json.averages.totalStudents || 0,
-          isLive: true,
-          source: json.averages.source || 'Backend Proxy',
-          lastUpdated: json.averages.calculatedAt || new Date().toISOString()
-        };
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify({
-            timestamp: Date.now(),
-            averages: computed
-          }));
-        } catch (e) {}
-        return computed;
+        const y1 = Number(json.averages.year_1) || 0;
+        const y2 = Number(json.averages.year_2) || 0;
+        const y3 = Number(json.averages.year_3) || 0;
+        const y4 = Number(json.averages.year_4) || 0;
+
+        if (y1 > 0 || y2 > 0 || y3 > 0 || y4 > 0) {
+          const computed = {
+            year_1: y1,
+            year_2: y2,
+            year_3: y3,
+            year_4: y4,
+            totalStudents: json.averages.totalStudents || 0,
+            isLive: true,
+            source: json.averages.source || 'Backend Proxy',
+            lastUpdated: json.averages.calculatedAt || new Date().toISOString()
+          };
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({
+              timestamp: Date.now(),
+              averages: computed
+            }));
+          } catch (e) {}
+          return computed;
+        }
       }
     }
   } catch (e) {}
@@ -502,7 +516,7 @@ export async function fetchAllLiveDepartmentsAndAverages() {
 }
 
 const STUDENT_LIVE_CACHE = new Map();
-const STUDENT_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const STUDENT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes fresh cache
 
 export function getCachedStudentPoints(rollNo) {
   if (!rollNo) return null;

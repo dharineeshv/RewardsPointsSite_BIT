@@ -28,14 +28,99 @@ export const ALL_DEPARTMENTS = [
   { code: 'BM', label: 'Biomedical Engineering' }
 ];
 
+// Helper to resolve student department code from user profile or roll number
+export function resolveUserDeptCode(user) {
+  if (!user) return 'ALL';
+  const userRoll = (user.id || user.roll_no || user.rollNo || user.roll || '').toUpperCase().trim();
+  
+  // 1. Check direct mentor database record
+  if (userRoll && Array.isArray(studentMentorData)) {
+    const record = studentMentorData.find(item => (item.rollNo || '').toUpperCase() === userRoll);
+    if (record?.deptCode) return record.deptCode;
+  }
+
+  // 2. Extract letters from roll number e.g. 7376232CT120 -> CT, 7376221CS101 -> CSE
+  const letters = (userRoll.match(/[A-Z]+/g) || []).join('');
+  const ROLL_CODE_MAP = {
+    'CT': 'CT',
+    'IT': 'IT',
+    'CS': 'CSE',
+    'CSE': 'CSE',
+    'EC': 'ECE',
+    'ECE': 'ECE',
+    'EE': 'EEE',
+    'EEE': 'EEE',
+    'AD': 'AI&DS',
+    'AIDS': 'AI&DS',
+    'AM': 'AIML',
+    'AIML': 'AIML',
+    'BT': 'BT',
+    'BM': 'BM',
+    'BME': 'BM',
+    'CE': 'CIVIL',
+    'CIVIL': 'CIVIL',
+    'ME': 'MECH',
+    'MECH': 'MECH',
+    'MC': 'MTRS',
+    'MTRS': 'MTRS',
+    'EI': 'EIE',
+    'EIE': 'EIE',
+    'CB': 'CSBS',
+    'CSBS': 'CSBS',
+    'CD': 'CSD',
+    'CSD': 'CSD',
+    'IS': 'ISE',
+    'ISE': 'ISE',
+    'AG': 'AGRI',
+    'AGRI': 'AGRI',
+    'FT': 'FT',
+    'FD': 'FT'
+  };
+  if (letters && ROLL_CODE_MAP[letters]) {
+    return ROLL_CODE_MAP[letters];
+  }
+
+  // 3. Check department name string
+  const deptStr = (user.department || user.dept || '').toUpperCase().trim();
+  if (deptStr.includes('COMPUTER TECH') || deptStr === 'CT') return 'CT';
+  if (deptStr.includes('COMPUTER SCI') || deptStr === 'CSE' || deptStr === 'CS') return 'CSE';
+  if (deptStr.includes('ELECTRONICS & COMM') || deptStr.includes('ELECTRONICS AND COMM') || deptStr === 'ECE') return 'ECE';
+  if (deptStr.includes('INFORMATION TECH') || deptStr === 'IT') return 'IT';
+  if (deptStr.includes('ARTIFICIAL INTELLIGENCE & DATA') || deptStr.includes('AI & DS') || deptStr.includes('AI&DS')) return 'AI&DS';
+  if (deptStr.includes('ARTIFICIAL INTELLIGENCE & MACHINE') || deptStr.includes('AIML')) return 'AIML';
+  if (deptStr.includes('MECHANICAL') || deptStr === 'MECH') return 'MECH';
+  if (deptStr.includes('ELECTRICAL') || deptStr === 'EEE') return 'EEE';
+  if (deptStr.includes('BIOTECH') || deptStr === 'BT') return 'BT';
+  if (deptStr.includes('BIOMEDICAL') || deptStr === 'BM') return 'BM';
+  if (deptStr.includes('AGRICULTURE') || deptStr.includes('AGRI')) return 'AGRI';
+  if (deptStr.includes('CIVIL')) return 'CIVIL';
+  if (deptStr.includes('FASHION') || deptStr.includes('FOOD')) return 'FT';
+  if (deptStr.includes('INSTRUMENTATION') || deptStr === 'EIE') return 'EIE';
+  if (deptStr.includes('INFORMATION SCI') || deptStr === 'ISE') return 'ISE';
+  if (deptStr.includes('MECHATRONICS') || deptStr === 'MTRS') return 'MTRS';
+  if (deptStr.includes('BUSINESS') || deptStr === 'CSBS') return 'CSBS';
+  if (deptStr.includes('DESIGN') || deptStr === 'CSD') return 'CSD';
+
+  return 'ALL';
+}
+
 export default function StudentMentorMappingView({ currentUser, isDarkMode = true }) {
+  const defaultDept = useMemo(() => resolveUserDeptCode(currentUser), [currentUser]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDept, setSelectedDept] = useState('ALL');
+  const [selectedDept, setSelectedDept] = useState(defaultDept || 'ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedRoll, setCopiedRoll] = useState(null);
   const [copiedEmail, setCopiedEmail] = useState(null);
   const chipsScrollRef = useRef(null);
   const pageSize = 30;
+
+  // Reactively sync default department when logged-in user changes
+  React.useEffect(() => {
+    if (defaultDept && defaultDept !== 'ALL') {
+      setSelectedDept(defaultDept);
+      setCurrentPage(1);
+    }
+  }, [defaultDept]);
 
   const scrollChips = (direction) => {
     if (chipsScrollRef.current) {

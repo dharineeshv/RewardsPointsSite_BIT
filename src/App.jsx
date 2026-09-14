@@ -1,4 +1,4 @@
-import StudentMentorMappingView from './components/StudentMentorMappingView';
+import StudentMentorMappingView, { resolveUserDeptCode } from './components/StudentMentorMappingView';
 import AveragePointsBarChart from './components/AveragePointsBarChart';
 import PointsToMarksSkewView from './components/PointsToMarksSkewView';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -2619,28 +2619,31 @@ export default function App() {
 
     async function syncLiveSheetPoints() {
       try {
-        const liveRecord = await fetchStudentRewardPointsFromSheet(rollNo, dept);
+        const liveRecord = await fetchStudentRewardPointsFromSheet(rollNo, dept, false);
         if (liveRecord && liveRecord.balance_points !== undefined) {
-          const livePointsStr = liveRecord.balance_points.toString();
+          const liveBal = parseFloat(String(liveRecord.balance_points).replace(/,/g, '')) || 0;
+          const livePointsStr = liveBal.toLocaleString();
           
           if (currentUser && (currentUser.id === rollNo || currentUser.roll_no === rollNo)) {
-            if (currentUser.currentPoints !== livePointsStr || currentUser.balance_points !== liveRecord.balance_points) {
-              setCurrentUser(prev => ({
+            setCurrentUser(prev => {
+              const updated = {
                 ...prev,
                 currentPoints: livePointsStr,
-                balance_points: liveRecord.balance_points
-              }));
-            }
+                balance_points: liveBal
+              };
+              try {
+                localStorage.setItem('bit_rp_user', JSON.stringify(updated));
+              } catch (e) {}
+              return updated;
+            });
           }
 
           if (displayedStudent && (displayedStudent.id === rollNo || displayedStudent.roll_no === rollNo)) {
-            if (displayedStudent.currentPoints !== livePointsStr || displayedStudent.balance_points !== liveRecord.balance_points) {
-              setDisplayedStudent(prev => ({
-                ...prev,
-                currentPoints: livePointsStr,
-                balance_points: liveRecord.balance_points
-              }));
-            }
+            setDisplayedStudent(prev => ({
+              ...prev,
+              currentPoints: livePointsStr,
+              balance_points: liveBal
+            }));
           }
         }
       } catch (err) {
@@ -2861,14 +2864,22 @@ export default function App() {
   const [selectedLeaveFilter, setSelectedLeaveFilter] = useState('ALL'); // 'ALL' | 'UPCOMING' | 'GP' | 'HOLIDAY'
   const [leaveSearchQuery, setLeaveSearchQuery] = useState('');
 
-  // Faculty & Staff Directory State
+  // Faculty & Staff Directory State (Defaults to logged-in student's department)
+  const defaultFacultyDept = useMemo(() => resolveUserDeptCode(currentUser), [currentUser]);
   const [facultyList, setFacultyList] = useState([]);
   const [loadingFaculty, setLoadingFaculty] = useState(false);
   const [facultyError, setFacultyError] = useState('');
-  const [selectedFacultyDept, setSelectedFacultyDept] = useState('ALL');
+  const [selectedFacultyDept, setSelectedFacultyDept] = useState(defaultFacultyDept || 'ALL');
   const [facultySearchQuery, setFacultySearchQuery] = useState('');
   const [copiedFacultyContact, setCopiedFacultyContact] = useState(null);
   const facultyChipsRef = useRef(null);
+
+  // Sync faculty department when logged-in student changes
+  useEffect(() => {
+    if (defaultFacultyDept && defaultFacultyDept !== 'ALL') {
+      setSelectedFacultyDept(defaultFacultyDept);
+    }
+  }, [defaultFacultyDept]);
 
   // Exam Hall Finder State
   const [examRegNo, setExamRegNo] = useState('');
@@ -4226,11 +4237,24 @@ export default function App() {
         const initials = savedUser?.initials || name.split(/\s+/).map(n => n[0]).filter(Boolean).join('').slice(0, 2) || roll.slice(0, 2);
         const photoUrl = savedUser?.picture || savedUser?.photo_url || profileApi?.photo_url || null;
 
-        const balanceRaw = searchApi?.balance_points ? searchApi.balance_points.replace(/,/g, '') : (savedUser?.currentPoints ? savedUser.currentPoints.toString().replace(/,/g, '') : '0');
+        // Always query live Google Sheet / Apps Script connector to avoid stale localStorage points
+        let liveBalance = null;
+        let liveCumulative = null;
+        let liveRedeemed = null;
+        try {
+          const liveSheetData = await fetchStudentRewardPointsFromSheet(roll, profileApi?.department || savedUser?.department || 'CT', false);
+          if (liveSheetData && liveSheetData.balance_points !== undefined) {
+            liveBalance = liveSheetData.balance_points;
+            liveCumulative = liveSheetData.cumulative_points ?? liveSheetData.balance_points;
+            liveRedeemed = liveSheetData.redeemed_points ?? 0;
+          }
+        } catch (e) {}
+
+        const balanceRaw = liveBalance !== null ? String(liveBalance) : (searchApi?.balance_points ? searchApi.balance_points.replace(/,/g, '') : (savedUser?.currentPoints ? savedUser.currentPoints.toString().replace(/,/g, '') : '0'));
         const balancePts = parseFloat(balanceRaw || '0').toLocaleString();
-        const cumulativeRaw = searchApi?.cumulative_reward_points ? searchApi.cumulative_reward_points.replace(/,/g, '') : (savedUser?.cumulativePoints ? savedUser.cumulativePoints.toString().replace(/,/g, '') : balanceRaw);
+        const cumulativeRaw = liveCumulative !== null ? String(liveCumulative) : (searchApi?.cumulative_reward_points ? searchApi.cumulative_reward_points.replace(/,/g, '') : (savedUser?.cumulativePoints ? savedUser.cumulativePoints.toString().replace(/,/g, '') : balanceRaw));
         const cumulativePts = parseFloat(cumulativeRaw || '0').toLocaleString();
-        const redeemedRaw = searchApi?.redeemed_points ? searchApi.redeemed_points.replace(/,/g, '') : (savedUser?.redeemedPoints ? savedUser.redeemedPoints.toString().replace(/,/g, '') : '0');
+        const redeemedRaw = liveRedeemed !== null ? String(liveRedeemed) : (searchApi?.redeemed_points ? searchApi.redeemed_points.replace(/,/g, '') : (savedUser?.redeemedPoints ? savedUser.redeemedPoints.toString().replace(/,/g, '') : '0'));
         const redeemedPts = parseFloat(redeemedRaw || '0').toLocaleString();
 
         const userObj = {
@@ -4248,6 +4272,7 @@ export default function App() {
           avatarBg: savedUser?.avatarBg || "from-[#38c4ee] to-[#0ea5e9]",
           badge: "Verified BIT Student",
           email: targetEmail,
+          balance_points: parseFloat(balanceRaw) || 0,
           currentPoints: balancePts,
           cumulativePoints: cumulativePts,
           redeemedPoints: redeemedPts,
@@ -5717,8 +5742,8 @@ export default function App() {
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeStyle}`}>
                                 {act.activity_type || 'General'}
                               </span>
-                              <span className="font-semibold text-[11px] text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                <span>📅</span>
+                              <span className="font-semibold text-[11px] text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                 <span>{act.date || 'Academic Year'}</span>
                               </span>
                             </div>
@@ -9382,7 +9407,7 @@ export default function App() {
                 <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
                   {[
                     { id: 'ALL', label: 'All' },
-                    { id: 'PS', label: '🎯 PS Skill' },
+                    { id: 'PS', label: 'PS Skill' },
                     { id: 'INITIATIVE', label: 'Initiatives' },
                     { id: 'TECHNICAL', label: 'Technical' },
                     { id: 'PENALTY', label: 'Penalties' }
@@ -9528,10 +9553,10 @@ export default function App() {
 
                         <div className={`flex flex-wrap items-center justify-between gap-2 text-[10px] pt-1 border-t ${isDarkMode ? 'border-slate-800/80 text-slate-400' : 'border-slate-200/80 text-slate-500'}`}>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold border ${badgeStyle}`}>
-                            {isPS ? '🎯 P-Skill' : (act.activity_type || act.category || 'Event')}
+                            {isPS ? 'P-Skill' : (act.activity_type || act.category || 'Event')}
                           </span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                            <span>📅</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
                             <span>{act.date || 'Academic Year'}</span>
                           </span>
                         </div>
