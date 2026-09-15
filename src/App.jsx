@@ -301,6 +301,44 @@ export function getStudentInitials(name = '', roll = '') {
   return 'ST';
 }
 
+export function cleanStudentName(rawName = '', rollNo = '') {
+  if (!rawName || typeof rawName !== 'string') return 'BIT Student';
+  let cleaned = rawName.trim();
+
+  // Strip leading roll number e.g. "7376232CT128 - DHARINEESH V" or "7376232CT128: DHARINEESH V"
+  if (rollNo) {
+    const cleanRoll = String(rollNo).trim().toUpperCase();
+    if (cleanRoll) {
+      cleaned = cleaned.replace(new RegExp(`^${cleanRoll}\\s*[-–—:]*\\s*`, 'i'), '');
+    }
+  }
+
+  // Strip standard BIT roll pattern (e.g. 7376232CT128, 7376241IT101) at the start
+  cleaned = cleaned.replace(/^\d{7}[A-Za-z]{2,3}\d{3}\s*[-–—:]*\s*/, '');
+
+  // Strip common honorifics
+  cleaned = cleaned.replace(/^(Mr\.|Ms\.|Mrs\.|Dr\.)\s+/i, '');
+
+  // Check if string is duplicated twice (e.g. "DHARINEESH V DHARINEESH V" or "DHARINEESH V - DHARINEESH V")
+  cleaned = cleaned.replace(/\s*[-–—]\s*/g, ' ').trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2 && parts.length % 2 === 0) {
+    const mid = parts.length / 2;
+    const firstHalf = parts.slice(0, mid).join(' ');
+    const secondHalf = parts.slice(mid).join(' ');
+    if (firstHalf.toLowerCase() === secondHalf.toLowerCase()) {
+      cleaned = firstHalf;
+    }
+  }
+
+  // If still empty or only rollNo was given as name
+  if (!cleaned || (rollNo && cleaned.toUpperCase() === String(rollNo).trim().toUpperCase())) {
+    return 'BIT Student';
+  }
+
+  return cleaned;
+}
+
 // Resilient Avatar Image Component
 function AvatarImage({ src, alt = "Avatar", initials = "", className = "w-full h-full", fallbackBg = null }) {
   const [hasError, setHasError] = useState(false);
@@ -3331,6 +3369,16 @@ export default function App() {
     return [];
   });
 
+  // Overall Website Visits tracking state
+  const [totalWebsiteVisits, setTotalWebsiteVisits] = useState(() => {
+    try {
+      const saved = parseInt(localStorage.getItem('bit_total_website_visits') || '0', 10);
+      return isNaN(saved) ? 0 : saved;
+    } catch (e) {
+      return 0;
+    }
+  });
+
   // Master PS Session & Proxy Gateway State
   const [psMasterTokenInput, setPsMasterTokenInput] = useState('');
   const [psSessionInfo, setPsSessionInfo] = useState(null);
@@ -3339,6 +3387,57 @@ export default function App() {
   const [proxyTestStatus, setProxyTestStatus] = useState('idle'); // idle | testing | success | error
   const [proxyTestResult, setProxyTestResult] = useState(null);
   const [proxyTestLatency, setProxyTestLatency] = useState(null);
+
+  // Track and increment overall website visits (session-aware with Firebase sync)
+  useEffect(() => {
+    const recordVisit = async () => {
+      try {
+        const hasCountedSession = sessionStorage.getItem('bit_session_visit_counted');
+        let currentLocal = parseInt(localStorage.getItem('bit_total_website_visits') || '0', 10);
+        if (isNaN(currentLocal) || currentLocal < 0) currentLocal = 0;
+
+        if (!hasCountedSession) {
+          currentLocal += 1;
+          localStorage.setItem('bit_total_website_visits', currentLocal.toString());
+          sessionStorage.setItem('bit_session_visit_counted', 'true');
+          setTotalWebsiteVisits(currentLocal);
+        }
+
+        const targetUrl = (firebaseDbUrl || localStorage.getItem('bit_firebase_url') || DEFAULT_FIREBASE_DB_URL).trim().replace(/\/$/, '');
+        if (targetUrl && targetUrl.startsWith('http')) {
+          try {
+            const res = await fetch(`${targetUrl}/analytics/total_visits.json`);
+            if (res.ok) {
+              const remoteCount = await res.json();
+              if (typeof remoteCount === 'number' && remoteCount > 0) {
+                const mergedCount = Math.max(remoteCount + (hasCountedSession ? 0 : 1), currentLocal);
+                setTotalWebsiteVisits(mergedCount);
+                localStorage.setItem('bit_total_website_visits', mergedCount.toString());
+                if (!hasCountedSession) {
+                  fetch(`${targetUrl}/analytics/total_visits.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(mergedCount)
+                  }).catch(() => {});
+                }
+                return;
+              }
+            }
+            // Initialize remote counter if empty
+            if (!hasCountedSession) {
+              fetch(`${targetUrl}/analytics/total_visits.json`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Math.max(currentLocal, 1))
+              }).catch(() => {});
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+    };
+
+    recordVisit();
+  }, [firebaseDbUrl]);
 
   // Load existing PS Session from Firebase
   const fetchPsSessionInfo = useCallback(async () => {
@@ -3468,24 +3567,46 @@ export default function App() {
       } catch (e) {}
 
       // 4. Merge all sources: local + cloud history + active presence
-      // Deduplicate by unique log ID or (roll_no + action + timestamp)
-      const seenKeys = new Set();
-      const combined = [];
-
-      const allEntries = [...cloudHistoryList, ...activeUsersList, ...localList];
+      // Strictly maintain ONE entry per student by overriding with the most recent event
+      const studentMap = new Map();
+      const allEntries = [...activeUsersList, ...cloudHistoryList, ...localList];
 
       for (const log of allEntries) {
         if (!log || typeof log !== 'object') continue;
-        const roll = (log.roll_no || log.id || '').toUpperCase().trim();
-        const action = (log.action || '').trim();
+        const roll = (log.roll_no || log.rollNo || log.id || '').toUpperCase().replace(/^ACTIVE-/, '').trim();
+        const studentKey = roll || log.id || `raw_${Math.random()}`;
         const ts = log.timestamp ? new Date(log.timestamp).getTime() : 0;
-        
-        const uniqueKey = log.id ? `${log.id}` : `${roll}_${action}_${Math.round(ts / 2000)}`;
-        if (!seenKeys.has(uniqueKey)) {
-          seenKeys.add(uniqueKey);
-          combined.push(log);
+        const sanitizedName = cleanStudentName(log.name, roll);
+
+        if (studentMap.has(studentKey)) {
+          const existing = studentMap.get(studentKey);
+          const existingTs = existing.timestamp ? new Date(existing.timestamp).getTime() : 0;
+
+          // If current log is newer, override with the latest action & status
+          if (ts >= existingTs) {
+            studentMap.set(studentKey, {
+              ...existing,
+              ...log,
+              name: sanitizedName || existing.name,
+              roll_no: roll || existing.roll_no,
+              timestamp: log.timestamp || existing.timestamp,
+              isOnline: log.action !== 'Logout' && log.action !== 'Session Expired' && (log.isOnline || log.source === 'active_user')
+            });
+          } else if (!existing.name && sanitizedName) {
+            existing.name = sanitizedName;
+          }
+        } else {
+          studentMap.set(studentKey, {
+            ...log,
+            name: sanitizedName,
+            roll_no: roll || log.roll_no,
+            timestamp: log.timestamp || new Date().toISOString(),
+            isOnline: log.action !== 'Logout' && log.action !== 'Session Expired'
+          });
         }
       }
+
+      const combined = Array.from(studentMap.values());
 
       // Sort newest first
       combined.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
@@ -3513,7 +3634,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [activeNav]);
 
-  // Log activity helper (saves locally & broadcasts to Firebase & Google Sheets without deleting past history)
+  // Log activity helper (saves locally & broadcasts to Firebase, overriding previous entry for same student)
   const logActivity = (student, action = 'Login') => {
     if (!student) return;
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
@@ -3522,7 +3643,7 @@ export default function App() {
     const deviceStr = `${os} (${browser})`;
 
     const rollNo = (student.id || student.roll_no || student.rollNo || 'Unknown').trim().toUpperCase();
-    const studentName = student.name || student.student_name || 'BIT Student';
+    const studentName = cleanStudentName(student.name || student.student_name || 'BIT Student', rollNo);
     const dept = student.department || student.dept || 'Computer Technology';
     const studentEmail = student.email || `${rollNo.toLowerCase()}@bitsathy.ac.in`;
     const nowIso = new Date().toISOString();
@@ -3541,9 +3662,13 @@ export default function App() {
       source: 'live'
     };
 
-    // Prepend new entry to activity logs while keeping the entire chronological history
+    // Prepend new entry to activity logs while overriding any older record for the same student
     setActivityLogs(prev => {
-      const updated = [newEntry, ...prev.filter(l => l.id !== uniqueLogId)].slice(0, 2000);
+      const filtered = prev.filter(l => {
+        const lRoll = (l.roll_no || l.rollNo || l.id || '').toUpperCase().replace(/^ACTIVE-/, '').trim();
+        return lRoll !== rollNo;
+      });
+      const updated = [newEntry, ...filtered].slice(0, 2000);
       try {
         localStorage.setItem('bit_activity_logs', JSON.stringify(updated));
       } catch (e) {}
@@ -3756,16 +3881,24 @@ export default function App() {
       }))
       .sort((a, b) => b.count - a.count);
 
+    const overallWebsiteVisits = Math.max(
+      totalWebsiteVisits,
+      totalLogs,
+      totalUniqueUsers,
+      1
+    );
+
     return {
       totalLogs,
       totalUniqueUsers,
+      overallWebsiteVisits,
       activeToday,
       totalSearches,
       mobilePercent,
       desktopPercent,
       topDepts
     };
-  }, [activityLogs]);
+  }, [activityLogs, totalWebsiteVisits]);
 
   const normalizeStudentYear = (yearStr, rollNo) => {
     const s = String(yearStr || '').trim().toUpperCase();
@@ -8747,10 +8880,32 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 4 KPI Top Metric Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+              {/* 5 KPI Top Metric Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
                 
-                {/* 1. Total Unique Users */}
+                {/* 1. Overall Website Visits */}
+                <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
+                  isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Overall Visits
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-violet-500/20 text-violet-400 flex items-center justify-center">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl sm:text-3xl font-black text-violet-500 dark:text-violet-400 tracking-tight">
+                      {adminMetrics.overallWebsiteVisits.toLocaleString()}
+                    </div>
+                    <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Total site traffic & views
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Total Unique Users */}
                 <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
                   isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
                 }`}>
@@ -8772,7 +8927,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Active Today */}
+                {/* 3. Active Today */}
                 <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
                   isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
                 }`}>
@@ -8794,7 +8949,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 3. Total Searches */}
+                {/* 4. Total Searches */}
                 <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
                   isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
                 }`}>
@@ -8816,7 +8971,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 4. Mobile vs Desktop */}
+                {/* 5. Mobile vs Desktop */}
                 <div className={`p-5 rounded-3xl border shadow-xl flex flex-col justify-between ${
                   isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200 bg-white'
                 }`}>
@@ -9259,7 +9414,7 @@ export default function App() {
                           })()}
                         </div>
                         <p className={`text-[11px] mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {activityLogs.length} total events tracked (All historical & real-time live events)
+                          {activityLogs.length} active students tracked (Real-time live status & latest activity)
                         </p>
                       </div>
 
@@ -9404,7 +9559,7 @@ export default function App() {
                               return (
                                 <tr key={log.id || `${log.roll_no}_${log.timestamp}`} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
                                   <td className="py-3 px-3.5">
-                                    <div className="font-bold truncate max-w-[140px] sm:max-w-[180px]">{log.name}</div>
+                                    <div className="font-bold truncate max-w-[140px] sm:max-w-[180px]">{cleanStudentName(log.name, log.roll_no)}</div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                       <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
                                         isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-300'
