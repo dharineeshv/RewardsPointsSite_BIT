@@ -1,35 +1,31 @@
 {
   "lastUpdated": "September 15, 2026",
-  "asOnDate": "September 14, 2026",
   "targetBatch": "2023-2027 Batch",
   "totalStudentsPlaced": 513,
   "totalCompaniesVisited": 93,
   "editionDate": "15-09-2026",
-  "flipbookUrl": "https://bitsathy.aflip.in/bitsathy_daily_news_15_09_2026.html#page/5",
-  "flipbookPlacementUrl": "https://bitsathy.aflip.in/bitsathy_daily_news_15_09_2026.html#page/5",
-  "flipbookDrivesUrl": "https://bitsathy.aflip.in/bitsathy_daily_news_15_09_2026.html#page/6",
   "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v2/ebd96b74cffb571ad751b13eafacd4d185537f7f.pdf",
   "totalPages": 6,
   "placementPageNumber": 5,
   "drivesPageNumber": 6,
   "upcomingDrives": [
     {
-      "company": "Tessolve",
-      "role": "Placement Drive (2023-2027)",
+      "company": "Tiger Analytics",
+      "role": "Software & AI Engineering Roles",
       "targetBatch": "2023-2027 Batch",
-      "startDate": "16 Sep 2026",
+      "startDate": "07 Sep 2026",
       "endDate": "26 Sep 2026",
       "status": "Active On-Campus Drive",
       "badge": "Upcoming Recruitment Drive",
-      "eligibility": "2023-2027 Batch Students"
+      "eligibility": "All Circuit & Tech Branches"
     }
   ],
   "upcomingContests": [
     {
       "name": "Datathon 2026",
-      "type": "Technical Contest & Hackathon",
-      "status": "Open / Active",
-      "endDate": "16 Sep 2026"
+      "type": "Data Science & Machine Learning Contest",
+      "status": "Open / Ongoing",
+      "endDate": "September 2026"
     }
   ],
   "salaryTiers": [
@@ -52,9 +48,9 @@
       ]
     },
     {
-      "tier": "7-10 LPA",
+      "tier": "7 - 10 LPA",
       "tierCategory": "Dream Tier",
-      "range": "7-10 LPA",
+      "range": "7.00 - 10.00 LPA",
       "offerCount": 87,
       "color": "from-purple-500 to-indigo-500",
       "badgeColor": "bg-purple-500/10 text-purple-400 border-purple-500/20",
@@ -70,9 +66,9 @@
       ]
     },
     {
-      "tier": "6-7 LPA",
+      "tier": "6 - 7 LPA",
       "tierCategory": "Prime Tier",
-      "range": "6-7 LPA",
+      "range": "6.00 - 7.00 LPA",
       "offerCount": 20,
       "color": "from-blue-500 to-cyan-500",
       "badgeColor": "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -86,9 +82,9 @@
       ]
     },
     {
-      "tier": "5-6 LPA",
+      "tier": "5 - 6 LPA",
       "tierCategory": "Core Plus",
-      "range": "5-6 LPA",
+      "range": "5.00 - 6.00 LPA",
       "offerCount": 43,
       "color": "from-emerald-500 to-teal-500",
       "badgeColor": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -106,9 +102,9 @@
       ]
     },
     {
-      "tier": "4-5 LPA",
+      "tier": "4 - 5 LPA",
       "tierCategory": "Standard Tier",
-      "range": "4-5 LPA",
+      "range": "4.00 - 5.00 LPA",
       "offerCount": 112,
       "color": "from-sky-500 to-blue-500",
       "badgeColor": "bg-sky-500/10 text-sky-400 border-sky-500/20",
@@ -131,9 +127,9 @@
       ]
     },
     {
-      "tier": "3-4 LPA",
+      "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
-      "range": "3-4 LPA",
+      "range": "3.00 - 4.00 LPA",
       "offerCount": 234,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
@@ -181,8 +177,5 @@
         "Yuvi Labs and Technologies"
       ]
     }
-  ],
-  "isLive": true,
-  "source": "BITSATHY DailyNews (Page 5 & Page 6)",
-  "fetchedAt": "2026-09-15T13:20:45.869Z"
+  ]
 }
