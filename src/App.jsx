@@ -4,10 +4,11 @@ import PointsToMarksSkewView from './components/PointsToMarksSkewView';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
-import placementData from './data/placementData.json';
+import placementDataSeed from './data/placementData.json';
+import { getInstantPlacementData, fetchLivePlacementData, publishLivePlacementData, getBitsathyFlipbookUrl } from './services/placementService';
 import studentMentorData from './data/studentMentorMapping.json';
 import InternalMarksView from './components/InternalMarksView';
-import { fetchDepartmentSheetData, fetchStudentRewardPointsFromSheet, fetchAuthenticatedStudentPoints, fetchInstitutionalAveragesFromSheet, calculateDynamicAveragesFromStudents, fetchAllLiveDepartmentsAndAverages, fetchLiveStudentEventLogs, fetchLiveMasterSpreadsheet, getCachedStudentPoints, cacheStudentPoints, AVERAGE_CHART_URL, SPREADSHEET_ID } from './services/googleSheetsService';
+import { fetchDepartmentSheetData, fetchStudentRewardPointsFromSheet, fetchAuthenticatedStudentPoints, fetchInstitutionalAveragesFromSheet, getInstantInitialAverages, calculateDynamicAveragesFromStudents, fetchAllLiveDepartmentsAndAverages, fetchLiveStudentEventLogs, fetchLiveMasterSpreadsheet, getCachedStudentPoints, cacheStudentPoints, AVERAGE_CHART_URL, SPREADSHEET_ID } from './services/googleSheetsService';
 import { COLLEGE_HOLIDAYS_AND_LEAVES } from './data/collegeLeaves';
 import { savePdfDocumentToDB, loadAllPdfDocumentsFromDB, removePdfDocumentFromDB } from './services/pdfStorageService';
 import { getCampusMessMenu } from './data/messMenuData';
@@ -155,7 +156,7 @@ export const getStudentTrack = (st) => {
   return { code: 'PBL', label: 'PBL (Project-Based Learning)' };
 };
 
-export const BIT_DAILY_PLACEMENT_DATA = placementData;
+export const BIT_DAILY_PLACEMENT_DATA = getInstantPlacementData();
 
 const STUDENTS_DATABASE = [
   {
@@ -1123,11 +1124,12 @@ function PlacementHeroSlider({ placementData, setPlacementActiveTab, setPlacemen
     touchEndX.current = null;
   };
 
-  const superDream = placementData.salaryTiers?.[0];
-  const dream = placementData.salaryTiers?.[1];
-  const prime = placementData.salaryTiers?.[2];
-  const core = placementData.salaryTiers?.[3];
-  const upcomingDrive = placementData.upcomingDrives?.[0];
+  const safePlacement = placementData || {};
+  const superDream = safePlacement.salaryTiers?.[0];
+  const dream = safePlacement.salaryTiers?.[1];
+  const prime = safePlacement.salaryTiers?.[2];
+  const core = safePlacement.salaryTiers?.[3];
+  const upcomingDrive = safePlacement.upcomingDrives?.[0];
 
   return (
     <div 
@@ -1152,15 +1154,15 @@ function PlacementHeroSlider({ placementData, setPlacementActiveTab, setPlacemen
             <div className="flex items-center gap-2 flex-wrap mb-2">
               <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30 flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-emerald-300" />
-                <span>Placement Milestone • {placementData.targetBatch}</span>
+                <span>Placement Milestone • {safePlacement.targetBatch || '2023-2027 Batch'}</span>
               </span>
               <span className="text-xs text-emerald-200 font-semibold">
-                Updated: {placementData.lastUpdated}
+                Updated: {safePlacement.lastUpdated || 'Today'}
               </span>
             </div>
             <div className="flex items-baseline gap-3 mt-1.5 flex-wrap">
               <span className="text-3xl sm:text-5xl font-black tracking-tight text-white drop-shadow-sm">
-                {placementData.totalStudentsPlaced}
+                {safePlacement.totalStudentsPlaced || 512}
               </span>
               <span className="text-base sm:text-xl font-bold text-emerald-200">
                 Individual Students Placed
@@ -1173,7 +1175,7 @@ function PlacementHeroSlider({ placementData, setPlacementActiveTab, setPlacemen
           <div className="relative z-10 flex items-center gap-2 sm:gap-3 flex-wrap mt-3 text-[11px] font-semibold text-white/90">
             <span className="px-3 py-1 rounded-xl bg-black/30 backdrop-blur-md border border-white/10 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{placementData.totalCompaniesVisited} Visited Companies</span>
+              <span>{safePlacement.totalCompaniesVisited || 93} Visited Companies</span>
             </span>
             <span className="px-3 py-1 rounded-xl bg-black/30 backdrop-blur-md border border-white/10">
               ⚡ Super Dream, Dream & Prime Tiers
@@ -1316,7 +1318,7 @@ function PlacementHeroSlider({ placementData, setPlacementActiveTab, setPlacemen
                 <span>Upcoming Recruitment Drive</span>
               </span>
               <span className="text-xs text-violet-200 font-semibold">
-                {upcomingDrive?.targetBatch || placementData.targetBatch}
+                {upcomingDrive?.targetBatch || safePlacement.targetBatch || '2023-2027 Batch'}
               </span>
             </div>
             <h3 className="text-2xl sm:text-4xl font-black text-white tracking-tight mt-1">
@@ -1967,10 +1969,10 @@ function BitRobotChatAssistant({
   const matchedStudentRecord = useMemo(() => {
     const rId = (student?.id || student?.roll_no || student?.rollNo || currentUser?.id || currentUser?.rollNo || '').toString().toUpperCase().trim();
     const mail = (student?.email || currentUser?.email || '').toLowerCase().trim();
-    return STUDENTS_INTERNAL_MARKS_LIST.find(s => 
-      (rId && s.rollNo.toUpperCase() === rId) ||
-      (mail && s.email && s.email.toLowerCase() === mail) ||
-      (mail && s.rollNo && mail.includes(s.rollNo.toLowerCase()))
+    return (STUDENTS_INTERNAL_MARKS_LIST || []).find(s => 
+      (rId && s && (s.rollNo || '').toUpperCase() === rId) ||
+      (mail && s && (s.email || '').toLowerCase() === mail) ||
+      (mail && s && s.rollNo && mail.includes(String(s.rollNo).toLowerCase()))
     ) || student || {};
   }, [student, currentUser]);
 
@@ -2654,6 +2656,38 @@ export default function App() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // BIT Daily Newspaper & Placement State (Pure Dynamic SWR)
+  const [placementData, setPlacementData] = useState(() => getInstantPlacementData());
+  const [loadingPlacementData, setLoadingPlacementData] = useState(false);
+  const [lastPlacementSyncTime, setLastPlacementSyncTime] = useState(() => new Date().toLocaleTimeString());
+  const [newspaperDate, setNewspaperDate] = useState('2026-09-05');
+  const [isNewspaperFullscreen, setIsNewspaperFullscreen] = useState(false);
+  const [copiedNewspaperLink, setCopiedNewspaperLink] = useState(false);
+  const [placementSearchQuery, setPlacementSearchQuery] = useState('');
+  const [placementSelectedTier, setPlacementSelectedTier] = useState('All');
+  const [placementActiveTab, setPlacementActiveTab] = useState('insights'); // 'insights' | 'page6' | 'page7'
+  const [placementKpiIndex, setPlacementKpiIndex] = useState(0);
+
+  // Dynamic Live Placement Sync Hook (Periodic auto-sync from live feed)
+  useEffect(() => {
+    let isMounted = true;
+    async function syncLivePlacement() {
+      try {
+        const live = await fetchLivePlacementData();
+        if (live && isMounted) {
+          setPlacementData(live);
+          setLastPlacementSyncTime(new Date().toLocaleTimeString());
+        }
+      } catch (e) {}
+    }
+    syncLivePlacement();
+    const syncTimer = setInterval(syncLivePlacement, 60000);
+    return () => {
+      isMounted = false;
+      clearInterval(syncTimer);
+    };
+  }, []);
+
   // Live Notifications State & Persistence
   const [notifications, setNotifications] = useState(() => {
     try {
@@ -2890,12 +2924,12 @@ export default function App() {
 
   // Automated Placement Bulletin Update Detector
   useEffect(() => {
-    if (!isLoggedIn || !currentUser?.email || !BIT_DAILY_PLACEMENT_DATA?.lastUpdated) return;
+    if (!isLoggedIn || !currentUser?.email || !placementData?.lastUpdated) return;
 
     const userKey = currentUser?.email?.toLowerCase() || 'default';
     const notifKey = `bit_notifications_${userKey}`;
     const placementKey = `bit_last_placement_${userKey}`;
-    const currentEdition = `${BIT_DAILY_PLACEMENT_DATA.editionDate || ''}_${BIT_DAILY_PLACEMENT_DATA.lastUpdated || ''}`;
+    const currentEdition = `${placementData.editionDate || ''}_${placementData.lastUpdated || ''}`;
 
     if (lastProcessedPlacementRef.current === `${userKey}_${currentEdition}`) return;
 
@@ -2903,12 +2937,12 @@ export default function App() {
 
     if (savedEdition && savedEdition !== currentEdition) {
       lastProcessedPlacementRef.current = `${userKey}_${currentEdition}`;
-      const recentDrive = BIT_DAILY_PLACEMENT_DATA.upcomingDrives?.[0]?.company || 'On-Campus Drive';
+      const recentDrive = placementData.upcomingDrives?.[0]?.company || 'On-Campus Drive';
       const placementNotif = {
         id: `placement_${Date.now()}`,
         type: 'placement_update',
-        title: `📰 Placement Updated (${BIT_DAILY_PLACEMENT_DATA.targetBatch})`,
-        description: `${BIT_DAILY_PLACEMENT_DATA.totalStudentsPlaced} students placed across ${BIT_DAILY_PLACEMENT_DATA.totalCompaniesVisited || 60}+ companies. New drive: ${recentDrive}.`,
+        title: `📰 Placement Updated (${placementData.targetBatch})`,
+        description: `${placementData.totalStudentsPlaced} students placed across ${placementData.totalCompaniesVisited || 60}+ companies. New drive: ${recentDrive}.`,
         timestamp: new Date().toISOString(),
         read: false,
         linkTab: 'BIT Placements'
@@ -2925,7 +2959,7 @@ export default function App() {
         localStorage.setItem(placementKey, currentEdition);
       } catch (e) {}
     }
-  }, [isLoggedIn, BIT_DAILY_PLACEMENT_DATA?.lastUpdated, BIT_DAILY_PLACEMENT_DATA?.editionDate, BIT_DAILY_PLACEMENT_DATA?.targetBatch, currentUser?.email]);
+  }, [isLoggedIn, placementData?.lastUpdated, placementData?.editionDate, placementData?.targetBatch, currentUser?.email]);
 
   // Browser Push Notification State & Permission Handler
   const [pushPermission, setPushPermission] = useState(() => {
@@ -3049,15 +3083,6 @@ export default function App() {
   const [mapFromLocation, setMapFromLocation] = useState('SF Block (CT & Special Functions)');
   const [mapToLocation, setMapToLocation] = useState('Main Auditorium');
 
-  // BIT Daily Newspaper & Placement State
-  const [newspaperDate, setNewspaperDate] = useState('2026-09-05');
-  const [isNewspaperFullscreen, setIsNewspaperFullscreen] = useState(false);
-  const [copiedNewspaperLink, setCopiedNewspaperLink] = useState(false);
-  const [placementSearchQuery, setPlacementSearchQuery] = useState('');
-  const [placementSelectedTier, setPlacementSelectedTier] = useState('All');
-  const [placementActiveTab, setPlacementActiveTab] = useState('insights'); // 'insights' | 'page6' | 'page7'
-  const [placementKpiIndex, setPlacementKpiIndex] = useState(0);
-
   // Theme Mode: 'system' (default), 'dark', or 'light'
   const [themeMode, setThemeMode] = useState(() => {
     try {
@@ -3129,14 +3154,9 @@ export default function App() {
     setDeferredPrompt(null);
   };
   
-  // Dynamic state for yearly averages (Fetched dynamically from official Google Sheet)
-  const [yearlyAverages, setYearlyAverages] = useState({
-    year_1: 0,
-    year_2: 0,
-    year_3: 0,
-    year_4: 0
-  });
-  const [loadingAverages, setLoadingAverages] = useState(true);
+  // Dynamic state for yearly averages (0ms instant SWR initialization)
+  const [yearlyAverages, setYearlyAverages] = useState(() => getInstantInitialAverages());
+  const [loadingAverages, setLoadingAverages] = useState(false);
 
   // Dynamic API state for rewards overview & Transaction Ledger
   const [rewardsData, setRewardsData] = useState([]);
@@ -4581,7 +4601,7 @@ export default function App() {
     async function fetchAverages() {
       try {
         const averages = await fetchInstitutionalAveragesFromSheet();
-        if (averages) {
+        if (averages && (Number(averages.year_1) > 0 || Number(averages.year_2) > 0 || Number(averages.year_3) > 0 || Number(averages.year_4) > 0)) {
           setYearlyAverages(averages);
         }
       } catch (err) {
@@ -8034,7 +8054,7 @@ export default function App() {
 
           {/* VIEW 3.9: BIT PLACEMENT & CAREER DESK */}
           {activeNav === 'BIT Placements' && (() => {
-            const filteredTiers = BIT_DAILY_PLACEMENT_DATA.salaryTiers.filter(tier => {
+            const filteredTiers = (placementData?.salaryTiers || []).filter(tier => {
               const matchesTier = placementSelectedTier === 'All' || tier.tier === placementSelectedTier;
               const q = placementSearchQuery.trim().toLowerCase();
               if (!q) return matchesTier;
@@ -8053,7 +8073,7 @@ export default function App() {
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pt-1">
                   <div>
                     <h1 className={`text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Placement Details Of {BIT_DAILY_PLACEMENT_DATA.targetBatch}
+                      Placement Details Of {placementData?.targetBatch || '2023-2027 Batch'}
                     </h1>
                     <div className="mt-2.5 flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl w-fit">
                       <Clock className="w-3.5 h-3.5 shrink-0 text-amber-500" />
@@ -8067,14 +8087,14 @@ export default function App() {
                       isDarkMode ? 'bg-slate-900/90 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-2xs'
                     }`}>
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>Updated: <strong className="text-emerald-500 font-mono">{BIT_DAILY_PLACEMENT_DATA.lastUpdated}</strong></span>
+                      <span>Updated: <strong className="text-emerald-500 font-mono">{placementData?.lastUpdated || 'Today'}</strong></span>
                     </div>
                   </div>
                 </div>
 
                 {/* Featured Placement Hero Banner Slider (Matching Home Page Slider) */}
                 <PlacementHeroSlider
-                  placementData={BIT_DAILY_PLACEMENT_DATA}
+                  placementData={placementData}
                   setPlacementActiveTab={setPlacementActiveTab}
                   setPlacementSelectedTier={setPlacementSelectedTier}
                 />
@@ -8297,7 +8317,7 @@ export default function App() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* Upcoming Placement Drive Card */}
-                      {BIT_DAILY_PLACEMENT_DATA.upcomingDrives.map((drive, dIdx) => (
+                      {(placementData?.upcomingDrives || []).map((drive, dIdx) => (
                         <div
                           key={dIdx}
                           className={`p-6 rounded-3xl border space-y-4 relative overflow-hidden ${
@@ -8338,7 +8358,7 @@ export default function App() {
                       ))}
 
                       {/* Contests Card */}
-                      {BIT_DAILY_PLACEMENT_DATA.upcomingContests.map((contest, cIdx) => (
+                      {(placementData?.upcomingContests || []).map((contest, cIdx) => (
                         <div
                           key={cIdx}
                           className={`p-6 rounded-3xl border space-y-4 relative overflow-hidden ${
@@ -10215,7 +10235,7 @@ export default function App() {
         student={displayedStudent || currentUser}
         yearlyAverages={yearlyAverages}
         leavesList={leavesList}
-        placementData={BIT_DAILY_PLACEMENT_DATA}
+        placementData={placementData}
         setActiveNav={setActiveNav}
         isDarkMode={isDarkMode}
       />

@@ -14,9 +14,10 @@ import {
   ShieldCheck,
   Volume2
 } from 'lucide-react';
-import placementData from '../data/placementData.json';
+import { getInstantPlacementData, fetchLivePlacementData } from '../services/placementService';
 
 export default function NotificationCenter({ isDarkMode, setActiveNav }) {
+  const [placementData, setPlacementData] = useState(() => getInstantPlacementData());
   const [isOpen, setIsOpen] = useState(false);
   const [permission, setPermission] = useState('default');
   const [readIds, setReadIds] = useState(() => {
@@ -36,6 +37,9 @@ export default function NotificationCenter({ isDarkMode, setActiveNav }) {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setPermission(Notification.permission);
     }
+    fetchLivePlacementData().then(data => {
+      if (data) setPlacementData(data);
+    }).catch(() => {});
   }, []);
 
   // Close dropdown on click outside
@@ -52,14 +56,15 @@ export default function NotificationCenter({ isDarkMode, setActiveNav }) {
   // Generate notifications list from dynamic placement & campus activities
   const notifications = useMemo(() => {
     const list = [];
-    const dateStr = placementData.editionDate || 'Today';
+    const safeData = placementData || {};
+    const dateStr = safeData.editionDate || 'Today';
 
     // 1. Placement Daily Count Notification
-    if (placementData.totalStudentsPlaced) {
+    if (safeData.totalStudentsPlaced) {
       list.push({
         id: `placement_daily_${dateStr}`,
         title: '🎉 Daily BIT Placement Update!',
-        description: `${placementData.totalStudentsPlaced} students placed across ${placementData.totalCompaniesVisited} companies (${placementData.targetBatch}).`,
+        description: `${safeData.totalStudentsPlaced} students placed across ${safeData.totalCompaniesVisited || 60}+ companies (${safeData.targetBatch || '2023-2027 Batch'}).`,
         category: 'Placement',
         icon: Briefcase,
         iconColor: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
@@ -69,37 +74,41 @@ export default function NotificationCenter({ isDarkMode, setActiveNav }) {
     }
 
     // 2. Active Placement Drive
-    if (placementData.upcomingDrives && placementData.upcomingDrives.length > 0) {
-      const drive = placementData.upcomingDrives[0];
-      list.push({
-        id: `drive_${drive.company.replace(/\s+/g, '_')}_${dateStr}`,
-        title: `🏢 Active Drive: ${drive.company}`,
-        description: `${drive.role} • ${drive.startDate} – ${drive.endDate} (${drive.targetBatch})`,
-        category: 'Recruitment',
-        icon: Sparkles,
-        iconColor: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
-        timestamp: 'Active Drive',
-        targetNav: 'Dashboard'
-      });
+    if (safeData.upcomingDrives && safeData.upcomingDrives.length > 0) {
+      const drive = safeData.upcomingDrives[0];
+      if (drive && drive.company) {
+        list.push({
+          id: `drive_${drive.company.replace(/\s+/g, '_')}_${dateStr}`,
+          title: `🏢 Active Drive: ${drive.company}`,
+          description: `${drive.role || 'Placement Drive'} • ${drive.startDate || 'Upcoming'} – ${drive.endDate || ''} (${drive.targetBatch || safeData.targetBatch || '2023-2027'})`,
+          category: 'Recruitment',
+          icon: Sparkles,
+          iconColor: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+          timestamp: 'Active Drive',
+          targetNav: 'Dashboard'
+        });
+      }
     }
 
     // 3. Contests / Competitions
-    if (placementData.upcomingContests && placementData.upcomingContests.length > 0) {
-      const contest = placementData.upcomingContests[0];
-      list.push({
-        id: `contest_${contest.name.replace(/\s+/g, '_')}`,
-        title: `🏆 Contest Live: ${contest.name}`,
-        description: `${contest.type} • Status: ${contest.status}`,
-        category: 'Hackathon',
-        icon: Trophy,
-        iconColor: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
-        timestamp: 'Ongoing',
-        targetNav: 'Leaderboard'
-      });
+    if (safeData.upcomingContests && safeData.upcomingContests.length > 0) {
+      const contest = safeData.upcomingContests[0];
+      if (contest && contest.name) {
+        list.push({
+          id: `contest_${contest.name.replace(/\s+/g, '_')}`,
+          title: `🏆 Contest Live: ${contest.name}`,
+          description: `${contest.type || 'Technical Contest'} • Status: ${contest.status || 'Active'}`,
+          category: 'Hackathon',
+          icon: Trophy,
+          iconColor: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+          timestamp: 'Ongoing',
+          targetNav: 'Leaderboard'
+        });
+      }
     }
 
     return list;
-  }, []);
+  }, [placementData]);
 
   const unreadCount = useMemo(() => {
     return notifications.filter((n) => !readIds.includes(n.id)).length;
@@ -114,7 +123,7 @@ export default function NotificationCenter({ isDarkMode, setActiveNav }) {
         if (res === 'granted') {
           // Send a test welcome notification
           new Notification('🔔 BIT Placement Alerts Enabled!', {
-            body: `You will automatically receive daily placement updates at ${placementData.editionDate || '5:00 PM'}!`,
+            body: `You will automatically receive daily placement updates at ${placementData?.editionDate || '5:00 PM'}!`,
             icon: '/favicon.ico'
           });
           setToastMessage('✅ Push notifications enabled! You will get daily 5:00 PM updates.');

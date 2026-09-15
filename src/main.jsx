@@ -29,10 +29,16 @@ class ErrorBoundary extends Component {
             ⚠️
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
-          <p className="text-xs text-slate-400 max-w-md mb-6">
-            An unexpected error occurred while rendering the view. Click below to reload the app.
+          <p className="text-xs text-slate-400 max-w-md mb-4">
+            An unexpected error occurred while rendering the view.
           </p>
-          <div className="flex gap-3">
+          {this.state.error && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 max-w-lg w-full mb-6 text-left overflow-auto max-h-48 font-mono text-[11px] text-rose-300">
+              <div className="font-bold text-rose-400 mb-1">{this.state.error.name}: {this.state.error.message}</div>
+              <div className="text-slate-500 text-[10px] whitespace-pre-wrap">{this.state.error.stack}</div>
+            </div>
+          )}
+          <div className="flex gap-3 flex-wrap justify-center">
             <button
               onClick={() => {
                 this.setState({ hasError: false, error: null });
@@ -41,6 +47,21 @@ class ErrorBoundary extends Component {
               className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
             >
               Reload Page
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  localStorage.removeItem('bit_live_placement_data_v2');
+                  localStorage.removeItem('bit_live_placement_data_v3');
+                  localStorage.removeItem('bit_live_placement_data_v3_time');
+                  localStorage.removeItem('bit_rp_theme');
+                } catch (e) {}
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              className="px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition-all cursor-pointer"
+            >
+              Clear Cache & Reload
             </button>
           </div>
         </div>
