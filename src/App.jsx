@@ -437,18 +437,6 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '', forced
   const firstNumMatch = (nameSegments[0] || '').match(/\d+/);
   if (firstNumMatch && !suffixNumber) suffixNumber = firstNumMatch[0];
 
-  let liveSheetData = null;
-  // 2.5. Live Master Sheet Direct Email Lookup
-  if (!rollId && isEmail) {
-    try {
-      const liveSheetMatch = await fetchStudentRewardPointsFromSheet(cleanInput, deptCode, true);
-      if (liveSheetMatch && (liveSheetMatch.roll_no || liveSheetMatch.rollNo)) {
-        rollId = (liveSheetMatch.roll_no || liveSheetMatch.rollNo).toUpperCase().trim();
-        liveSheetData = liveSheetMatch;
-      }
-    } catch (e) {}
-  }
-
   // 3. Search in studentMentorData directory (all registered college students)
   if (!rollId && Array.isArray(studentMentorData) && studentMentorData.length > 0) {
     const candidates = studentMentorData.filter(s => {
@@ -499,14 +487,10 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '', forced
         mentorInfo = filteredByInitial[0];
         rollId = mentorInfo.rollNo;
       } else if (filteredByInitial.length > 1) {
-        // If multiple students share the exact same name and initial in the same batch (e.g. AD237 and AD238)
-        // Check if email has middle initial segment vs plain name
         if (middleInitial && nameSegments.length >= 2 && filteredByInitial.length >= 2) {
-          // The student with middle initial in email gets the 2nd record (e.g. sanjay.m.ad23 -> AD238)
           mentorInfo = filteredByInitial[1];
           rollId = mentorInfo.rollNo;
         } else {
-          // The student without middle initial (e.g. sanjay.ad23) gets the 1st record (e.g. AD237)
           mentorInfo = filteredByInitial[0];
           rollId = mentorInfo.rollNo;
         }
@@ -559,7 +543,19 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '', forced
     }
   }
 
-  // 6. Default fallback to uppercase prefix if nothing else found
+  let liveSheetData = null;
+  // 6. If student is not in local datasets (e.g. New Admission Student), query Live Google Sheet
+  if (!rollId && isEmail) {
+    try {
+      const liveSheetMatch = await fetchStudentRewardPointsFromSheet(cleanInput, deptCode, true);
+      if (liveSheetMatch && (liveSheetMatch.roll_no || liveSheetMatch.rollNo)) {
+        rollId = (liveSheetMatch.roll_no || liveSheetMatch.rollNo).toUpperCase().trim();
+        liveSheetData = liveSheetMatch;
+      }
+    } catch (e) {}
+  }
+
+  // 7. Default fallback to uppercase prefix if nothing else found
   if (!rollId) {
     rollId = emailPrefix.toUpperCase();
   }
