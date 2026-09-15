@@ -18,7 +18,8 @@ import {
   parseStudentRows
 } from '../data/rp_distribution';
 import { fetchStudentRewardPointsFromSheet, APPS_SCRIPT_SHEET_URL } from '../services/googleSheetsService';
-import studentMentorData from '../data/studentMentorMapping.json';
+import { getInstantStudentMentorData } from '../services/studentMentorService';
+const studentMentorData = getInstantStudentMentorData();
 
 const DEPT_CODE_TO_NAME = {
   'CT': 'COMPUTER TECHNOLOGY',

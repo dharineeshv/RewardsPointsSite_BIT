@@ -1,10 +1,16 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   Users, Search, Mail, Copy, Check, Filter, 
   GraduationCap, Sparkles, Building, ChevronLeft, ChevronRight, UserCheck, RefreshCw,
-  ExternalLink
+  ExternalLink, Radio
 } from 'lucide-react';
-import studentMentorData from '../data/studentMentorMapping.json';
+import { 
+  getInstantStudentMentorData, 
+  fetchLiveStudentMentorData, 
+  resolveUserDeptCode 
+} from '../services/studentMentorService';
+
+export { resolveUserDeptCode };
 
 export const ALL_DEPARTMENTS = [
   { code: 'ALL', label: 'All Departments' },
@@ -28,84 +34,11 @@ export const ALL_DEPARTMENTS = [
   { code: 'BM', label: 'Biomedical Engineering' }
 ];
 
-// Helper to resolve student department code from user profile or roll number
-export function resolveUserDeptCode(user) {
-  if (!user) return 'ALL';
-  const userRoll = (user.id || user.roll_no || user.rollNo || user.roll || '').toUpperCase().trim();
-  
-  // 1. Check direct mentor database record
-  if (userRoll && Array.isArray(studentMentorData)) {
-    const record = studentMentorData.find(item => (item.rollNo || '').toUpperCase() === userRoll);
-    if (record?.deptCode) return record.deptCode;
-  }
-
-  // 2. Extract letters from roll number e.g. 7376232CT120 -> CT, 7376221CS101 -> CSE
-  const letters = (userRoll.match(/[A-Z]+/g) || []).join('');
-  const ROLL_CODE_MAP = {
-    'CT': 'CT',
-    'IT': 'IT',
-    'CS': 'CSE',
-    'CSE': 'CSE',
-    'EC': 'ECE',
-    'ECE': 'ECE',
-    'EE': 'EEE',
-    'EEE': 'EEE',
-    'AD': 'AI&DS',
-    'AIDS': 'AI&DS',
-    'AM': 'AIML',
-    'AIML': 'AIML',
-    'BT': 'BT',
-    'BM': 'BM',
-    'BME': 'BM',
-    'CE': 'CIVIL',
-    'CIVIL': 'CIVIL',
-    'ME': 'MECH',
-    'MECH': 'MECH',
-    'MC': 'MTRS',
-    'MTRS': 'MTRS',
-    'EI': 'EIE',
-    'EIE': 'EIE',
-    'CB': 'CSBS',
-    'CSBS': 'CSBS',
-    'CD': 'CSD',
-    'CSD': 'CSD',
-    'IS': 'ISE',
-    'ISE': 'ISE',
-    'AG': 'AGRI',
-    'AGRI': 'AGRI',
-    'FT': 'FT',
-    'FD': 'FT'
-  };
-  if (letters && ROLL_CODE_MAP[letters]) {
-    return ROLL_CODE_MAP[letters];
-  }
-
-  // 3. Check department name string
-  const deptStr = (user.department || user.dept || '').toUpperCase().trim();
-  if (deptStr.includes('COMPUTER TECH') || deptStr === 'CT') return 'CT';
-  if (deptStr.includes('COMPUTER SCI') || deptStr === 'CSE' || deptStr === 'CS') return 'CSE';
-  if (deptStr.includes('ELECTRONICS & COMM') || deptStr.includes('ELECTRONICS AND COMM') || deptStr === 'ECE') return 'ECE';
-  if (deptStr.includes('INFORMATION TECH') || deptStr === 'IT') return 'IT';
-  if (deptStr.includes('ARTIFICIAL INTELLIGENCE & DATA') || deptStr.includes('AI & DS') || deptStr.includes('AI&DS')) return 'AI&DS';
-  if (deptStr.includes('ARTIFICIAL INTELLIGENCE & MACHINE') || deptStr.includes('AIML')) return 'AIML';
-  if (deptStr.includes('MECHANICAL') || deptStr === 'MECH') return 'MECH';
-  if (deptStr.includes('ELECTRICAL') || deptStr === 'EEE') return 'EEE';
-  if (deptStr.includes('BIOTECH') || deptStr === 'BT') return 'BT';
-  if (deptStr.includes('BIOMEDICAL') || deptStr === 'BM') return 'BM';
-  if (deptStr.includes('AGRICULTURE') || deptStr.includes('AGRI')) return 'AGRI';
-  if (deptStr.includes('CIVIL')) return 'CIVIL';
-  if (deptStr.includes('FASHION') || deptStr.includes('FOOD')) return 'FT';
-  if (deptStr.includes('INSTRUMENTATION') || deptStr === 'EIE') return 'EIE';
-  if (deptStr.includes('INFORMATION SCI') || deptStr === 'ISE') return 'ISE';
-  if (deptStr.includes('MECHATRONICS') || deptStr === 'MTRS') return 'MTRS';
-  if (deptStr.includes('BUSINESS') || deptStr === 'CSBS') return 'CSBS';
-  if (deptStr.includes('DESIGN') || deptStr === 'CSD') return 'CSD';
-
-  return 'ALL';
-}
-
 export default function StudentMentorMappingView({ currentUser, isDarkMode = true }) {
-  const defaultDept = useMemo(() => resolveUserDeptCode(currentUser), [currentUser]);
+  const [studentMentorData, setStudentMentorData] = useState(() => getInstantStudentMentorData());
+  const [isLiveSyncing, setIsLiveSyncing] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+  const defaultDept = useMemo(() => resolveUserDeptCode(currentUser, studentMentorData), [currentUser, studentMentorData]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState(defaultDept || 'ALL');
   const [currentPage, setCurrentPage] = useState(1);
@@ -113,6 +46,28 @@ export default function StudentMentorMappingView({ currentUser, isDarkMode = tru
   const [copiedEmail, setCopiedEmail] = useState(null);
   const chipsScrollRef = useRef(null);
   const pageSize = 30;
+
+  // Live Cloud SWR Sync Hook
+  const syncLiveData = useCallback(async (force = false) => {
+    setIsLiveSyncing(true);
+    try {
+      const res = await fetchLiveStudentMentorData(force);
+      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+        setStudentMentorData(res.data);
+        setIsLive(res.isLive || false);
+      }
+    } catch (e) {
+      console.warn('Student mentor live sync error:', e);
+    } finally {
+      setIsLiveSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    syncLiveData(false);
+    const timer = setInterval(() => syncLiveData(false), 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [syncLiveData]);
 
   // Reactively sync default department when logged-in user changes
   React.useEffect(() => {

@@ -133,11 +133,7 @@
     {
       "tier": "3-4 LPA",
       "tierCategory": "Base Tier",
-<<<<<<< HEAD
-      "range": "3.00 - 4.00 LPA",
-=======
       "range": "3-4 LPA",
->>>>>>> b19f6bb (feat: dynamic live newspaper placement and drives extraction system)
       "offerCount": 234,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
