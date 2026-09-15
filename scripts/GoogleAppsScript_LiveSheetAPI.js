@@ -20,6 +20,8 @@ function doGet(e) {
     const params = e && e.parameter ? e.parameter : {};
     const action = (params.action || '').trim().toLowerCase();
     const rollNo = (params.rollNo || params.roll || params.id || '').trim().toUpperCase();
+    const email = (params.email || params.emailId || '').trim().toLowerCase();
+    const query = (params.query || rollNo || email).trim();
     const department = (params.department || params.dept || params.tab || '').trim().toUpperCase();
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -34,7 +36,7 @@ function doGet(e) {
       return createJsonResponse({ success: true, sheets: sheetNames });
     }
 
-    if (action === 'averages' || action === 'benchmarks' || (!rollNo && !department)) {
+    if (action === 'averages' || action === 'benchmarks' || (!query && !department)) {
       const sheetAverages = findAveragesTableInSheet(ss);
       if (sheetAverages) {
         return createJsonResponse({
@@ -47,8 +49,8 @@ function doGet(e) {
       }
     }
 
-    if (rollNo) {
-      const studentData = findStudentByRoll(ss, rollNo, department);
+    if (query || rollNo || email) {
+      const studentData = findStudentByRoll(ss, query || rollNo, department, email);
       if (studentData) {
         return createJsonResponse({
           success: true,
@@ -58,7 +60,7 @@ function doGet(e) {
       } else {
         return createJsonResponse({
           success: false,
-          message: 'Student with roll number ' + rollNo + ' not found in sheet.',
+          message: 'Student with identifier ' + (query || rollNo || email) + ' not found in sheet.',
           data: null
         });
       }
@@ -228,43 +230,48 @@ function findAveragesTableInSheet(ss) {
   return null;
 }
 
-function findStudentByRoll(ss, targetRoll, targetDept = '') {
-  const cleanRoll = String(targetRoll).trim().toUpperCase();
+function findStudentByRoll(ss, targetRollOrQuery, targetDept = '', targetEmail = '') {
+  const query = String(targetRollOrQuery || '').trim();
+  const isEmailInput = query.includes('@') || String(targetEmail || '').includes('@');
+  const cleanEmail = (targetEmail || (isEmailInput ? query : '')).toLowerCase().trim();
+  const cleanEmailPrefix = cleanEmail ? cleanEmail.split('@')[0] : '';
+  const cleanRoll = (!isEmailInput && query.length >= 6 ? query : '').toUpperCase().trim();
   
-  // Deduce department code from roll e.g. 7376232CT142 -> CT, 7376222IT101 -> IT, 7376231CS102 -> CSE
+  // Deduce department code from roll or email e.g. 7376232CT142 -> CT, sanjay.m.ad23@bitsathy.ac.in -> AI&DS
   let deptHint = targetDept ? String(targetDept).trim().toUpperCase() : '';
   if (!deptHint || deptHint === 'ALL') {
-    if (cleanRoll.includes('CT')) deptHint = 'CT';
-    else if (cleanRoll.includes('CS') || cleanRoll.includes('CSE')) deptHint = 'CSE';
-    else if (cleanRoll.includes('IT')) deptHint = 'IT';
-    else if (cleanRoll.includes('AD') || cleanRoll.includes('AIDS')) deptHint = 'AI&DS';
-    else if (cleanRoll.includes('AL') || cleanRoll.includes('AIML')) deptHint = 'AIML';
-    else if (cleanRoll.includes('EC') || cleanRoll.includes('ECE')) deptHint = 'ECE';
-    else if (cleanRoll.includes('EE') || cleanRoll.includes('EEE')) deptHint = 'EEE';
-    else if (cleanRoll.includes('ME') || cleanRoll.includes('MECH')) deptHint = 'MECH';
-    else if (cleanRoll.includes('BT')) deptHint = 'BT';
-    else if (cleanRoll.includes('BM')) deptHint = 'BIOMEDICAL';
-    else if (cleanRoll.includes('AG')) deptHint = 'AGRI';
-    else if (cleanRoll.includes('CE')) deptHint = 'CIVIL';
-    else if (cleanRoll.includes('FD')) deptHint = 'FD';
-    else if (cleanRoll.includes('FT')) deptHint = 'FT';
-    else if (cleanRoll.includes('EI')) deptHint = 'EIE';
-    else if (cleanRoll.includes('IS') || cleanRoll.includes('SE')) deptHint = 'ISE';
-    else if (cleanRoll.includes('MZ') || cleanRoll.includes('MT') || cleanRoll.includes('MC')) deptHint = 'MTRS';
+    const hintSource = (cleanRoll || cleanEmailPrefix).toUpperCase();
+    if (hintSource.includes('CT')) deptHint = 'CT';
+    else if (hintSource.includes('CS') || hintSource.includes('CSE')) deptHint = 'CSE';
+    else if (hintSource.includes('IT')) deptHint = 'IT';
+    else if (hintSource.includes('AD') || hintSource.includes('AIDS')) deptHint = 'AI&DS';
+    else if (hintSource.includes('AL') || hintSource.includes('AIML')) deptHint = 'AIML';
+    else if (hintSource.includes('EC') || hintSource.includes('ECE')) deptHint = 'ECE';
+    else if (hintSource.includes('EE') || hintSource.includes('EEE')) deptHint = 'EEE';
+    else if (hintSource.includes('ME') || hintSource.includes('MECH')) deptHint = 'MECH';
+    else if (hintSource.includes('BT')) deptHint = 'BT';
+    else if (hintSource.includes('BM')) deptHint = 'BIOMEDICAL';
+    else if (hintSource.includes('AG')) deptHint = 'AGRI';
+    else if (hintSource.includes('CE')) deptHint = 'CIVIL';
+    else if (hintSource.includes('FD')) deptHint = 'FD';
+    else if (hintSource.includes('FT')) deptHint = 'FT';
+    else if (hintSource.includes('EI')) deptHint = 'EIE';
+    else if (hintSource.includes('IS') || hintSource.includes('SE')) deptHint = 'ISE';
+    else if (hintSource.includes('MZ') || hintSource.includes('MT') || hintSource.includes('MC')) deptHint = 'MTRS';
   }
 
   // Build sheet list prioritizing department sheet first, then Studentwise Reward Points, then others
   const allSheets = ss.getSheets();
   const sortedSheets = [];
   
-  // 1. Department tab first (e.g. 'CT', 'CSE')
+  // 1. Department tab first (e.g. 'CT', 'AI&DS', 'CSE')
   if (deptHint) {
     const deptSheet = ss.getSheetByName(deptHint) || allSheets.find(s => s.getName().toUpperCase() === deptHint);
     if (deptSheet) sortedSheets.push(deptSheet);
   }
   
   // 2. Master Studentwise Reward Points sheet second
-  const masterSheet = ss.getSheetByName('Studentwise Reward Points');
+  const masterSheet = ss.getSheetByName('Studentwise Reward Points') || ss.getSheetByName('Details');
   if (masterSheet && !sortedSheets.includes(masterSheet)) sortedSheets.push(masterSheet);
   
   // 3. Other sheets
@@ -281,7 +288,7 @@ function findStudentByRoll(ss, targetRoll, targetDept = '') {
     if (!data || data.length < 2) continue;
 
     let headerIdx = -1;
-    let rollCol = -1, nameCol = -1, yearCol = -1, deptCol = -1, mentorCol = -1;
+    let rollCol = -1, nameCol = -1, yearCol = -1, deptCol = -1, mentorCol = -1, emailCol = -1;
     let balCol = -1, cumCol = -1, redCol = -1;
 
     // Detect header row and exact column indexes
@@ -294,6 +301,7 @@ function findStudentByRoll(ss, targetRoll, targetDept = '') {
         headerIdx = r;
         rollCol = rIdx;
         nameCol = nIdx;
+        emailCol = row.findIndex(c => c.includes('EMAIL') || c.includes('MAIL') || c.includes('E-MAIL'));
         yearCol = row.findIndex(c => c === 'YEAR' || c.includes('YR') || c.includes('BATCH'));
         deptCol = row.findIndex(c => c.includes('DEPT') || c.includes('DEPARTMENT') || c.includes('BRANCH'));
         mentorCol = row.findIndex(c => c.includes('MENTOR') || c.includes('FACULTY'));
@@ -333,6 +341,7 @@ function findStudentByRoll(ss, targetRoll, targetDept = '') {
       const row = data[r];
       let rowRoll = '';
       let rowName = '';
+      let rowEmail = '';
       let rowYear = '';
       let rowDept = sheetName;
       let rowMentor = '';
@@ -343,6 +352,7 @@ function findStudentByRoll(ss, targetRoll, targetDept = '') {
       if (headerIdx !== -1 && rollCol !== -1) {
         rowRoll = String(row[rollCol] || '').trim().toUpperCase();
         rowName = String(row[nameCol] || '').trim();
+        rowEmail = emailCol !== -1 ? String(row[emailCol] || '').trim().toLowerCase() : '';
         rowYear = yearCol !== -1 ? String(row[yearCol] || '').trim() : '';
         rowDept = deptCol !== -1 && row[deptCol] ? String(row[deptCol]).trim() : sheetName;
         rowMentor = mentorCol !== -1 ? String(row[mentorCol] || '').trim() : '';
@@ -380,7 +390,25 @@ function findStudentByRoll(ss, targetRoll, targetDept = '') {
         }
       }
 
-      if (rowRoll === cleanRoll || rowRoll.includes(cleanRoll)) {
+      // Check match:
+      let isMatch = false;
+      if (cleanRoll && rowRoll && (rowRoll === cleanRoll || rowRoll.includes(cleanRoll))) {
+        isMatch = true;
+      } else if (cleanEmail && rowEmail && (rowEmail === cleanEmail || rowEmail.includes(cleanEmail) || cleanEmail.includes(rowEmail))) {
+        isMatch = true;
+      } else if (cleanEmail) {
+        // Check if any cell in this row matches the email
+        for (let c = 0; c < Math.min(row.length, 12); c++) {
+          const cellVal = String(row[c] || '').trim().toLowerCase();
+          if (cellVal === cleanEmail || (cleanEmailPrefix && cellVal.includes(cleanEmailPrefix) && cellVal.includes('@bitsathy'))) {
+            isMatch = true;
+            rowEmail = cellVal;
+            break;
+          }
+        }
+      }
+
+      if (isMatch) {
         // Extract live courses and marks if present in sheet
         const theoryCourses = [];
         const addonCourses = [];
@@ -468,6 +496,7 @@ function findStudentByRoll(ss, targetRoll, targetDept = '') {
           roll_no: rowRoll,
           rollNo: rowRoll,
           id: rowRoll,
+          email: rowEmail || cleanEmail || '',
           name: rowName || ('Student (' + rowRoll + ')'),
           student_name: rowName || ('Student (' + rowRoll + ')'),
           year: rowYear || 'IV',

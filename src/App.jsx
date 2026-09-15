@@ -360,55 +360,161 @@ async function bitcentralFetch(pathAndQuery) {
 
 // Robust student roll & profile resolver from email or query
 // Robust student roll & profile resolver for all BIT students
-async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
+// Robust student roll & profile resolver for all BIT students
+async function resolveStudentRollAndProfile(emailOrRoll, googleName = '', forcedRoll = '') {
   const cleanInput = (emailOrRoll || '').toLowerCase().trim();
   const cleanUpper = cleanInput.toUpperCase();
   const isEmail = cleanInput.includes('@');
   const emailPrefix = isEmail ? cleanInput.split('@')[0] : cleanInput;
   const cleanName = (googleName || '').trim().toLowerCase();
 
-  const dotParts = emailPrefix.split('.');
-  const namePart = dotParts[0] || '';
-  const deptYrPart = dotParts[1] || '';
-  const deptMatch = deptYrPart.match(/^([a-z]+)(\d{2})$/i);
-  const deptCode = deptMatch ? deptMatch[1].toUpperCase() : '';
-  const batchYr = deptMatch ? deptMatch[2] : '';
-
-  let rollId = '';
+  let rollId = (forcedRoll || '').toUpperCase().trim();
   let studentRecord = null;
   let mentorInfo = null;
+  let matchedCandidates = [];
 
-  // 1. Check if input is directly a valid roll number format
-  if (/^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(cleanUpper) || /^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(emailPrefix)) {
-    rollId = (/^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(cleanUpper) ? cleanUpper : emailPrefix.toUpperCase());
+  // Check saved roll preference for this email
+  if (!rollId && isEmail) {
+    try {
+      const savedRoll = localStorage.getItem(`bit_rp_confirmed_roll_${cleanInput}`);
+      if (savedRoll) rollId = savedRoll.toUpperCase().trim();
+    } catch (e) {}
   }
 
-  // 2. Match in official studentMentorData directory (all registered college students)
-  if (Array.isArray(studentMentorData) && studentMentorData.length > 0) {
-    const matchedMentor = studentMentorData.find(s => {
-      const sRoll = (s.rollNo || '').toUpperCase();
-      const sName = (s.studentName || '').toLowerCase();
-      if (rollId && sRoll === rollId) return true;
-      if (sRoll.toLowerCase() === emailPrefix) return true;
-      if (deptCode && (s.deptCode === deptCode || sRoll.includes(deptCode))) {
-        if (batchYr && sRoll.includes(batchYr)) {
-          if (cleanName && sName.includes(cleanName)) return true;
-          if (namePart && sName.includes(namePart)) return true;
-        }
-      }
-      if (cleanName && sName.length > 3 && (sName.includes(cleanName) || cleanName.includes(sName))) {
-        if (!batchYr || sRoll.includes(batchYr)) return true;
-      }
-      return false;
-    });
-
-    if (matchedMentor) {
-      mentorInfo = matchedMentor;
-      if (!rollId) rollId = matchedMentor.rollNo;
+  // 1. Check if input is directly a valid roll number format
+  if (!rollId) {
+    if (/^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(cleanUpper)) {
+      rollId = cleanUpper;
+    } else if (/^7376\d{2,3}[A-Z]{2,4}\d{2,4}$/i.test(emailPrefix)) {
+      rollId = emailPrefix.toUpperCase();
     }
   }
 
-  // 3. Match in comprehensive official student database (STUDENTS_INTERNAL_MARKS_LIST)
+  // 2. Parse multi-segment email prefix
+  // e.g. "sanjay.m.ad23", "dharineesh.ct23", "sanjay.ad23", "sanjay1.ad23", "kaushi.k.ct23"
+  const dotParts = emailPrefix.split('.').filter(Boolean);
+  let deptCode = '';
+  let batchYr = '';
+  let nameSegments = [];
+  let middleInitial = '';
+  let suffixNumber = '';
+
+  // Scan dot parts from the end to find deptCode and batchYr (e.g. "ad23", "ct23", "cse24")
+  for (let i = dotParts.length - 1; i >= 0; i--) {
+    const part = dotParts[i];
+    const deptMatch = part.match(/^([a-z]+)(\d{2})$/i);
+    if (deptMatch) {
+      deptCode = deptMatch[1].toUpperCase();
+      batchYr = deptMatch[2];
+      nameSegments = dotParts.slice(0, i);
+      break;
+    }
+  }
+
+  if (!deptCode && dotParts.length > 1) {
+    const last = dotParts[dotParts.length - 1];
+    if (/^[a-z]{2,4}$/i.test(last)) {
+      deptCode = last.toUpperCase();
+      nameSegments = dotParts.slice(0, dotParts.length - 1);
+    }
+  }
+
+  if (nameSegments.length === 0) {
+    nameSegments = dotParts;
+  }
+
+  const firstName = (nameSegments[0] || '').replace(/\d+$/, '').toLowerCase();
+  
+  // Extract initials and numbers if present
+  for (let i = 1; i < nameSegments.length; i++) {
+    const seg = nameSegments[i];
+    if (/^[a-z]{1,2}$/i.test(seg)) {
+      middleInitial = seg.toLowerCase();
+    }
+    const numMatch = seg.match(/\d+/);
+    if (numMatch) suffixNumber = numMatch[0];
+  }
+  const firstNumMatch = (nameSegments[0] || '').match(/\d+/);
+  if (firstNumMatch && !suffixNumber) suffixNumber = firstNumMatch[0];
+
+  let liveSheetData = null;
+  // 2.5. Live Master Sheet Direct Email Lookup
+  if (!rollId && isEmail) {
+    try {
+      const liveSheetMatch = await fetchStudentRewardPointsFromSheet(cleanInput, deptCode, true);
+      if (liveSheetMatch && (liveSheetMatch.roll_no || liveSheetMatch.rollNo)) {
+        rollId = (liveSheetMatch.roll_no || liveSheetMatch.rollNo).toUpperCase().trim();
+        liveSheetData = liveSheetMatch;
+      }
+    } catch (e) {}
+  }
+
+  // 3. Search in studentMentorData directory (all registered college students)
+  if (!rollId && Array.isArray(studentMentorData) && studentMentorData.length > 0) {
+    const candidates = studentMentorData.filter(s => {
+      const sRoll = (s.rollNo || '').toUpperCase();
+      const sName = (s.studentName || '').toLowerCase();
+      const sDept = (s.deptCode || s.department || '').toUpperCase();
+
+      if (sRoll.toLowerCase() === emailPrefix) return true;
+
+      // Department & Batch checks
+      const deptOk = !deptCode || sDept.includes(deptCode) || sRoll.includes(deptCode);
+      const batchOk = !batchYr || sRoll.includes(batchYr);
+      if (!deptOk || !batchOk) return false;
+
+      // Name match check
+      const hasCleanName = cleanName && (sName.includes(cleanName) || cleanName.includes(sName));
+      const hasFirstName = firstName && (sName.includes(firstName) || firstName.includes(sName.split(' ')[0]));
+      return hasCleanName || hasFirstName;
+    });
+
+    if (candidates.length === 1) {
+      rollId = candidates[0].rollNo;
+      mentorInfo = candidates[0];
+    } else if (candidates.length > 1) {
+      // Disambiguate multi-candidate matches:
+      let filteredByInitial = candidates;
+      if (middleInitial) {
+        filteredByInitial = candidates.filter(c => {
+          const cName = (c.studentName || '').toLowerCase();
+          const initials = cName.split(/\s+/).slice(1).map(p => p[0]).join('');
+          return cName.endsWith(` ${middleInitial}`) || initials.includes(middleInitial);
+        });
+        if (filteredByInitial.length === 0) {
+          filteredByInitial = candidates;
+        }
+      }
+
+      if (suffixNumber) {
+        const idx = parseInt(suffixNumber, 10);
+        if (filteredByInitial.length >= idx) {
+          mentorInfo = filteredByInitial[idx - 1];
+          rollId = mentorInfo.rollNo;
+        } else {
+          mentorInfo = filteredByInitial[0];
+          rollId = mentorInfo.rollNo;
+        }
+      } else if (filteredByInitial.length === 1) {
+        mentorInfo = filteredByInitial[0];
+        rollId = mentorInfo.rollNo;
+      } else if (filteredByInitial.length > 1) {
+        // If multiple students share the exact same name and initial in the same batch (e.g. AD237 and AD238)
+        // Check if email has middle initial segment vs plain name
+        if (middleInitial && nameSegments.length >= 2 && filteredByInitial.length >= 2) {
+          // The student with middle initial in email gets the 2nd record (e.g. sanjay.m.ad23 -> AD238)
+          mentorInfo = filteredByInitial[1];
+          rollId = mentorInfo.rollNo;
+        } else {
+          // The student without middle initial (e.g. sanjay.ad23) gets the 1st record (e.g. AD237)
+          mentorInfo = filteredByInitial[0];
+          rollId = mentorInfo.rollNo;
+        }
+      }
+    }
+  }
+
+  // 4. Match in comprehensive official student database (STUDENTS_INTERNAL_MARKS_LIST)
   if (Array.isArray(STUDENTS_INTERNAL_MARKS_LIST) && STUDENTS_INTERNAL_MARKS_LIST.length > 0) {
     if (rollId) {
       studentRecord = STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || '').toUpperCase() === rollId);
@@ -422,14 +528,13 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
       }
     }
 
-    // Name + department prefix matching from email
-    if (!studentRecord) {
+    if (!studentRecord && !rollId) {
       studentRecord = STUDENTS_INTERNAL_MARKS_LIST.find(st => {
         const sName = (st.name || '').toLowerCase();
         const sRoll = (st.rollNo || '').toUpperCase();
         const sEmail = (st.email || '').toLowerCase();
 
-        const nameMatches = (cleanName && sName.includes(cleanName)) || (namePart && sName.includes(namePart)) || sEmail.includes(namePart);
+        const nameMatches = (cleanName && sName.includes(cleanName)) || (firstName && sName.includes(firstName)) || sEmail.includes(firstName);
         const deptMatches = !deptCode || sRoll.includes(deptCode);
         const batchMatches = !batchYr || sRoll.includes(batchYr);
 
@@ -442,7 +547,7 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
     }
   }
 
-  // 4. Match in STUDENTS_DATABASE fallback
+  // 5. Match in STUDENTS_DATABASE fallback
   if (!studentRecord && Array.isArray(STUDENTS_DATABASE)) {
     studentRecord = STUDENTS_DATABASE.find(s => 
       (s.id && s.id.toUpperCase() === rollId) || 
@@ -454,7 +559,7 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
     }
   }
 
-  // 5. Default fallback to uppercase prefix if nothing else found
+  // 6. Default fallback to uppercase prefix if nothing else found
   if (!rollId) {
     rollId = emailPrefix.toUpperCase();
   }
@@ -466,35 +571,22 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
     calculatedPoints = eventLogs.reduce((acc, ev) => acc + (parseFloat(ev.points) || 0), 0);
   }
 
-  let resolvedName = studentRecord?.name || mentorInfo?.studentName || googleName || rollId;
-  let resolvedDept = studentRecord?.department || mentorInfo?.department || (deptCode ? `B. TECH. - ${deptCode}` : 'Engineering');
-  let resolvedMentor = mentorInfo?.mentorName || studentRecord?.mentor || 'BIT Faculty';
-  let resolvedYear = mentorInfo?.year || studentRecord?.year || 'IV';
-  let resolvedEmail = studentRecord?.email || (cleanInput.includes('@') ? cleanInput : `${rollId.toLowerCase()}@bitsathy.ac.in`);
+  const liveSource = liveSheetData || getCachedStudentPoints(rollId) || (isEmail ? getCachedStudentPoints(cleanInput) : null);
 
-  let initialBalance = studentRecord?.balancePoints !== undefined ? studentRecord.balancePoints : (calculatedPoints > 0 ? calculatedPoints : 0);
-  let initialCumulative = studentRecord?.cumulativePoints !== undefined ? studentRecord.cumulativePoints : (calculatedPoints > 0 ? calculatedPoints : initialBalance);
-  let initialRedeemed = studentRecord?.redeemedPoints !== undefined ? studentRecord.redeemedPoints : 0;
+  let resolvedName = liveSource?.name || liveSource?.student_name || studentRecord?.name || mentorInfo?.studentName || googleName || rollId;
+  let resolvedDept = liveSource?.department || studentRecord?.department || mentorInfo?.department || (deptCode ? `B. TECH. - ${deptCode}` : 'Engineering');
+  let resolvedMentor = liveSource?.mentor || liveSource?.mentor_name || mentorInfo?.mentorName || studentRecord?.mentor || 'BIT Faculty';
+  let resolvedYear = liveSource?.year || mentorInfo?.year || studentRecord?.year || 'IV';
+  let resolvedEmail = liveSource?.email || studentRecord?.email || (cleanInput.includes('@') ? cleanInput : `${rollId.toLowerCase()}@bitsathy.ac.in`);
 
-  // Check instant live cache first
-  const cachedLive = getCachedStudentPoints(rollId);
-  if (cachedLive) {
-    if (cachedLive.balance_points !== undefined) {
-      initialBalance = cachedLive.balance_points;
-    }
-    if (cachedLive.cumulative_points !== undefined) {
-      initialCumulative = cachedLive.cumulative_points;
-    }
-    if (cachedLive.redeemed_points !== undefined) {
-      initialRedeemed = cachedLive.redeemed_points;
-    }
-    if (cachedLive.name && cachedLive.name !== rollId) {
-      resolvedName = cachedLive.name;
-    }
-    if (cachedLive.mentor && cachedLive.mentor !== 'BIT Faculty') {
-      resolvedMentor = cachedLive.mentor;
-    }
-  }
+  let initialBalance = liveSource?.balance_points !== undefined ? liveSource.balance_points : (studentRecord?.balancePoints !== undefined ? studentRecord.balancePoints : (calculatedPoints > 0 ? calculatedPoints : 0));
+  let initialCumulative = liveSource?.cumulative_points !== undefined ? liveSource.cumulative_points : (studentRecord?.cumulativePoints !== undefined ? studentRecord.cumulativePoints : (calculatedPoints > 0 ? calculatedPoints : initialBalance));
+  let initialRedeemed = liveSource?.redeemed_points !== undefined ? liveSource.redeemed_points : (studentRecord?.redeemedPoints !== undefined ? studentRecord.redeemedPoints : 0);
+
+  let liveTheory = liveSource?.theoryCourses?.length ? liveSource.theoryCourses : (studentRecord?.theoryCourses || []);
+  let liveAddon = liveSource?.addonCourses?.length ? liveSource.addonCourses : (studentRecord?.addonCourses || []);
+  let liveLab = liveSource?.labCourses?.length ? liveSource.labCourses : (studentRecord?.labCourses || []);
+  let liveGrandTotal = liveSource?.grandTotal || studentRecord?.grandTotal || '0.00';
 
   let profileApiData = {
     roll_no: rollId,
@@ -508,10 +600,10 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
     year: resolvedYear,
     email: resolvedEmail,
     activityBreakdown: studentRecord?.activityBreakdown || [],
-    theoryCourses: studentRecord?.theoryCourses || [],
-    labCourses: studentRecord?.labCourses || [],
-    addonCourses: studentRecord?.addonCourses || [],
-    grandTotal: studentRecord?.grandTotal || '0.00',
+    theoryCourses: liveTheory,
+    labCourses: liveLab,
+    addonCourses: liveAddon,
+    grandTotal: liveGrandTotal,
     balance_points: String(initialBalance),
     currentPoints: String(initialBalance),
     cumulative_reward_points: String(initialCumulative),
@@ -521,11 +613,17 @@ async function resolveStudentRollAndProfile(emailOrRoll, googleName = '') {
   };
 
   // Trigger non-blocking live sheet fetch in background to warm cache
-  const deptName = studentRecord?.department || mentorInfo?.deptCode || 'CT';
-  fetchStudentRewardPointsFromSheet(rollId, deptName, false).catch(() => {});
+  const deptName = resolvedDept || studentRecord?.department || mentorInfo?.deptCode || 'CT';
+  fetchStudentRewardPointsFromSheet(cleanInput || rollId, deptName, false).catch(() => {});
 
   const searchApiData = profileApiData;
-  return { rollId, profileApiData, searchApiData };
+  return { 
+    rollId, 
+    candidates: matchedCandidates, 
+    isAmbiguous: matchedCandidates.length > 1 && !forcedRoll,
+    profileApiData, 
+    searchApiData 
+  };
 }
 
 function DashboardHeroSlider({ 
@@ -1254,8 +1352,11 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
   const [authError, setAuthError] = useState(initialNotice);
 
   const processStudentLogin = async (email, googleName = '', photo = null) => {
-    // Robust student roll & profile resolution
-    const { rollId, profileApiData, searchApiData } = await resolveStudentRollAndProfile(email, googleName);
+    // Robust student roll & profile resolution completely in background
+    const res = await resolveStudentRollAndProfile(email, googleName);
+    const rollId = res.rollId;
+    const profileApiData = res.profileApiData;
+    const searchApiData = res.searchApiData;
 
     const name = (profileApiData?.name || searchApiData?.student_name || googleName || rollId).trim().toUpperCase();
     const initials = name.split(/\s+/).map(n => n[0]).filter(Boolean).join('').slice(0, 2) || rollId.slice(0, 2) || 'ST';
@@ -2609,27 +2710,45 @@ export default function App() {
     } catch (e) {}
   }, [currentUser?.email, isLoggedIn]);
 
-  // Live Google Sheet Reward Points Auto-Sync for Logged-In Student & Displayed Student
+  // Live Google Sheet Reward Points & Full Profile Auto-Sync for Logged-In Student & Displayed Student
   useEffect(() => {
     const studentToSync = displayedStudent || currentUser;
-    if (!studentToSync?.id && !studentToSync?.roll_no) return;
+    if (!studentToSync?.id && !studentToSync?.roll_no && !studentToSync?.email) return;
 
     const rollNo = (studentToSync.id || studentToSync.roll_no || studentToSync.rollNo || '').trim().toUpperCase();
+    const email = (studentToSync.email || '').trim().toLowerCase();
     const dept = studentToSync.department || 'CT';
 
     async function syncLiveSheetPoints() {
       try {
-        const liveRecord = await fetchStudentRewardPointsFromSheet(rollNo, dept, false);
+        const liveRecord = await fetchStudentRewardPointsFromSheet(email || rollNo, dept, false);
         if (liveRecord && liveRecord.balance_points !== undefined) {
           const liveBal = parseFloat(String(liveRecord.balance_points).replace(/,/g, '')) || 0;
           const livePointsStr = liveBal.toLocaleString();
+          const liveCum = liveRecord.cumulative_points !== undefined ? parseFloat(String(liveRecord.cumulative_points).replace(/,/g, '')) || liveBal : liveBal;
+          const liveCumStr = liveCum.toLocaleString();
+          const liveRed = liveRecord.redeemed_points !== undefined ? parseFloat(String(liveRecord.redeemed_points).replace(/,/g, '')) || 0 : 0;
+          const liveRedStr = liveRed.toLocaleString();
           
-          if (currentUser && (currentUser.id === rollNo || currentUser.roll_no === rollNo)) {
+          if (currentUser && (currentUser.id === rollNo || currentUser.roll_no === rollNo || currentUser.email?.toLowerCase() === email)) {
             setCurrentUser(prev => {
               const updated = {
                 ...prev,
                 currentPoints: livePointsStr,
-                balance_points: liveBal
+                balance_points: liveBal,
+                cumulativePoints: liveCumStr,
+                cumulative_reward_points: liveCumStr,
+                redeemedPoints: liveRedStr,
+                redeemed_points: liveRedStr,
+                name: (liveRecord.name && liveRecord.name !== rollNo) ? liveRecord.name : prev.name,
+                student_name: (liveRecord.name && liveRecord.name !== rollNo) ? liveRecord.name : (prev.student_name || prev.name),
+                mentor_name: (liveRecord.mentor && liveRecord.mentor !== 'BIT Faculty') ? liveRecord.mentor : prev.mentor_name,
+                department: liveRecord.department || prev.department,
+                year: liveRecord.year ? (String(liveRecord.year).startsWith('Year') ? String(liveRecord.year) : `Year ${liveRecord.year}`) : prev.year,
+                theoryCourses: liveRecord.theoryCourses?.length ? liveRecord.theoryCourses : prev.theoryCourses,
+                addonCourses: liveRecord.addonCourses?.length ? liveRecord.addonCourses : prev.addonCourses,
+                labCourses: liveRecord.labCourses?.length ? liveRecord.labCourses : prev.labCourses,
+                grandTotal: liveRecord.grandTotal || prev.grandTotal
               };
               try {
                 localStorage.setItem('bit_rp_user', JSON.stringify(updated));
@@ -2638,11 +2757,24 @@ export default function App() {
             });
           }
 
-          if (displayedStudent && (displayedStudent.id === rollNo || displayedStudent.roll_no === rollNo)) {
+          if (displayedStudent && (displayedStudent.id === rollNo || displayedStudent.roll_no === rollNo || displayedStudent.email?.toLowerCase() === email)) {
             setDisplayedStudent(prev => ({
               ...prev,
               currentPoints: livePointsStr,
-              balance_points: liveBal
+              balance_points: liveBal,
+              cumulativePoints: liveCumStr,
+              cumulative_reward_points: liveCumStr,
+              redeemedPoints: liveRedStr,
+              redeemed_points: liveRedStr,
+              name: (liveRecord.name && liveRecord.name !== rollNo) ? liveRecord.name : prev.name,
+              student_name: (liveRecord.name && liveRecord.name !== rollNo) ? liveRecord.name : (prev.student_name || prev.name),
+              mentor_name: (liveRecord.mentor && liveRecord.mentor !== 'BIT Faculty') ? liveRecord.mentor : prev.mentor_name,
+              department: liveRecord.department || prev.department,
+              year: liveRecord.year ? (String(liveRecord.year).startsWith('Year') ? String(liveRecord.year) : `Year ${liveRecord.year}`) : prev.year,
+              theoryCourses: liveRecord.theoryCourses?.length ? liveRecord.theoryCourses : prev.theoryCourses,
+              addonCourses: liveRecord.addonCourses?.length ? liveRecord.addonCourses : prev.addonCourses,
+              labCourses: liveRecord.labCourses?.length ? liveRecord.labCourses : prev.labCourses,
+              grandTotal: liveRecord.grandTotal || prev.grandTotal
             }));
           }
         }
@@ -2652,7 +2784,7 @@ export default function App() {
     }
 
     syncLiveSheetPoints();
-  }, [currentUser?.id, displayedStudent?.id]);
+  }, [currentUser?.id, currentUser?.email, displayedStudent?.id, displayedStudent?.email]);
 
   // Ref locks to avoid duplicate processing on rapid re-renders
   const lastProcessedRpRef = useRef(null);

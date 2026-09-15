@@ -572,44 +572,65 @@ export function cacheStudentPoints(rollNo, data) {
 }
 
 /**
- * Fetch a specific student's live reward points from their department tab
+ * Fetch a specific student's live reward points from their department tab by roll number or email
  */
-export async function fetchStudentRewardPointsFromSheet(rollNo, department = 'CT', useCache = true) {
-  if (!rollNo) return null;
-  const cleanRoll = String(rollNo).trim().toUpperCase();
+export async function fetchStudentRewardPointsFromSheet(rollNoOrEmail, department = '', useCache = true) {
+  if (!rollNoOrEmail) return null;
+  const rawInput = String(rollNoOrEmail).trim();
+  const isEmail = rawInput.includes('@');
+  const cleanRoll = isEmail ? '' : rawInput.toUpperCase();
+  const cleanEmail = isEmail ? rawInput.toLowerCase() : '';
+  const cacheKey = cleanEmail || cleanRoll;
 
   // 0. Return instant cached value if available (0ms delay)
-  if (useCache) {
-    const cached = getCachedStudentPoints(cleanRoll);
+  if (useCache && cacheKey) {
+    const cached = getCachedStudentPoints(cacheKey);
     if (cached) return cached;
   }
 
-  // Deduce department tab code from roll number (e.g. 7376232CT120 -> CT)
-  const rollLetters = (cleanRoll.match(/[A-Z]+/g) || []).join('');
-  const targetDept = department || rollLetters || 'CT';
+  // Deduce department tab code from roll number or email (e.g. 7376232CT120 -> CT, sanjay.m.ad23@bitsathy.ac.in -> AI&DS)
+  let targetDept = department;
+  if (!targetDept) {
+    if (cleanRoll) {
+      const rollLetters = (cleanRoll.match(/[A-Z]+/g) || []).join('');
+      targetDept = rollLetters || 'CT';
+    } else if (cleanEmail) {
+      const prefix = cleanEmail.split('@')[0];
+      const match = prefix.match(/([a-z]+)\d{2}$/i);
+      if (match) targetDept = match[1].toUpperCase();
+    }
+  }
 
-  // 1. Query live Apps Script Web App Connector directly with department hint for sub-second execution
+  // 1. Query live Apps Script Web App Connector directly
   if (APPS_SCRIPT_SHEET_URL) {
     try {
-      const url = `${APPS_SCRIPT_SHEET_URL}?rollNo=${encodeURIComponent(cleanRoll)}&dept=${encodeURIComponent(targetDept)}&_t=${Date.now()}`;
+      let queryParams = `_t=${Date.now()}`;
+      if (cleanRoll) queryParams += `&rollNo=${encodeURIComponent(cleanRoll)}`;
+      if (cleanEmail) queryParams += `&email=${encodeURIComponent(cleanEmail)}`;
+      if (targetDept) queryParams += `&dept=${encodeURIComponent(targetDept)}`;
+
+      const url = `${APPS_SCRIPT_SHEET_URL}?${queryParams}`;
       const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const result = await res.json();
         if (result && result.success && result.data) {
-          cacheStudentPoints(cleanRoll, result.data);
+          if (cacheKey) cacheStudentPoints(cacheKey, result.data);
+          if (result.data.roll_no) cacheStudentPoints(result.data.roll_no.toUpperCase(), result.data);
+          if (result.data.email) cacheStudentPoints(result.data.email.toLowerCase(), result.data);
           return result.data;
         }
       }
     } catch (e) {}
   }
 
-  // 2. Query Backend Proxy /api/points/me?roll=...
+  // 2. Query Backend Proxy /api/points/me?roll=... or /api/points/me?email=...
   try {
-    const res = await fetch(`/api/points/me?roll=${encodeURIComponent(cleanRoll)}`);
+    const qParam = isEmail ? `email=${encodeURIComponent(cleanEmail)}` : `roll=${encodeURIComponent(cleanRoll)}`;
+    const res = await fetch(`/api/points/me?${qParam}`);
     if (res.ok) {
       const result = await res.json();
       if (result && result.success && result.data) {
-        cacheStudentPoints(cleanRoll, result.data);
+        if (cacheKey) cacheStudentPoints(cacheKey, result.data);
         return result.data;
       }
     }
@@ -617,11 +638,18 @@ export async function fetchStudentRewardPointsFromSheet(rollNo, department = 'CT
 
   // 3. Query department sheet tab directly via JSONP / sheet-data
   try {
-    const students = await fetchDepartmentSheetData(targetDept);
+    const students = await fetchDepartmentSheetData(targetDept || 'CT');
     if (Array.isArray(students) && students.length > 0) {
-      const found = students.find(s => s && ((s.roll_no || s.rollNo || s.id || '').toUpperCase() === cleanRoll));
+      const found = students.find(s => {
+        if (!s) return false;
+        const sRoll = (s.roll_no || s.rollNo || s.id || '').toUpperCase();
+        const sEmail = (s.email || '').toLowerCase();
+        if (cleanRoll && sRoll === cleanRoll) return true;
+        if (cleanEmail && sEmail === cleanEmail) return true;
+        return false;
+      });
       if (found) {
-        cacheStudentPoints(cleanRoll, found);
+        if (cacheKey) cacheStudentPoints(cacheKey, found);
         return found;
       }
     }
