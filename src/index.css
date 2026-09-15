@@ -85,3 +85,26 @@ body {
   animation: taraGlowRing 3s infinite ease-in-out;
 }
 
+/* Professional Skeleton Shimmer Wave Animations */
+@keyframes shimmerSweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer-light {
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 30%, #ffffff 50%, #e2e8f0 70%, #f1f5f9 100%);
+  background-size: 200% 100%;
+  animation: shimmerSweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.skeleton-shimmer-dark {
+  background: linear-gradient(90deg, #1e293b 0%, #334155 30%, #475569 50%, #334155 70%, #1e293b 100%);
+  background-size: 200% 100%;
+  animation: shimmerSweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+

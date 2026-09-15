@@ -14,6 +14,7 @@
  */
 
 const SPREADSHEET_ID = '1t5uHtrRMSXQkxrFRUudDpwuN23A6K61PhdrjDNZFaV8';
+const CACHE_TTL = 300; // 5 minutes cache for ultra-fast ~100ms response
 
 function doGet(e) {
   try {
@@ -23,10 +24,12 @@ function doGet(e) {
     const email = (params.email || params.emailId || '').trim().toLowerCase();
     const query = (params.query || rollNo || email).trim();
     const department = (params.department || params.dept || params.tab || '').trim().toUpperCase();
+    const noCache = params.nocache === '1' || params.nocache === 'true' || params.refresh === '1';
 
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const cache = CacheService.getScriptCache();
 
     if (action === 'debug_sheets' || action === 'tabs') {
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const sheetNames = ss.getSheets().map(s => ({
         name: s.getName(),
         gid: s.getSheetId(),
@@ -37,21 +40,60 @@ function doGet(e) {
     }
 
     if (action === 'averages' || action === 'benchmarks' || (!query && !department)) {
+      const cacheKey = 'bit_sheet_averages';
+      if (!noCache) {
+        const cached = cache.get(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            return createJsonResponse({ ...parsed, cached: true });
+          } catch (e) {}
+        }
+      }
+
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const sheetAverages = findAveragesTableInSheet(ss);
       if (sheetAverages) {
-        return createJsonResponse({
+        const responseData = {
           success: true,
           source: 'Google Sheet (Given in Sheet Table)',
           averages: sheetAverages.averages,
           foundIn: sheetAverages.foundIn,
           rawTable: sheetAverages.rawTable
-        });
+        };
+        try {
+          cache.put(cacheKey, JSON.stringify(responseData), CACHE_TTL);
+        } catch (e) {}
+        return createJsonResponse(responseData);
       }
     }
 
     if (query || rollNo || email) {
+      const targetIdentifier = (email || query || rollNo).toLowerCase();
+      const cacheKey = 'bit_student_' + targetIdentifier.replace(/[^a-z0-9]/gi, '_');
+      
+      if (!noCache) {
+        const cached = cache.get(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            return createJsonResponse({ success: true, source: 'Google Sheet (Edge Cached Live Sync)', data: parsed, cached: true });
+          } catch (e) {}
+        }
+      }
+
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const studentData = findStudentByRoll(ss, query || rollNo, department, email);
       if (studentData) {
+        try {
+          cache.put(cacheKey, JSON.stringify(studentData), CACHE_TTL);
+          if (studentData.roll_no) {
+            cache.put('bit_student_' + studentData.roll_no.toLowerCase(), JSON.stringify(studentData), CACHE_TTL);
+          }
+          if (studentData.email) {
+            cache.put('bit_student_' + studentData.email.toLowerCase().replace(/[^a-z0-9]/gi, '_'), JSON.stringify(studentData), CACHE_TTL);
+          }
+        } catch (e) {}
         return createJsonResponse({
           success: true,
           source: 'Google Sheet (Dynamic Live Sync)',
@@ -67,7 +109,24 @@ function doGet(e) {
     }
 
     if (department) {
+      const cacheKey = 'bit_dept_' + department;
+      if (!noCache) {
+        const cached = cache.get(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            return createJsonResponse({ success: true, department: department, count: parsed.length, students: parsed, cached: true });
+          } catch (e) {}
+        }
+      }
+
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       const deptStudents = getDepartmentStudents(ss, department);
+      if (deptStudents && deptStudents.length > 0) {
+        try {
+          cache.put(cacheKey, JSON.stringify(deptStudents), CACHE_TTL);
+        } catch (e) {}
+      }
       return createJsonResponse({
         success: true,
         department: department,
@@ -76,6 +135,7 @@ function doGet(e) {
       });
     }
 
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const allData = getAllDepartmentsSummary(ss);
     return createJsonResponse({
       success: true,

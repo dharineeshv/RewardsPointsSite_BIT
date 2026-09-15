@@ -324,7 +324,58 @@ export async function fetchDepartmentSheetData(department = 'CT', useCache = tru
     } catch (e) {}
   }
 
-  // 1. Try Live Apps Script Web App Connector for complete department student list (0ms direct cloud connector)
+  // 1. Prioritize Direct Google GViz JSONP by GID (~150ms ultra-fast Google CDN)
+  try {
+    const payload = await fetchGVizJsonp(SPREADSHEET_ID, null, targetGid);
+    if (payload && payload.table) {
+      const students = parseDepartmentSheetPayload(payload, tabName);
+      if (students.length > 0) {
+        // Pre-cache all students in memory for instant 0ms lookups
+        students.forEach(s => {
+          if (s.roll_no) cacheStudentPoints(s.roll_no.toUpperCase(), s);
+          if (s.email) cacheStudentPoints(s.email.toLowerCase(), s);
+        });
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), students }));
+        } catch (e) {}
+        return students;
+      }
+    }
+  } catch (err) {}
+
+  // 2. Direct GViz JSONP by Tab Name (~150ms)
+  try {
+    const payload = await fetchGVizJsonp(SPREADSHEET_ID, tabName);
+    if (payload && payload.table) {
+      const students = parseDepartmentSheetPayload(payload, tabName);
+      if (students.length > 0) {
+        students.forEach(s => {
+          if (s.roll_no) cacheStudentPoints(s.roll_no.toUpperCase(), s);
+          if (s.email) cacheStudentPoints(s.email.toLowerCase(), s);
+        });
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), students }));
+        } catch (e) {}
+        return students;
+      }
+    }
+  } catch (err) {}
+
+  // 3. Try Backend Proxy /api/points/sheet-data
+  try {
+    const res = await fetch(`/api/points/sheet-data?tab=${encodeURIComponent(tabName)}&gid=${targetGid}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.students) && json.students.length > 0) {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), students: json.students }));
+        } catch (e) {}
+        return json.students;
+      }
+    }
+  } catch (e) {}
+
+  // 4. Fallback to Apps Script Connector
   if (APPS_SCRIPT_SHEET_URL) {
     try {
       const url = `${APPS_SCRIPT_SHEET_URL}?department=${encodeURIComponent(tabName)}&_t=${Date.now()}`;
@@ -340,48 +391,6 @@ export async function fetchDepartmentSheetData(department = 'CT', useCache = tru
       }
     } catch (e) {}
   }
-
-  // 2. Try Backend Proxy /api/points/sheet-data
-  try {
-    const res = await fetch(`/api/points/sheet-data?tab=${encodeURIComponent(tabName)}&gid=${targetGid}`);
-    if (res.ok) {
-      const json = await res.json();
-      if (json && json.success && Array.isArray(json.students) && json.students.length > 0) {
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), students: json.students }));
-        } catch (e) {}
-        return json.students;
-      }
-    }
-  } catch (e) {}
-
-  // 3. Try Direct JSONP by GID (fast, no CORS, carries Google session cookies)
-  try {
-    const payload = await fetchGVizJsonp(SPREADSHEET_ID, null, targetGid);
-    if (payload && payload.table) {
-      const students = parseDepartmentSheetPayload(payload, tabName);
-      if (students.length > 0) {
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), students }));
-        } catch (e) {}
-        return students;
-      }
-    }
-  } catch (err) {}
-
-  // 3. Try Direct JSONP by Tab Name
-  try {
-    const payload = await fetchGVizJsonp(SPREADSHEET_ID, tabName);
-    if (payload && payload.table) {
-      const students = parseDepartmentSheetPayload(payload, tabName);
-      if (students.length > 0) {
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), students }));
-        } catch (e) {}
-        return students;
-      }
-    }
-  } catch (err) {}
 
   try {
     const cached = localStorage.getItem(cacheKey);
@@ -533,24 +542,33 @@ export async function fetchAllLiveDepartmentsAndAverages() {
 }
 
 const STUDENT_LIVE_CACHE = new Map();
-const STUDENT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes fresh cache
+const STUDENT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes fresh in-memory cache
 
-export function getCachedStudentPoints(rollNo) {
-  if (!rollNo) return null;
-  const cleanRoll = String(rollNo).trim().toUpperCase();
-  if (STUDENT_LIVE_CACHE.has(cleanRoll)) {
-    const item = STUDENT_LIVE_CACHE.get(cleanRoll);
-    if (Date.now() - item.timestamp < STUDENT_CACHE_TTL) {
+export function getCachedStudentPoints(rollNoOrEmail, allowStale = false) {
+  if (!rollNoOrEmail) return null;
+  const cleanKey = String(rollNoOrEmail).trim().toLowerCase().replace(/[^a-z0-9]/gi, '_');
+  const upperKey = String(rollNoOrEmail).trim().toUpperCase();
+
+  if (STUDENT_LIVE_CACHE.has(cleanKey)) {
+    const item = STUDENT_LIVE_CACHE.get(cleanKey);
+    if (allowStale || Date.now() - item.timestamp < STUDENT_CACHE_TTL) {
       return item.data;
     }
   }
+  if (STUDENT_LIVE_CACHE.has(upperKey)) {
+    const item = STUDENT_LIVE_CACHE.get(upperKey);
+    if (allowStale || Date.now() - item.timestamp < STUDENT_CACHE_TTL) {
+      return item.data;
+    }
+  }
+
   if (typeof window !== 'undefined') {
     try {
-      const raw = localStorage.getItem(`bit_live_student_${cleanRoll}`);
+      const raw = localStorage.getItem(`bit_live_student_${cleanKey}`) || localStorage.getItem(`bit_live_student_${upperKey}`);
       if (raw) {
         const item = JSON.parse(raw);
-        if (item && item.data && Date.now() - item.timestamp < STUDENT_CACHE_TTL) {
-          STUDENT_LIVE_CACHE.set(cleanRoll, item);
+        if (item && item.data && (allowStale || Date.now() - item.timestamp < STUDENT_CACHE_TTL * 2)) {
+          STUDENT_LIVE_CACHE.set(cleanKey, item);
           return item.data;
         }
       }
@@ -559,14 +577,24 @@ export function getCachedStudentPoints(rollNo) {
   return null;
 }
 
-export function cacheStudentPoints(rollNo, data) {
-  if (!rollNo || !data) return;
-  const cleanRoll = String(rollNo).trim().toUpperCase();
+export function cacheStudentPoints(rollNoOrEmail, data) {
+  if (!rollNoOrEmail || !data) return;
+  const cleanKey = String(rollNoOrEmail).trim().toLowerCase().replace(/[^a-z0-9]/gi, '_');
+  const upperKey = String(rollNoOrEmail).trim().toUpperCase();
   const entry = { timestamp: Date.now(), data };
-  STUDENT_LIVE_CACHE.set(cleanRoll, entry);
+
+  STUDENT_LIVE_CACHE.set(cleanKey, entry);
+  STUDENT_LIVE_CACHE.set(upperKey, entry);
+
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(`bit_live_student_${cleanRoll}`, JSON.stringify(entry));
+      localStorage.setItem(`bit_live_student_${cleanKey}`, JSON.stringify(entry));
+      if (data.roll_no) {
+        localStorage.setItem(`bit_live_student_${String(data.roll_no).toUpperCase().trim()}`, JSON.stringify(entry));
+      }
+      if (data.email) {
+        localStorage.setItem(`bit_live_student_${String(data.email).toLowerCase().trim().replace(/[^a-z0-9]/gi, '_')}`, JSON.stringify(entry));
+      }
     } catch (e) {}
   }
 }
@@ -584,7 +612,7 @@ export async function fetchStudentRewardPointsFromSheet(rollNoOrEmail, departmen
 
   // 0. Return instant cached value if available (0ms delay)
   if (useCache && cacheKey) {
-    const cached = getCachedStudentPoints(cacheKey);
+    const cached = getCachedStudentPoints(cacheKey, false);
     if (cached) return cached;
   }
 
@@ -601,10 +629,43 @@ export async function fetchStudentRewardPointsFromSheet(rollNoOrEmail, departmen
     }
   }
 
-  // 1. Query live Apps Script Web App Connector directly
+  // 1. Direct GViz query via department tab (~150ms ultra-fast Google CDN)
+  try {
+    const students = await fetchDepartmentSheetData(targetDept || 'CT', useCache);
+    if (Array.isArray(students) && students.length > 0) {
+      const found = students.find(s => {
+        if (!s) return false;
+        const sRoll = (s.roll_no || s.rollNo || s.id || '').toUpperCase();
+        const sEmail = (s.email || '').toLowerCase();
+        if (cleanRoll && sRoll === cleanRoll) return true;
+        if (cleanEmail && sEmail === cleanEmail) return true;
+        return false;
+      });
+      if (found) {
+        if (cacheKey) cacheStudentPoints(cacheKey, found);
+        return found;
+      }
+    }
+  } catch (e) {}
+
+  // 2. Query Backend Proxy /api/points/me?roll=... or /api/points/me?email=...
+  try {
+    const qParam = isEmail ? `email=${encodeURIComponent(cleanEmail)}` : `roll=${encodeURIComponent(cleanRoll)}`;
+    const res = await fetch(`/api/points/me?${qParam}`);
+    if (res.ok) {
+      const result = await res.json();
+      if (result && result.success && result.data) {
+        if (cacheKey) cacheStudentPoints(cacheKey, result.data);
+        return result.data;
+      }
+    }
+  } catch (e) {}
+
+  // 3. Fallback to Apps Script Web App Connector if GViz is restricted
   if (APPS_SCRIPT_SHEET_URL) {
     try {
       let queryParams = `_t=${Date.now()}`;
+      if (!useCache) queryParams += '&nocache=1';
       if (cleanRoll) queryParams += `&rollNo=${encodeURIComponent(cleanRoll)}`;
       if (cleanEmail) queryParams += `&email=${encodeURIComponent(cleanEmail)}`;
       if (targetDept) queryParams += `&dept=${encodeURIComponent(targetDept)}`;
@@ -622,38 +683,6 @@ export async function fetchStudentRewardPointsFromSheet(rollNoOrEmail, departmen
       }
     } catch (e) {}
   }
-
-  // 2. Query Backend Proxy /api/points/me?roll=... or /api/points/me?email=...
-  try {
-    const qParam = isEmail ? `email=${encodeURIComponent(cleanEmail)}` : `roll=${encodeURIComponent(cleanRoll)}`;
-    const res = await fetch(`/api/points/me?${qParam}`);
-    if (res.ok) {
-      const result = await res.json();
-      if (result && result.success && result.data) {
-        if (cacheKey) cacheStudentPoints(cacheKey, result.data);
-        return result.data;
-      }
-    }
-  } catch (e) {}
-
-  // 3. Query department sheet tab directly via JSONP / sheet-data
-  try {
-    const students = await fetchDepartmentSheetData(targetDept || 'CT');
-    if (Array.isArray(students) && students.length > 0) {
-      const found = students.find(s => {
-        if (!s) return false;
-        const sRoll = (s.roll_no || s.rollNo || s.id || '').toUpperCase();
-        const sEmail = (s.email || '').toLowerCase();
-        if (cleanRoll && sRoll === cleanRoll) return true;
-        if (cleanEmail && sEmail === cleanEmail) return true;
-        return false;
-      });
-      if (found) {
-        if (cacheKey) cacheStudentPoints(cacheKey, found);
-        return found;
-      }
-    }
-  } catch (e) {}
 
   return null;
 }

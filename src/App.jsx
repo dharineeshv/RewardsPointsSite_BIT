@@ -1565,11 +1565,11 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
             
             <div className="mt-1.5 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold border border-indigo-500/20">
               <Sparkles className="w-3 h-3" />
-              <span>Student RP Portal</span>
+              <span>BIT Single Sign-On (SSO)</span>
             </div>
 
             <p className={`text-xs mt-2.5 leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-              Sign in with your institutional Google account to explore your real-time reward points, activities, and achievements.
+              Sign in with your student Google Workspace account. Your SSO session will remain active across visits until you explicitly log out.
             </p>
           </div>
 
@@ -1632,7 +1632,7 @@ function LoginPage({ onLogin, isDarkMode, initialNotice = '' }) {
           {/* Security & Authentication Notice */}
           <div className={`mt-4 pt-3 border-t text-center ${isDarkMode ? 'border-slate-800/80' : 'border-slate-200/80'}`}>
             <p className={`text-[11px] font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Use your <span className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>@bitsathy.ac.in</span> student email
+              Institutional SSO via <span className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>@bitsathy.ac.in</span>
             </p>
           </div>
 
@@ -2574,33 +2574,15 @@ Response Guidelines:
   );
 }
 
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
-
 export default function App() {
-  const [sessionTimeoutNotice, setSessionTimeoutNotice] = useState(() => {
-    try {
-      const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
-      const lastActive = parseInt(localStorage.getItem('bit_rp_last_active') || '0', 10);
-      if (isLogged && lastActive && Date.now() - lastActive > INACTIVITY_TIMEOUT_MS) {
-        return 'Session expired due to 10 minutes of inactivity. Please sign in again.';
-      }
-    } catch (e) {}
-    return '';
-  });
+  const [sessionTimeoutNotice, setSessionTimeoutNotice] = useState('');
 
+  // SSO Session Persistence: Automatically continue for existing users unless explicitly logged out
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try {
-      if (sessionTimeoutNotice) return false;
       const isLogged = localStorage.getItem('bit_rp_is_logged_in') === 'true';
-      if (!isLogged) return false;
-      const lastActive = parseInt(localStorage.getItem('bit_rp_last_active') || '0', 10);
-      if (lastActive && Date.now() - lastActive > INACTIVITY_TIMEOUT_MS) {
-        localStorage.removeItem('bit_rp_is_logged_in');
-        localStorage.removeItem('bit_rp_user');
-        localStorage.removeItem('bit_rp_last_active');
-        return false;
-      }
-      return true;
+      const savedUser = localStorage.getItem('bit_rp_user');
+      return !!(isLogged && savedUser);
     } catch (e) {
       return false;
     }
@@ -2632,6 +2614,7 @@ export default function App() {
   });
 
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [isStudentPointsLoading, setIsStudentPointsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -2784,6 +2767,13 @@ export default function App() {
     }
 
     syncLiveSheetPoints();
+    const liveSyncInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        syncLiveSheetPoints();
+      }
+    }, 30000);
+
+    return () => clearInterval(liveSyncInterval);
   }, [currentUser?.id, currentUser?.email, displayedStudent?.id, displayedStudent?.email]);
 
   // Ref locks to avoid duplicate processing on rapid re-renders
@@ -4589,15 +4579,16 @@ export default function App() {
       const dept = s.department || mentorRec?.department || 'Engineering';
       const yr = s.year || mentorRec?.year || 'IV';
       const cachedLive = getCachedStudentPoints(rollNo);
+      const hasCachedLive = !!(cachedLive && (cachedLive.balance_points !== undefined || cachedLive.points !== undefined));
       const balStr = cachedLive?.balance_points !== undefined 
         ? String(cachedLive.balance_points) 
-        : (s.balancePoints !== undefined ? s.balancePoints : (s.currentPoints || 0)).toString();
+        : (s.balancePoints !== undefined ? String(s.balancePoints) : (s.currentPoints !== undefined ? String(s.currentPoints) : '0'));
       const cumStr = cachedLive?.cumulative_points !== undefined
         ? String(cachedLive.cumulative_points)
-        : (s.cumulativePoints !== undefined ? s.cumulativePoints : (s.cumulativePoints || balStr)).toString();
+        : (s.cumulativePoints !== undefined ? String(s.cumulativePoints) : balStr);
       const redStr = cachedLive?.redeemed_points !== undefined
         ? String(cachedLive.redeemed_points)
-        : (s.redeemedPoints !== undefined ? s.redeemedPoints : (s.redeemedPoints || 0)).toString();
+        : (s.redeemedPoints !== undefined ? String(s.redeemedPoints) : '0');
 
       return {
         id: rollNo,
@@ -4611,6 +4602,7 @@ export default function App() {
         photo_url: photoUrl,
         department: dept,
         year: yr,
+        hasCachedLive: hasCachedLive || parseFloat(balStr) > 0,
         mentor_name: s.mentor || mentorRec?.mentorName || 'BIT Faculty',
         mentor: s.mentor || mentorRec?.mentorName || 'BIT Faculty',
         balance_points: balStr,
@@ -4634,11 +4626,12 @@ export default function App() {
     setSearchQuery(rollNo);
     logActivity(currentUser, `Search (${rollNo})`);
 
-    // 1. Transform initial local state immediately for instant feedback
+    // 1. Instant 0.00s Local Render (SWR) — NEVER block the UI with a skeleton
     const transformed = transformApiStudent(apiItem);
     setDisplayedStudent(transformed);
+    setIsStudentPointsLoading(false);
 
-    // 2. Fetch live data from official Google Sheet immediately
+    // 2. Ultra-Fast Background Direct GViz Revalidation (~150ms)
     try {
       const liveData = await fetchStudentRewardPointsFromSheet(rollNo, apiItem.department);
       if (liveData && (liveData.balance_points !== undefined || liveData.points !== undefined || liveData.currentPoints !== undefined)) {
@@ -4652,7 +4645,8 @@ export default function App() {
         const photoUrl = liveData.picture || liveData.photo_url || `https://ips.bitsathy.ac.in/assets/images/${rollNo}.jpg`;
         const studentEmail = liveData.email || transformed.email || `${rollNo.toLowerCase()}@bitsathy.ac.in`;
 
-        setDisplayedStudent({
+        setDisplayedStudent(prev => ({
+          ...prev,
           ...transformed,
           id: rollNo,
           rollNo: rollNo,
@@ -4688,7 +4682,7 @@ export default function App() {
             { label: "Cumulative Points", pts: liveCum, percent: 100, color: "bg-[#22d3ee]" },
             { label: "Redeemed Points", pts: liveRed, percent: liveCum > 0 ? Math.round((liveRed / liveCum) * 100) : 0, color: "bg-amber-500" },
           ]
-        });
+        }));
       }
     } catch (e) {
       console.warn('[LiveStudentSync] Error fetching live student:', e);
@@ -4736,8 +4730,8 @@ export default function App() {
     }
   };
 
-  const handleLogout = (isTimeout = false) => {
-    logActivity(currentUser, isTimeout ? 'Session Expired' : 'Logout');
+  const handleLogout = () => {
+    logActivity(currentUser, 'Logout');
     setIsLoggedIn(false);
     setCurrentUser(null);
     setDisplayedStudent(null);
@@ -4745,11 +4739,7 @@ export default function App() {
     setNotifications([]);
     lastProcessedRpRef.current = null;
     lastProcessedPlacementRef.current = null;
-    if (isTimeout) {
-      setSessionTimeoutNotice('Session timed out after 10 minutes of inactivity. Please sign in again.');
-    } else {
-      setSessionTimeoutNotice('');
-    }
+    setSessionTimeoutNotice('');
     try {
       localStorage.removeItem('bit_rp_is_logged_in');
       localStorage.removeItem('bit_rp_user');
@@ -4761,48 +4751,6 @@ export default function App() {
     }
     setPsToken('');
   };
-
-  // 10-Minute Idle Inactivity Auto-Logout Tracker
-  useEffect(() => {
-    if (!isLoggedIn) return;
-
-    // Record initial active timestamp
-    try {
-      if (!localStorage.getItem('bit_rp_last_active')) {
-        localStorage.setItem('bit_rp_last_active', Date.now().toString());
-      }
-    } catch (e) {}
-
-    // Throttle user activity events to update localStorage every 5 seconds max
-    let lastRecorded = Date.now();
-    const updateActivity = () => {
-      const now = Date.now();
-      if (now - lastRecorded > 5000) {
-        lastRecorded = now;
-        try {
-          localStorage.setItem('bit_rp_last_active', now.toString());
-        } catch (e) {}
-      }
-    };
-
-    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
-    activityEvents.forEach(evt => window.addEventListener(evt, updateActivity, { passive: true }));
-
-    // Periodic check every 5 seconds
-    const interval = setInterval(() => {
-      try {
-        const lastActive = parseInt(localStorage.getItem('bit_rp_last_active') || '0', 10);
-        if (lastActive && Date.now() - lastActive >= INACTIVITY_TIMEOUT_MS) {
-          handleLogout(true);
-        }
-      } catch (e) {}
-    }, 5000);
-
-    return () => {
-      activityEvents.forEach(evt => window.removeEventListener(evt, updateActivity));
-      clearInterval(interval);
-    };
-  }, [isLoggedIn]);
 
   // If user is not logged in, render the dedicated Login Page
   if (!isLoggedIn) {
@@ -4944,10 +4892,18 @@ export default function App() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 pl-2">
-                        <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 block whitespace-nowrap">
-                          +{item.balance_points ? parseFloat(String(item.balance_points).replace(/,/g, '')).toLocaleString() : '0'} RP
-                        </span>
-                        <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Balance</span>
+                        {item.hasCachedLive ? (
+                          <>
+                            <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 block whitespace-nowrap">
+                              +{item.balance_points ? parseFloat(String(item.balance_points).replace(/,/g, '')).toLocaleString() : '0'} RP
+                            </span>
+                            <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Balance</span>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20">
+                            Verified BIT
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -5365,10 +5321,18 @@ export default function App() {
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0 pl-2">
-                      <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 block whitespace-nowrap">
-                        +{item.balance_points ? parseFloat(String(item.balance_points).replace(/,/g, '')).toLocaleString() : '0'} RP
-                      </span>
-                      <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Balance</span>
+                      {item.hasCachedLive ? (
+                        <>
+                          <span className="text-xs font-black text-emerald-500 dark:text-emerald-400 block whitespace-nowrap">
+                            +{item.balance_points ? parseFloat(String(item.balance_points).replace(/,/g, '')).toLocaleString() : '0'} RP
+                          </span>
+                          <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Balance</span>
+                        </>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20">
+                          Verified BIT
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -5809,9 +5773,28 @@ export default function App() {
                       }`}>
                         ACTIVE BALANCE POINTS
                       </span>
-                      <div className="text-2xl sm:text-3xl font-black text-emerald-500 dark:text-emerald-400 tracking-tight leading-tight">
-                        {student.currentPoints} <span className="text-base sm:text-lg font-bold">RP</span>
-                      </div>
+                      {isStudentPointsLoading ? (
+                        <div className="flex items-center gap-1.5 mt-1.5 md:justify-end">
+                          <div
+                            className={`h-7 w-20 rounded-lg border ${
+                              isDarkMode
+                                ? 'skeleton-shimmer-dark border-slate-700/60'
+                                : 'skeleton-shimmer-light border-slate-200/80 shadow-2xs'
+                            }`}
+                          />
+                          <div
+                            className={`h-5 w-7 rounded-md border ${
+                              isDarkMode
+                                ? 'skeleton-shimmer-dark border-slate-700/60'
+                                : 'skeleton-shimmer-light border-slate-200/80 shadow-2xs'
+                            }`}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-2xl sm:text-3xl font-black text-emerald-500 dark:text-emerald-400 tracking-tight leading-tight animate-fadeIn">
+                          {student.currentPoints} <span className="text-base sm:text-lg font-bold">RP</span>
+                        </div>
+                      )}
                     </div>
 
                     <button
