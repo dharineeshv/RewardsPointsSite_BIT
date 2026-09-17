@@ -1946,6 +1946,24 @@ function getTimeBasedGreeting() {
   return 'Good Night';
 }
 
+function LiveChatBubbleIcon({ className = 'w-6 h-6 text-white' }) {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      className={className} 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2.2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="currentColor" fillOpacity="0.12" />
+      <line x1="8" y1="9" x2="16" y2="9" strokeWidth="2.4" />
+      <line x1="8" y1="13" x2="13" y2="13" strokeWidth="2.4" />
+    </svg>
+  );
+}
+
 function BitRobotChatAssistant({
   currentUser,
   student,
@@ -1955,11 +1973,43 @@ function BitRobotChatAssistant({
   setActiveNav,
   isDarkMode
 }) {
+  const CHAT_PROMPT_KEY = 'bit_chat_prompt_dismissed_time';
+  const PROMPT_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+
   const [isOpen, setIsOpen] = useState(false);
+  const [showPromptBubble, setShowPromptBubble] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isGeminiLive, setIsGeminiLive] = useState(true);
   const messagesEndRef = useRef(null);
+
+  // Check if 30 minutes have elapsed since user dismissed the prompt
+  useEffect(() => {
+    const checkPromptStatus = () => {
+      if (typeof window === 'undefined') return;
+      try {
+        const dismissedTime = localStorage.getItem(CHAT_PROMPT_KEY);
+        if (!dismissedTime) {
+          setShowPromptBubble(true);
+          return;
+        }
+        const elapsed = Date.now() - parseInt(dismissedTime, 10);
+        if (elapsed >= PROMPT_COOLDOWN_MS) {
+          setShowPromptBubble(true);
+        } else {
+          setShowPromptBubble(false);
+        }
+      } catch (e) {
+        setShowPromptBubble(true);
+      }
+    };
+
+    checkPromptStatus();
+
+    // Check periodically every 20 seconds to reveal prompt once 30 minutes pass
+    const timer = setInterval(checkPromptStatus, 20000);
+    return () => clearInterval(timer);
+  }, []);
 
   const studentName = currentUser?.name || student?.name || 'Student';
   const firstName = studentName.split(' ')[0] || 'Student';
@@ -2328,35 +2378,77 @@ Response Guidelines:
 
   return (
     <>
-      {/* Floating Robot Action Button (FAB with Smiling Tara - Fixed & Perfectly Positioned for Mobile & Desktop) */}
+      {/* Floating Action Container with Speech Bubble Prompt */}
       <div 
         style={{ position: 'fixed', bottom: 'calc(2.25rem + env(safe-area-inset-bottom, 0px))', right: '1.25rem', zIndex: 99999 }}
-        className="fixed bottom-9 right-5 sm:bottom-10 sm:right-7 z-[99999] flex items-center gap-2 pointer-events-auto touch-manipulation select-none"
+        className="fixed bottom-9 right-5 sm:bottom-10 sm:right-7 z-[99999] flex flex-col items-end pointer-events-auto touch-manipulation select-none"
       >
+        {/* Speech Bubble Prompt in Top Corner ("We're Online! How may I help you today?") */}
+        {showPromptBubble && !isOpen && (
+          <div 
+            onClick={() => {
+              setIsOpen(true);
+              setShowPromptBubble(false);
+            }}
+            className="relative mb-3 w-[260px] sm:w-[280px] bg-white dark:bg-slate-900 text-slate-900 dark:text-white pl-4 pr-8 py-3 rounded-2xl shadow-2xl border border-slate-200/90 dark:border-slate-700/90 cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-98 animate-fadeIn"
+          >
+            {/* Pointer arrow pointing straight down to the blue circle */}
+            <div className="absolute -bottom-2 right-4 sm:right-5 w-0 h-0 border-x-[7px] border-x-transparent border-t-[8px] border-t-white dark:border-t-slate-900 drop-shadow-xs" />
+
+            <div>
+              <div className="font-bold text-sm sm:text-[15px] leading-tight text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>We're Online!</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug font-medium">
+                How may I help you today?
+              </p>
+            </div>
+
+            {/* Dismiss / Deny 'X' Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                  localStorage.setItem(CHAT_PROMPT_KEY, Date.now().toString());
+                } catch (err) {}
+                setShowPromptBubble(false);
+              }}
+              className="absolute top-2 right-2 p-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Dismiss for 30 minutes"
+              aria-label="Dismiss chat prompt"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Circular Blue Chat Button */}
         <button
           type="button"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setIsOpen(prev => !prev);
+            setIsOpen(prev => {
+              const nextState = !prev;
+              if (nextState) setShowPromptBubble(false);
+              return nextState;
+            });
           }}
-          className={`group relative flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full cursor-pointer transition-all duration-300 active:scale-95 shadow-2xl pointer-events-auto ${
+          className={`relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full cursor-pointer transition-all duration-300 active:scale-95 shadow-2xl pointer-events-auto ${
             isOpen 
               ? 'bg-gradient-to-tr from-rose-600 to-red-500 shadow-rose-500/40 rotate-90' 
-              : 'bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 shadow-indigo-500/40 hover:scale-108 tara-avatar-glow'
+              : 'bg-[#0066FF] hover:bg-[#0052CC] shadow-blue-500/40 hover:scale-108'
           }`}
-          title={isOpen ? 'Close Assistant' : 'Chat with Tara'}
-          aria-label="Open Tara BIT Assistant"
+          title={isOpen ? 'Close Assistant' : "We're Online! How may I help you today?"}
+          aria-label="Open BIT Assistant"
         >
-          {/* Animated Ambient Halo Glow */}
-          {!isOpen && (
-            <span className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 rounded-full blur-md opacity-60 group-hover:opacity-100 animate-pulse-glow -z-10 pointer-events-none" />
-          )}
-
           {isOpen ? (
             <X className="w-5 h-5 sm:w-6 sm:h-6 text-white transition-transform duration-200" />
           ) : (
-            <TaraRobotFace size={30} mood="happy" className="group-hover:scale-110 transition-transform duration-200 pointer-events-none" />
+            <LiveChatBubbleIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white transition-transform duration-200 pointer-events-none" />
           )}
         </button>
       </div>
@@ -2371,11 +2463,11 @@ Response Guidelines:
               : 'bg-white/95 border-slate-200/90 text-slate-900 shadow-indigo-950/20'
           }`}
         >
-          {/* 1. Header with Tara Branding */}
-          <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white flex items-center justify-between shadow-md shrink-0">
+          {/* 1. Header with Live Chat Branding */}
+          <div className="px-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 text-white flex items-center justify-between shadow-md shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center shadow-inner">
-                <TaraRobotFace size={34} mood={isTyping ? 'thinking' : 'happy'} />
+                <LiveChatBubbleIcon className="w-5 h-5 text-white" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
@@ -2383,7 +2475,7 @@ Response Guidelines:
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-indigo-100 font-medium">
                   <span className={`w-1.5 h-1.5 rounded-full inline-block ${isGeminiLive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                  <span>{isTyping ? 'Tara is thinking...' : isGeminiLive ? 'AI Active • Ready to assist 😊' : 'Ready to assist 😊'}</span>
+                  <span>{isTyping ? 'Tara is typing...' : isGeminiLive ? 'Online • Ready to assist' : 'Online • Ready to assist'}</span>
                 </div>
               </div>
             </div>
@@ -2416,8 +2508,8 @@ Response Guidelines:
                 className={`flex gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.sender === 'bot' && (
-                  <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-600 flex items-center justify-center shrink-0 mt-0.5 shadow-sm overflow-hidden p-0.5">
-                    <TaraRobotFace size={24} mood="happy" />
+                  <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shrink-0 mt-0.5 shadow-sm overflow-hidden p-1 text-white">
+                    <LiveChatBubbleIcon className="w-4 h-4 text-white" />
                   </div>
                 )}
 
