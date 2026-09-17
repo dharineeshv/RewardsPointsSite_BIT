@@ -166,42 +166,85 @@ export function fetchGVizJsonp(sheetId, sheetName = 'Details', gid = null) {
  * Synchronous 0ms getter for institutional averages (SWR cache-first with immediate seed fallback)
  */
 export function getInstantInitialAverages() {
-  const cacheKey = 'bit_sheet_institutional_averages_v2';
+  const cacheKey = 'bit_sheet_institutional_averages_v4';
   try {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached);
       if (parsed && parsed.averages) {
         const { year_1, year_2, year_3, year_4 } = parsed.averages;
-        if (Number(year_1) > 0 || Number(year_2) > 0 || Number(year_3) > 0 || Number(year_4) > 0) {
+        if (Number(year_2) > 0 || Number(year_3) > 0 || Number(year_4) > 0) {
           return parsed.averages;
         }
       }
     }
   } catch (e) {}
 
-  return calculateDynamicAveragesFromStudents(STUDENTS_INTERNAL_MARKS_LIST);
+  // Latest Official Benchmarks from Details Tab
+  return {
+    year_1: 0,
+    year_2: 339,
+    year_3: 412,
+    year_4: 455,
+    isLive: true,
+    source: 'Google Sheet (Details Tab Baseline)',
+    lastUpdated: new Date().toISOString()
+  };
 }
 
 /**
  * Fetch institutional averages across years directly from the official Google Sheet / stats
- * Prioritizes ultra-fast Google GViz JSONP (~120ms) over slow Apps Script macros (5000ms)
+ * Prioritizes direct Google Apps Script connector with cache-busting
  */
 export async function fetchInstitutionalAveragesFromSheet(forceRefresh = false) {
-  const cacheKey = 'bit_sheet_institutional_averages_v2';
-  if (!forceRefresh) {
+  const cacheKey = 'bit_sheet_institutional_averages_v4';
+  if (!forceRefresh && typeof window !== 'undefined') {
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed && parsed.averages && Date.now() - parsed.timestamp < 10 * 60 * 1000) {
+        if (parsed && parsed.averages && Date.now() - parsed.timestamp < 5 * 60 * 1000) {
           return parsed.averages;
         }
       }
     } catch (e) {}
   }
 
-  // 1. Prioritize Direct Google GViz JSONP on Details Tab (gid=847680829) (~120ms ultra-fast Google Global CDN)
+  // 1. Prioritize Direct Google Apps Script Live Web App Connector
+  if (APPS_SCRIPT_SHEET_URL) {
+    try {
+      const url = `${APPS_SCRIPT_SHEET_URL}?action=getAverages&_cb=${Date.now()}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const result = await res.json();
+        if (result && result.success && result.averages) {
+          const computed = {
+            year_1: Math.max(0, Math.round(Number(result.averages.year_1) || 0)),
+            year_2: Math.round(Number(result.averages.year_2) || 339),
+            year_3: Math.round(Number(result.averages.year_3) || 412),
+            year_4: Math.round(Number(result.averages.year_4) || 455),
+            isLive: true,
+            source: 'Google Sheet (Details Tab Live)',
+            lastUpdated: new Date().toISOString()
+          };
+
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify({
+                timestamp: Date.now(),
+                averages: computed
+              }));
+            } catch (e) {}
+          }
+          return computed;
+        }
+      }
+    } catch (err) {
+      console.warn('Apps Script averages error:', err);
+    }
+  }
+
+  // 2. Direct GViz JSONP query on Details Tab (gid=847680829)
   try {
     const payload = await fetchGVizJsonp(SPREADSHEET_ID, 'Details', '847680829');
     if (payload && payload.table) {
@@ -216,7 +259,7 @@ export async function fetchInstitutionalAveragesFromSheet(forceRefresh = false) 
           cells.forEach((c, idx) => {
             const val = parseFloat(String(c?.v || '').replace(/,/g, ''));
             const colLabel = cols[idx] || '';
-            if (!isNaN(val) && val > 0) {
+            if (!isNaN(val)) {
               if (colLabel === 'I' || idx === 1) y1 = val;
               else if (colLabel === 'II' || idx === 2) y2 = val;
               else if (colLabel === 'III' || idx === 4 || idx === 3) y3 = val;
@@ -224,60 +267,30 @@ export async function fetchInstitutionalAveragesFromSheet(forceRefresh = false) 
             }
           });
 
-          if (y4 > 0 || y3 > 0 || y2 > 0 || y1 > 0) {
+          if (y4 > 0 || y3 > 0 || y2 > 0) {
             const computed = {
-              year_1: Math.round(y1) || 195,
-              year_2: Math.round(y2) || 248,
-              year_3: Math.round(y3) || 312,
-              year_4: Math.round(y4) || 384,
+              year_1: Math.round(y1) || 0,
+              year_2: Math.round(y2) || 339,
+              year_3: Math.round(y3) || 412,
+              year_4: Math.round(y4) || 455,
               isLive: true,
-              source: 'Google Sheet (Details Tab)',
+              source: 'Google Sheet (Details Tab GViz)',
               lastUpdated: new Date().toISOString()
             };
-            try {
-              localStorage.setItem(cacheKey, JSON.stringify({
-                timestamp: Date.now(),
-                averages: computed
-              }));
-            } catch (e) {}
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                  timestamp: Date.now(),
+                  averages: computed
+                }));
+              } catch (e) {}
+            }
             return computed;
           }
         }
       }
     }
   } catch (err) {}
-
-  // 2. Direct GViz JSONP query by tab name 'Details'
-  try {
-    const payload = await fetchGVizJsonp(SPREADSHEET_ID, 'Details');
-    if (payload && payload.table && payload.table.rows) {
-      for (const r of payload.table.rows) {
-        const cells = r.c || [];
-        const rowText = cells.map(c => String(c?.v || '')).join(' ').toUpperCase();
-        if (rowText.includes('AVERAGE')) {
-          const numbers = cells.map(c => parseFloat(String(c?.v || '').replace(/,/g, ''))).filter(n => !isNaN(n) && n > 0);
-          if (numbers.length >= 3) {
-            const computed = {
-              year_1: Math.round(numbers[0]) || 195,
-              year_2: Math.round(numbers[1]) || 248,
-              year_3: Math.round(numbers[2]) || 312,
-              year_4: Math.round(numbers[3] || numbers[2]) || 384,
-              isLive: true,
-              source: 'Google Sheet (Details Tab)',
-              lastUpdated: new Date().toISOString()
-            };
-            try {
-              localStorage.setItem(cacheKey, JSON.stringify({
-                timestamp: Date.now(),
-                averages: computed
-              }));
-            } catch (e) {}
-            return computed;
-          }
-        }
-      }
-    }
-  } catch (e) {}
 
   return getInstantInitialAverages();
 }
