@@ -18,6 +18,7 @@ import {
   parseStudentRows
 } from '../data/rp_distribution';
 import { fetchStudentRewardPointsFromSheet, APPS_SCRIPT_SHEET_URL } from '../services/googleSheetsService';
+import { fetchLiveGradioInternalMarks } from '../services/internalMarksGradioService';
 import { getInstantStudentMentorData } from '../services/studentMentorService';
 const studentMentorData = getInstantStudentMentorData();
 
@@ -58,6 +59,119 @@ function resolveStudentDepartment(roll = '', defaultDept = '') {
   const letters = (cleanRoll.match(/[A-Z]+/g) || []).join('');
   if (letters && DEPT_CODE_TO_NAME[letters]) return DEPT_CODE_TO_NAME[letters];
   return 'ENGINEERING';
+}
+
+export function pointsToInternalMark(points) {
+  const p = Math.max(0, Number(points) || 0);
+  if (p <= 0) return '';
+  if (p >= 500) return '15.00';
+  if (p >= 450) return '14.50';
+  if (p >= 400) return '14.00';
+  if (p >= 360) return '13.50';
+  if (p >= 320) return '13.00';
+  if (p >= 280) return '12.50';
+  if (p >= 240) return '12.00';
+  if (p >= 200) return '11.00';
+  if (p >= 160) return '10.00';
+  if (p >= 120) return '9.00';
+  if (p >= 80) return '8.00';
+  if (p >= 50) return '6.00';
+  if (p >= 25) return '4.00';
+  return (Math.min(15, (p / 500) * 15)).toFixed(2);
+}
+
+export function computeLiveCourseMarks(baseRecord, liveRedeemedPoints) {
+  if (!baseRecord) return baseRecord;
+  // If baseRecord already has verified live Gradio courses, preserve them directly
+  if (baseRecord.isLiveGradio && Array.isArray(baseRecord.theoryCourses) && baseRecord.theoryCourses.length > 0) {
+    return baseRecord;
+  }
+
+  const rawRedeemed = Number(liveRedeemedPoints);
+  const redeemed = !isNaN(rawRedeemed) && rawRedeemed >= 0 
+    ? rawRedeemed 
+    : (Number(baseRecord.redeemedPoints) || 0);
+
+  let rawTheory = Array.isArray(baseRecord.theoryCourses) && baseRecord.theoryCourses.length > 0 
+    ? baseRecord.theoryCourses.map(c => ({ ...c })) 
+    : [];
+  let rawAddon = Array.isArray(baseRecord.addonCourses) && baseRecord.addonCourses.length > 0 
+    ? baseRecord.addonCourses.map(c => ({ ...c })) 
+    : [];
+  let rawLab = Array.isArray(baseRecord.labCourses) && baseRecord.labCourses.length > 0 
+    ? baseRecord.labCourses.map(c => ({ ...c })) 
+    : [];
+
+  // Fallback defaults for courses if empty
+  if (rawTheory.length === 0 && rawLab.length === 0) {
+    const deptPrefix = (baseRecord.department?.toUpperCase().includes('COMPUTER TECH') || baseRecord.rollNo?.includes('CT')) ? '22CT' : '22';
+    rawTheory = [
+      { slot: 'TS1', code: `${deptPrefix}701`, ip1: '', ip2: '', total: '' },
+      { slot: 'TS2', code: `${deptPrefix}702`, ip1: '', ip2: '', total: '' },
+      { slot: 'TS3', code: `${deptPrefix}021`, ip1: '', ip2: '', total: '' }
+    ];
+  }
+
+  let remainingPoints = redeemed;
+
+  const updatedTheory = rawTheory.map((tc) => {
+    const slotAlloc = Math.min(510, Math.max(0, remainingPoints));
+    remainingPoints -= slotAlloc;
+    const mark = pointsToInternalMark(slotAlloc);
+    return {
+      ...tc,
+      allocatedPoints: slotAlloc,
+      ip1: mark || (slotAlloc > 0 ? pointsToInternalMark(slotAlloc) : tc.ip1 || ''),
+      ip2: tc.ip2 || '',
+      total: mark || tc.total || tc.ip1 || (slotAlloc > 0 ? pointsToInternalMark(slotAlloc) : '0.00')
+    };
+  });
+
+  const updatedAddon = rawAddon.map((ac) => {
+    const slotAlloc = Math.min(510, Math.max(0, remainingPoints));
+    remainingPoints -= slotAlloc;
+    const mark = pointsToInternalMark(slotAlloc);
+    return {
+      ...ac,
+      allocatedPoints: slotAlloc,
+      ip1: mark || ac.ip1 || '',
+      ip2: ac.ip2 || '',
+      total: mark || ac.total || ac.ip1 || '0.00'
+    };
+  });
+
+  const updatedLab = rawLab.map((lc) => {
+    const slotAlloc = Math.min(510, Math.max(0, remainingPoints));
+    remainingPoints -= slotAlloc;
+    const mark = pointsToInternalMark(slotAlloc);
+    return {
+      ...lc,
+      allocatedPoints: slotAlloc,
+      ip1: mark || lc.ip1 || '',
+      ip2: lc.ip2 || '',
+      total: mark || lc.total || lc.ip1 || '0.00'
+    };
+  });
+
+  const allCourses = [...updatedTheory, ...updatedAddon, ...updatedLab];
+  const ip1TotalNum = allCourses.reduce((sum, c) => sum + (parseFloat(c.ip1) || 0), 0);
+  const ip1Total = ip1TotalNum > 0 ? ip1TotalNum.toFixed(2) : (baseRecord.ip1Total || '0.00');
+  const ip2Total = baseRecord.ip2Total || '0.00';
+  const grandTotal = (parseFloat(ip1Total) + parseFloat(ip2Total)).toFixed(2);
+
+  return {
+    ...baseRecord,
+    redeemedPoints: redeemed,
+    theoryCourses: updatedTheory,
+    addonCourses: updatedAddon,
+    labCourses: updatedLab,
+    totalTheoryCount: updatedTheory.length,
+    totalLabCount: updatedLab.length,
+    totalSubjectsCount: allCourses.length,
+    ip1Total,
+    ip2Total,
+    grandTotal
+  };
 }
 
 export default function InternalMarksView({ currentUser, isDarkMode, onNavigateToSkew }) {
@@ -121,7 +235,10 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
     const matched = studentsData.find(s => (s.rollNo || s.id || '').toUpperCase() === targetRoll) ||
       studentsData.find(s => (s.rollNo || s.id || '').toUpperCase().includes(targetRoll));
 
-    if (matched) return matched;
+    if (matched) {
+      // Dynamically recalculate if redeemed points are present
+      return computeLiveCourseMarks(matched, matched.redeemedPoints || matched.redeemed_points);
+    }
 
     // 2. Dynamic resolution from institute student mentor directory
     const mentorRec = Array.isArray(studentMentorData)
@@ -133,7 +250,7 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
     const dynamicMentor = mentorRec?.mentorName || mentorRec?.mentor || currentUser?.mentor || '';
     const dynamicYear = mentorRec?.year || currentUser?.year || 'IV';
 
-    return {
+    const fallbackRecord = {
       rollNo: targetRoll,
       name: dynamicName,
       year: dynamicYear,
@@ -151,9 +268,11 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
       ip2Total: '0.00',
       grandTotal: '0.00'
     };
+
+    return computeLiveCourseMarks(fallbackRecord, 0);
   }, [studentsData, selectedRoll, defaultRoll, currentUser]);
 
-  // Dynamic Live Sync function from Google Sheets API
+  // Dynamic Live Sync function from Google Sheets API & Gradio Internal Marks
   const fetchLiveGoogleSheetData = useCallback(async (isManual = false) => {
     const rollToFetch = (selectedRoll || defaultRoll || currentUser?.id || currentUser?.roll_no || '').trim().toUpperCase();
     if (!rollToFetch) return;
@@ -162,40 +281,77 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
 
     try {
       const dept = resolveStudentDepartment(rollToFetch);
-      const liveStudent = await fetchStudentRewardPointsFromSheet(rollToFetch, dept);
+      
+      // Concurrently fetch live points from sheet and live verified internal marks from Gradio
+      const [liveStudent, gradioMarks] = await Promise.allSettled([
+        fetchStudentRewardPointsFromSheet(rollToFetch, dept),
+        fetchLiveGradioInternalMarks(rollToFetch, isManual)
+      ]);
 
-      if (liveStudent) {
+      const liveStudentData = liveStudent.status === 'fulfilled' ? liveStudent.value : null;
+      const gradioMarksData = gradioMarks.status === 'fulfilled' ? gradioMarks.value : null;
+
+      if (liveStudentData || gradioMarksData) {
         setStudentsData(prevList => {
           const cleanRoll = String(rollToFetch).toUpperCase();
           const existingIdx = prevList.findIndex(s => (s.rollNo || s.id || '').toUpperCase() === cleanRoll);
+          const baseRecord = existingIdx !== -1 ? prevList[existingIdx] : {};
 
-          const updatedRecord = {
-            ...(existingIdx !== -1 ? prevList[existingIdx] : {}),
+          const mentorRec = Array.isArray(studentMentorData)
+            ? studentMentorData.find(m => (m.rollNo || '').toUpperCase() === cleanRoll)
+            : null;
+
+          const liveRedeemed = liveStudentData?.redeemed_points ?? (gradioMarksData?.totalRedeemedPoints ? parseFloat(gradioMarksData.totalRedeemedPoints.replace(/,/g, '')) : baseRecord.redeemedPoints ?? 0);
+          const liveBalance = liveStudentData?.balance_points ?? baseRecord.balancePoints ?? 0;
+          const liveCumulative = liveStudentData?.cumulative_points ?? baseRecord.cumulativePoints ?? (liveRedeemed + liveBalance);
+
+          // Compute baseline dynamic marks
+          let computed = computeLiveCourseMarks({
+            ...baseRecord,
             rollNo: cleanRoll,
             id: cleanRoll,
-            name: liveStudent.name || (existingIdx !== -1 ? prevList[existingIdx].name : cleanRoll),
-            mentor: liveStudent.mentor || (existingIdx !== -1 ? prevList[existingIdx].mentor : ''),
-            department: liveStudent.department || (existingIdx !== -1 ? prevList[existingIdx].department : dept),
-            year: liveStudent.year || (existingIdx !== -1 ? prevList[existingIdx].year : 'IV'),
-            balancePoints: liveStudent.balance_points ?? (existingIdx !== -1 ? prevList[existingIdx].balancePoints : 0),
-            cumulativePoints: liveStudent.cumulative_points ?? (existingIdx !== -1 ? prevList[existingIdx].cumulativePoints : 0),
-            redeemedPoints: liveStudent.redeemed_points ?? (existingIdx !== -1 ? prevList[existingIdx].redeemedPoints : 0),
-            theoryCourses: (liveStudent.theoryCourses && liveStudent.theoryCourses.length > 0) ? liveStudent.theoryCourses : (existingIdx !== -1 ? (prevList[existingIdx].theoryCourses || []) : []),
-            addonCourses: (liveStudent.addonCourses && liveStudent.addonCourses.length > 0) ? liveStudent.addonCourses : (existingIdx !== -1 ? (prevList[existingIdx].addonCourses || []) : []),
-            labCourses: (liveStudent.labCourses && liveStudent.labCourses.length > 0) ? liveStudent.labCourses : (existingIdx !== -1 ? (prevList[existingIdx].labCourses || []) : []),
-            activityBreakdown: (liveStudent.activityBreakdown && liveStudent.activityBreakdown.length > 0) ? liveStudent.activityBreakdown : (existingIdx !== -1 ? (prevList[existingIdx].activityBreakdown || []) : []),
-            eventLogs: (liveStudent.eventLogs && liveStudent.eventLogs.length > 0) ? liveStudent.eventLogs : (existingIdx !== -1 ? (prevList[existingIdx].eventLogs || []) : []),
-            ip1Total: liveStudent.ip1Total || (existingIdx !== -1 ? prevList[existingIdx].ip1Total : '0.00'),
-            ip2Total: liveStudent.ip2Total || (existingIdx !== -1 ? prevList[existingIdx].ip2Total : '0.00'),
-            grandTotal: liveStudent.grandTotal || (existingIdx !== -1 ? prevList[existingIdx].grandTotal : '0.00'),
-          };
+            name: liveStudentData?.name || baseRecord.name || mentorRec?.name || cleanRoll,
+            mentor: liveStudentData?.mentor || baseRecord.mentor || mentorRec?.mentorName || '',
+            department: liveStudentData?.department || baseRecord.department || mentorRec?.department || dept,
+            year: liveStudentData?.year || baseRecord.year || mentorRec?.year || 'IV',
+            balancePoints: liveBalance,
+            cumulativePoints: liveCumulative,
+            redeemedPoints: liveRedeemed,
+            activityBreakdown: (liveStudentData?.activityBreakdown && liveStudentData.activityBreakdown.length > 0) ? liveStudentData.activityBreakdown : (baseRecord.activityBreakdown || []),
+            eventLogs: (liveStudentData?.eventLogs && liveStudentData.eventLogs.length > 0) ? liveStudentData.eventLogs : (baseRecord.eventLogs || []),
+          }, liveRedeemed);
+
+          // If Gradio returned official live verified internal marks, prioritize it for marks
+          if (gradioMarksData && Array.isArray(gradioMarksData.theoryCourses) && gradioMarksData.theoryCourses.length > 0) {
+            computed = {
+              ...computed,
+              theoryCourses: gradioMarksData.theoryCourses,
+              labCourses: (gradioMarksData.labCourses && gradioMarksData.labCourses.length > 0) ? gradioMarksData.labCourses : (computed.labCourses || []),
+              addonCourses: (gradioMarksData.addonCourses && gradioMarksData.addonCourses.length > 0) ? gradioMarksData.addonCourses : (computed.addonCourses || []),
+              totalTheoryCount: gradioMarksData.totalTheoryCount || computed.totalTheoryCount,
+              totalLabCount: gradioMarksData.totalLabCount || computed.totalLabCount,
+              totalSubjectsCount: gradioMarksData.totalSubjectsCount || computed.totalSubjectsCount,
+              ip1Total: gradioMarksData.ip1Total || computed.ip1Total,
+              ip2Total: gradioMarksData.ip2Total || computed.ip2Total || '0.00',
+              grandTotal: gradioMarksData.grandTotal || computed.grandTotal,
+              isLiveGradio: true
+            };
+          }
 
           const newList = [...prevList];
           if (existingIdx !== -1) {
-            newList[existingIdx] = updatedRecord;
+            newList[existingIdx] = computed;
           } else {
-            newList.unshift(updatedRecord);
+            newList.unshift(computed);
           }
+
+          try {
+            localStorage.setItem('bit_live_internal_marks', JSON.stringify({
+              time: new Date().toISOString(),
+              students: newList
+            }));
+          } catch (e) {}
+
           return newList;
         });
 
@@ -205,9 +361,9 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
         return;
       }
 
-      setSyncStatus('live');
+      setSyncStatus('ready');
     } catch (err) {
-      console.warn('Live Google Sheet fetch notice:', err);
+      console.warn('Live Internal Marks sync notice:', err);
       setSyncStatus('ready');
     }
   }, [currentUser, selectedRoll, defaultRoll]);
@@ -217,13 +373,47 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
     fetchLiveGoogleSheetData(false);
   }, [selectedRoll, defaultRoll]);
 
-  // Search filter results (up to 8 matches)
+  // Search filter results across master sheet and college mentor directory (up to 8 matches)
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase().trim();
-    return studentsData.filter(
-      s => s.rollNo.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
-    ).slice(0, 8);
+    const seen = new Set();
+    const results = [];
+
+    for (const s of studentsData) {
+      const roll = (s.rollNo || s.id || '').toUpperCase();
+      const name = (s.name || '').toLowerCase();
+      if (roll.toLowerCase().includes(q) || name.includes(q)) {
+        seen.add(roll);
+        results.push({
+          rollNo: roll,
+          name: s.name,
+          department: s.department,
+          year: s.year
+        });
+        if (results.length >= 8) return results;
+      }
+    }
+
+    if (Array.isArray(studentMentorData)) {
+      for (const m of studentMentorData) {
+        const roll = (m.rollNo || '').toUpperCase();
+        if (!roll || seen.has(roll)) continue;
+        const name = (m.name || '').toLowerCase();
+        if (roll.toLowerCase().includes(q) || name.includes(q)) {
+          seen.add(roll);
+          results.push({
+            rollNo: roll,
+            name: m.name,
+            department: m.department,
+            year: m.year
+          });
+          if (results.length >= 8) return results;
+        }
+      }
+    }
+
+    return results;
   }, [studentsData, searchQuery]);
 
   return (
@@ -427,7 +617,16 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
               setIsDropdownOpen(true);
             }}
             onFocus={() => setIsDropdownOpen(true)}
-            placeholder="Search Roll No (eg. CT109, CT120)..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && searchQuery.trim()) {
+                const target = searchQuery.trim().toUpperCase();
+                setSyncStatus('syncing');
+                setSelectedRoll(target);
+                setSearchQuery('');
+                setIsDropdownOpen(false);
+              }
+            }}
+            placeholder="Search Roll No (eg. 7376231CS105, CT109)..."
             className={`w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold border outline-none transition-all ${
               isDarkMode
                 ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500'
@@ -445,6 +644,7 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
                   key={s.rollNo}
                   type="button"
                   onClick={() => {
+                    setSyncStatus('syncing');
                     setSelectedRoll(s.rollNo);
                     setSearchQuery('');
                     setIsDropdownOpen(false);
@@ -534,175 +734,221 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
             </thead>
             <tbody className="divide-y divide-transparent font-medium">
               
-              {/* SECTION 1: THEORY COURSES */}
-              <tr>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
-                  isDarkMode ? 'text-white' : 'text-slate-950'
-                }`}>
-                  THEORY COURSES - ({activeStudent.totalTheoryCount || (activeStudent.theoryCourses || []).length || 0} COURSES)
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  (15)
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  (15)
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  (30)
-                </td>
-              </tr>
-
-              {/* Theory Course Rows */}
-              {(activeStudent.theoryCourses || []).map((tc, idx) => (
-                <tr key={idx} className="transition-colors">
-                  <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
-                    {tc.code}
-                  </td>
-                  <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
-                    isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                  }`}>
-                    {tc.ip1 || ''}
-                  </td>
-                  <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
-                    isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                  }`}>
-                    {tc.ip2 || ''}
-                  </td>
-                  <td className={`py-1.5 px-2 sm:px-4 text-center font-mono font-extrabold ${
-                    isDarkMode ? 'text-white' : 'text-slate-950'
-                  }`}>
-                    {tc.total || tc.ip1 || '0.00'}
-                  </td>
-                </tr>
-              ))}
-
-              {/* SECTION 2: ADD-ON / HONOR / MINOR COURSES */}
-              <tr>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
-                  isDarkMode ? 'text-white' : 'text-slate-950'
-                }`}>
-                  ADD-ON / HONOR / MINOR COURSES
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  ()
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  (30)
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  (30)
-                </td>
-              </tr>
-
-              {/* Add-on Course Rows (if any) */}
-              {(activeStudent.addonCourses || []).length > 0 &&
-                (activeStudent.addonCourses || []).map((ac, idx) => (
-                  <tr key={idx} className="transition-colors">
-                    <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
-                      {ac.code}
-                    </td>
-                    <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
-                      isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                    }`}>
-                      {ac.ip1 || ''}
-                    </td>
-                    <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
-                      isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                    }`}>
-                      {ac.ip2 || ''}
-                    </td>
-                    <td className={`py-1.5 px-2 sm:px-4 text-center font-mono font-extrabold ${
-                      isDarkMode ? 'text-white' : 'text-slate-950'
-                    }`}>
-                      {ac.total || ac.ip1 || '0.00'}
+              {/* SKELETON LOADING STATE (Until live verified Gradio data resolves) */}
+              {syncStatus === 'syncing' && !activeStudent?.isLiveGradio ? (
+                <>
+                  <tr>
+                    <td colSpan={4} className="py-3 px-2 sm:px-4">
+                      <div className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-500 bg-blue-500/10 px-4 py-2.5 rounded-2xl border border-blue-500/20 animate-pulse">
+                        <RefreshCw className="w-4 h-4 animate-spin text-blue-500 shrink-0" />
+                        <span>Fetching exact live internal marks from Gradio for {activeStudent.rollNo}...</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
-
-              {/* SECTION 3: LAB COURSES */}
-              <tr>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
-                  isDarkMode ? 'text-white' : 'text-slate-950'
-                }`}>
-                  LAB. COURSES - ({activeStudent.totalLabCount || (activeStudent.labCourses || []).length || 0} COURSES)
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  (20)
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  (20)
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
-                  isDarkMode ? 'text-slate-300' : 'text-slate-900'
-                }`}>
-                  (40)
-                </td>
-              </tr>
-
-              {/* Lab Course Rows (if any) */}
-              {(activeStudent.labCourses || []).length > 0 &&
-                (activeStudent.labCourses || []).map((lc, idx) => (
-                  <tr key={idx} className="transition-colors">
-                    <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
-                      {lc.code}
+                  {[1, 2, 3, 4].map((i) => (
+                    <tr key={`skel-row-${i}`} className="animate-pulse">
+                      <td className="py-2.5 px-2 sm:px-4">
+                        <div className={`h-5 rounded-lg w-28 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`} />
+                      </td>
+                      <td className="py-2.5 px-2 sm:px-4 text-center">
+                        <div className={`h-5 rounded-lg w-14 mx-auto ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`} />
+                      </td>
+                      <td className="py-2.5 px-2 sm:px-4 text-center">
+                        <div className={`h-5 rounded-lg w-10 mx-auto ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`} />
+                      </td>
+                      <td className="py-2.5 px-2 sm:px-4 text-center">
+                        <div className={`h-5 rounded-lg w-14 mx-auto ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`} />
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className={`border-t-2 ${isDarkMode ? 'border-slate-700' : 'border-slate-300'} animate-pulse`}>
+                    <td className="py-4 px-2 sm:px-4">
+                      <div className={`h-6 rounded-lg w-36 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`} />
                     </td>
-                    <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
-                      isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                    }`}>
-                      {lc.ip1 || ''}
+                    <td className="py-4 px-2 sm:px-4 text-center">
+                      <div className={`h-6 rounded-lg w-16 mx-auto ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`} />
                     </td>
-                    <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
-                      isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                    }`}>
-                      {lc.ip2 || ''}
+                    <td className="py-4 px-2 sm:px-4 text-center">
+                      <div className={`h-6 rounded-lg w-10 mx-auto ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`} />
                     </td>
-                    <td className={`py-1.5 px-2 sm:px-4 text-center font-mono font-extrabold ${
-                      isDarkMode ? 'text-white' : 'text-slate-950'
-                    }`}>
-                      {lc.total || lc.ip1 || '0.00'}
+                    <td className="py-4 px-2 sm:px-4 text-center">
+                      <div className={`h-6 rounded-lg w-16 mx-auto ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`} />
                     </td>
                   </tr>
-                ))}
+                </>
+              ) : (
+                <>
+                  {/* SECTION 1: THEORY COURSES */}
+                  <tr>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
+                      isDarkMode ? 'text-white' : 'text-slate-950'
+                    }`}>
+                      THEORY COURSES - ({activeStudent.totalTheoryCount || (activeStudent.theoryCourses || []).length || 0} COURSES)
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      (15)
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      (15)
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      (30)
+                    </td>
+                  </tr>
 
-              {/* SECTION 4: GRAND TOTALS */}
-              <tr className={`border-t-2 ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
-                  isDarkMode ? 'text-white' : 'text-slate-950'
-                }`}>
-                  TOTAL - ({activeStudent.totalSubjectsCount} SUBJECTS)
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-mono font-black ${
-                  isDarkMode ? 'text-white' : 'text-slate-950'
-                }`}>
-                  {activeStudent.ip1Total || '0.00'}
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-mono font-black ${
-                  isDarkMode ? 'text-white' : 'text-slate-950'
-                }`}>
-                  {activeStudent.ip2Total || '0.00'}
-                </td>
-                <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-mono font-black ${
-                  isDarkMode ? 'text-white' : 'text-slate-950'
-                }`}>
-                  {activeStudent.grandTotal || activeStudent.ip1Total || '0.00'}
-                </td>
-              </tr>
+                  {/* Theory Course Rows */}
+                  {(activeStudent.theoryCourses || []).map((tc, idx) => (
+                    <tr key={idx} className="transition-colors">
+                      <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
+                        {tc.code}
+                      </td>
+                      <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
+                        isDarkMode ? 'text-slate-300' : 'text-slate-800'
+                      }`}>
+                        {tc.ip1 || ''}
+                      </td>
+                      <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
+                        isDarkMode ? 'text-slate-300' : 'text-slate-800'
+                      }`}>
+                        {tc.ip2 || ''}
+                      </td>
+                      <td className={`py-1.5 px-2 sm:px-4 text-center font-mono font-extrabold ${
+                        isDarkMode ? 'text-white' : 'text-slate-950'
+                      }`}>
+                        {tc.total || tc.ip1 || '0.00'}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {/* SECTION 2: ADD-ON / HONOR / MINOR COURSES */}
+                  <tr>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
+                      isDarkMode ? 'text-white' : 'text-slate-950'
+                    }`}>
+                      ADD-ON / HONOR / MINOR COURSES
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      ()
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      (30)
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      (30)
+                    </td>
+                  </tr>
+
+                  {/* Add-on Course Rows (if any) */}
+                  {(activeStudent.addonCourses || []).length > 0 &&
+                    (activeStudent.addonCourses || []).map((ac, idx) => (
+                      <tr key={idx} className="transition-colors">
+                        <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
+                          {ac.code}
+                        </td>
+                        <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
+                          isDarkMode ? 'text-slate-300' : 'text-slate-800'
+                        }`}>
+                          {ac.ip1 || ''}
+                        </td>
+                        <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
+                          isDarkMode ? 'text-slate-300' : 'text-slate-800'
+                        }`}>
+                          {ac.ip2 || ''}
+                        </td>
+                        <td className={`py-1.5 px-2 sm:px-4 text-center font-mono font-extrabold ${
+                          isDarkMode ? 'text-white' : 'text-slate-950'
+                        }`}>
+                          {ac.total || ac.ip1 || '0.00'}
+                        </td>
+                      </tr>
+                    ))}
+
+                  {/* SECTION 3: LAB COURSES */}
+                  <tr>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
+                      isDarkMode ? 'text-white' : 'text-slate-950'
+                    }`}>
+                      LAB. COURSES - ({activeStudent.totalLabCount || (activeStudent.labCourses || []).length || 0} COURSES)
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      (20)
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      (20)
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-extrabold font-mono ${
+                      isDarkMode ? 'text-slate-300' : 'text-slate-900'
+                    }`}>
+                      (40)
+                    </td>
+                  </tr>
+
+                  {/* Lab Course Rows (if any) */}
+                  {(activeStudent.labCourses || []).length > 0 &&
+                    (activeStudent.labCourses || []).map((lc, idx) => (
+                      <tr key={idx} className="transition-colors">
+                        <td className="py-1.5 px-2 sm:px-4 font-bold text-[#009ce0] hover:underline cursor-pointer">
+                          {lc.code}
+                        </td>
+                        <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
+                          isDarkMode ? 'text-slate-300' : 'text-slate-800'
+                        }`}>
+                          {lc.ip1 || ''}
+                        </td>
+                        <td className={`py-1.5 px-2 sm:px-4 text-center font-mono ${
+                          isDarkMode ? 'text-slate-300' : 'text-slate-800'
+                        }`}>
+                          {lc.ip2 || ''}
+                        </td>
+                        <td className={`py-1.5 px-2 sm:px-4 text-center font-mono font-extrabold ${
+                          isDarkMode ? 'text-white' : 'text-slate-950'
+                        }`}>
+                          {lc.total || lc.ip1 || '0.00'}
+                        </td>
+                      </tr>
+                    ))}
+
+                  {/* SECTION 4: GRAND TOTALS */}
+                  <tr className={`border-t-2 ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 font-black uppercase tracking-tight ${
+                      isDarkMode ? 'text-white' : 'text-slate-950'
+                    }`}>
+                      TOTAL - ({activeStudent.totalSubjectsCount} SUBJECTS)
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-mono font-black ${
+                      isDarkMode ? 'text-white' : 'text-slate-950'
+                    }`}>
+                      {activeStudent.ip1Total || '0.00'}
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-mono font-black ${
+                      isDarkMode ? 'text-white' : 'text-slate-950'
+                    }`}>
+                      {activeStudent.ip2Total || '0.00'}
+                    </td>
+                    <td className={`pt-6 pb-2 px-2 sm:px-4 text-center font-mono font-black ${
+                      isDarkMode ? 'text-white' : 'text-slate-950'
+                    }`}>
+                      {activeStudent.grandTotal || activeStudent.ip1Total || '0.00'}
+                    </td>
+                  </tr>
+                </>
+              )}
 
             </tbody>
           </table>

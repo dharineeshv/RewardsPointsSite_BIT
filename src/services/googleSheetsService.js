@@ -621,6 +621,23 @@ export async function fetchStudentRewardPointsFromSheet(rollNoOrEmail, departmen
     }
   }
 
+function enrichStudentWithInternalMarks(student) {
+  if (!student) return student;
+  const roll = (student.roll_no || student.rollNo || student.id || '').toUpperCase();
+  const matched = STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || s.id || '').toUpperCase() === roll);
+  
+  if (matched) {
+    student.theoryCourses = (matched.theoryCourses && matched.theoryCourses.length > 0) ? matched.theoryCourses : (student.theoryCourses || []);
+    student.addonCourses = (matched.addonCourses && matched.addonCourses.length > 0) ? matched.addonCourses : (student.addonCourses || []);
+    student.labCourses = (matched.labCourses && matched.labCourses.length > 0) ? matched.labCourses : (student.labCourses || []);
+    student.totalTheoryCount = matched.totalTheoryCount || (student.theoryCourses ? student.theoryCourses.length : 0);
+    student.totalLabCount = matched.totalLabCount || (student.labCourses ? student.labCourses.length : 0);
+    student.totalSubjectsCount = matched.totalSubjectsCount || ((student.theoryCourses?.length || 0) + (student.labCourses?.length || 0));
+    if (!student.mentor && matched.mentor) student.mentor = matched.mentor;
+  }
+  return student;
+}
+
   // 1. Direct GViz query via department tab (~150ms ultra-fast Google CDN)
   try {
     const students = await fetchDepartmentSheetData(targetDept || 'CT', useCache);
@@ -634,8 +651,9 @@ export async function fetchStudentRewardPointsFromSheet(rollNoOrEmail, departmen
         return false;
       });
       if (found) {
-        if (cacheKey) cacheStudentPoints(cacheKey, found);
-        return found;
+        const enriched = enrichStudentWithInternalMarks(found);
+        if (cacheKey) cacheStudentPoints(cacheKey, enriched);
+        return enriched;
       }
     }
   } catch (e) {}
@@ -647,8 +665,9 @@ export async function fetchStudentRewardPointsFromSheet(rollNoOrEmail, departmen
     if (res.ok) {
       const result = await res.json();
       if (result && result.success && result.data) {
-        if (cacheKey) cacheStudentPoints(cacheKey, result.data);
-        return result.data;
+        const enriched = enrichStudentWithInternalMarks(result.data);
+        if (cacheKey) cacheStudentPoints(cacheKey, enriched);
+        return enriched;
       }
     }
   } catch (e) {}
@@ -667,10 +686,11 @@ export async function fetchStudentRewardPointsFromSheet(rollNoOrEmail, departmen
       if (res.ok) {
         const result = await res.json();
         if (result && result.success && result.data) {
-          if (cacheKey) cacheStudentPoints(cacheKey, result.data);
-          if (result.data.roll_no) cacheStudentPoints(result.data.roll_no.toUpperCase(), result.data);
-          if (result.data.email) cacheStudentPoints(result.data.email.toLowerCase(), result.data);
-          return result.data;
+          const enriched = enrichStudentWithInternalMarks(result.data);
+          if (cacheKey) cacheStudentPoints(cacheKey, enriched);
+          if (enriched.roll_no) cacheStudentPoints(enriched.roll_no.toUpperCase(), enriched);
+          if (enriched.email) cacheStudentPoints(enriched.email.toLowerCase(), enriched);
+          return enriched;
         }
       }
     } catch (e) {}
