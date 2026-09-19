@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Award, Sparkles, LayoutGrid, CheckCircle2, Zap, Flame, Crown, Sprout } from 'lucide-react';
+import { BarChart3, TrendingUp, Award, Sparkles, LayoutGrid, CheckCircle2, Zap, Flame, Crown, Sprout, Calendar, CalendarCheck, Clock } from 'lucide-react';
+import { getStudentRedemptionSchedule } from './InternalMarksView';
 
 const YEAR_THEMES = {
   year_1: {
@@ -194,71 +195,106 @@ export default function AveragePointsBarChart({
         )}
       </div>
 
-      {/* Student Comparison Insight Banner (Matching Reference Image 2) */}
-      {activeStudent && (
-        <div className={`relative z-10 mb-4 sm:mb-5 p-3 sm:p-4 rounded-xl sm:rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all duration-300 ${
-          isDarkMode 
-            ? 'bg-slate-900/90 border-indigo-900/40 text-slate-100 shadow-md shadow-indigo-950/20' 
-            : 'bg-[#EEF2FF] border-[#C7D7FE] text-slate-900 shadow-xs'
-        }`}>
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Squircle Trend Icon */}
-            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 border transition-all ${
-              isDarkMode 
-                ? 'bg-indigo-950/80 border-indigo-800/60 text-indigo-400 shadow-xs' 
-                : 'bg-[#D6E2FF] border-[#BACDFF] text-indigo-700 shadow-xs'
-            }`}>
-              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
+      {/* Student Academic Year Official IP Redemption Deadlines */}
+      {(() => {
+        const studentYear = activeStudent?.year || userYearLabel || '';
+        const studentRoll = activeStudent?.id || activeStudent?.roll_no || activeStudent?.rollNo || '';
+        const sched = getStudentRedemptionSchedule(studentYear, studentRoll);
 
-            {/* Score & Benchmark Text with High-Contrast Badges */}
-            <div className="min-w-0 flex-1">
-              <div className={`text-[11px] sm:text-xs font-bold flex items-center gap-1.5 sm:gap-2 flex-wrap leading-tight ${
-                isDarkMode ? 'text-slate-100' : 'text-slate-900'
-              }`}>
-                <span className={`flex items-center gap-1.5 font-extrabold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  Score: 
-                  <span className={`font-mono font-black px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] tracking-tight shadow-xs ${
-                    isDarkMode ? 'bg-slate-800 text-white border border-slate-700' : 'bg-slate-900 text-white'
+        return (
+          <div className={`relative z-10 mb-4 sm:mb-5 p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-300 ${
+            isDarkMode 
+              ? 'bg-slate-900/90 border-indigo-900/40 text-slate-100 shadow-md shadow-indigo-950/20' 
+              : 'bg-[#EEF2FF] border-[#C7D7FE] text-slate-900 shadow-xs'
+          }`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 mb-2.5 border-b border-indigo-100/60 dark:border-indigo-900/40">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                  isDarkMode 
+                    ? 'bg-indigo-950/80 border-indigo-800/60 text-indigo-400' 
+                    : 'bg-[#D6E2FF] border-[#BACDFF] text-indigo-700'
+                }`}>
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className={`text-xs sm:text-sm font-black flex items-center gap-1.5 flex-wrap ${
+                    isDarkMode ? 'text-white' : 'text-slate-900'
                   }`}>
-                    {studentPoints.toLocaleString()} RP
-                  </span>
-                </span>
-                <span className={`font-black ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>•</span>
-                <span className={`flex items-center gap-1.5 font-extrabold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {activeYearData.label} Avg: 
-                  <span className={`font-mono font-black px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] tracking-tight shadow-xs ${
-                    isDarkMode ? 'bg-slate-800 text-white border border-slate-700' : 'bg-slate-900 text-white'
+                    <span>IP Redemption Deadlines</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20">
+                      {sched.yearLabel} • {sched.semesters}
+                    </span>
+                  </div>
+                  <p className={`text-[10px] sm:text-[11px] font-semibold mt-0.5 ${
+                    isDarkMode ? 'text-slate-400' : 'text-slate-600'
                   }`}>
-                    {activeYearData.value.toLocaleString()} RP
-                  </span>
+                    Official schedule for points redemption to internal marks conversion
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                  isDarkMode 
+                    ? 'bg-indigo-950 text-indigo-300 border-indigo-800/60' 
+                    : 'bg-white text-indigo-700 border-indigo-200'
+                }`}>
+                  Official Schedule
                 </span>
               </div>
-              <p className={`text-[11px] sm:text-xs font-bold mt-1.5 flex items-center gap-1.5 truncate ${
-                isDarkMode ? 'text-indigo-300' : 'text-indigo-950'
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* IP - 1 */}
+              <div className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                isDarkMode 
+                  ? 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700' 
+                  : 'bg-white border-indigo-100 hover:border-indigo-200 shadow-2xs'
               }`}>
-                <span>{isAboveAvg ? '🚀' : '🎯'}</span>
-                <span>
-                  {isAboveAvg
-                    ? `You are ${Math.abs(diffFromAvg).toLocaleString()} RP higher than average RP`
-                    : `You are ${Math.abs(diffFromAvg).toLocaleString()} RP below average RP`}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                      IP - 1 ({sched.sem1})
+                    </span>
+                  </div>
+                  <div className={`text-base sm:text-lg font-black font-mono tracking-tight mt-0.5 ${
+                    isDarkMode ? 'text-white' : 'text-slate-900'
+                  }`}>
+                    {sched.ip1Date}
+                  </div>
+                </div>
+                <span className={`text-[10px] sm:text-[11px] font-extrabold px-2.5 py-1 rounded-lg border shrink-0 ${sched.ip1BadgeClass}`}>
+                  {sched.ip1Status}
                 </span>
-              </p>
+              </div>
+
+              {/* IP - 2 */}
+              <div className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                isDarkMode 
+                  ? 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700' 
+                  : 'bg-white border-indigo-100 hover:border-indigo-200 shadow-2xs'
+              }`}>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <CalendarCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                      IP - 2 ({sched.sem2})
+                    </span>
+                  </div>
+                  <div className={`text-base sm:text-lg font-black font-mono tracking-tight mt-0.5 ${
+                    isDarkMode ? 'text-white' : 'text-slate-900'
+                  }`}>
+                    {sched.ip2Date}
+                  </div>
+                </div>
+                <span className={`text-[10px] sm:text-[11px] font-extrabold px-2.5 py-1 rounded-lg border shrink-0 ${sched.ip2BadgeClass}`}>
+                  {sched.ip2Status}
+                </span>
+              </div>
             </div>
           </div>
-
-          {/* Right Difference Pill */}
-          <div className="flex items-center self-start sm:self-auto shrink-0">
-            <span className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-black border font-mono tracking-tight shadow-xs ${
-              isDarkMode 
-                ? 'bg-indigo-950/90 text-indigo-200 border-indigo-800/60' 
-                : 'bg-[#C6D7FE] text-slate-950 border-[#AEC5FD]'
-            }`}>
-              {isAboveAvg ? `+${diffFromAvg.toLocaleString()} RP` : `${diffFromAvg.toLocaleString()} RP`}
-            </span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 1. VIBRANT & INTERACTIVE COLORFUL BAR CHART (MOBILE RESPONSIVE) */}
       {viewMode === 'chart' ? (

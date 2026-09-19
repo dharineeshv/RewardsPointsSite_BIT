@@ -8,7 +8,7 @@ import placementDataSeed from './data/placementData.json';
 import { getInstantPlacementData, fetchLivePlacementData, publishLivePlacementData, getBitsathyFlipbookUrl } from './services/placementService';
 import { getInstantStudentMentorData } from './services/studentMentorService';
 const studentMentorData = getInstantStudentMentorData();
-import InternalMarksView from './components/InternalMarksView';
+import InternalMarksView, { getStudentRedemptionSchedule } from './components/InternalMarksView';
 import { fetchLiveGradioStudentProfile } from './services/internalMarksGradioService';
 import { fetchDepartmentSheetData, fetchStudentRewardPointsFromSheet, fetchAuthenticatedStudentPoints, fetchInstitutionalAveragesFromSheet, getInstantInitialAverages, calculateDynamicAveragesFromStudents, fetchAllLiveDepartmentsAndAverages, fetchLiveStudentEventLogs, fetchLiveMasterSpreadsheet, getCachedStudentPoints, cacheStudentPoints, AVERAGE_CHART_URL, SPREADSHEET_ID } from './services/googleSheetsService';
 import { COLLEGE_HOLIDAYS_AND_LEAVES } from './data/collegeLeaves';
@@ -9948,6 +9948,56 @@ export default function App() {
                 <div className="text-lg sm:text-2xl font-black text-emerald-500 dark:text-emerald-400 mt-0.5 truncate">{selectedStudent.currentPoints} RP</div>
               </div>
             </div>
+
+            {/* IP-1 & IP-2 Redemption Schedule Timeline */}
+            {(() => {
+              const sched = getStudentRedemptionSchedule(selectedStudent.year, selectedStudent.id || selectedStudent.roll_no);
+              return (
+                <div className={`p-3.5 sm:p-4 rounded-2xl border mb-5 ${
+                  isDarkMode ? 'bg-slate-800/40 border-slate-700/80' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-indigo-500" />
+                      <span className={`text-xs font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                        IP Redemption Deadlines ({sched.yearLabel} • {sched.semesters})
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-indigo-500">Official Schedule</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className={`p-2.5 rounded-xl border ${
+                      isDarkMode ? 'bg-slate-900/60 border-slate-700/60' : 'bg-white border-slate-200/80'
+                    }`}>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider truncate">IP - 1 ({sched.sem1})</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${sched.ip1BadgeClass}`}>
+                          {sched.ip1Status}
+                        </span>
+                      </div>
+                      <div className={`text-sm sm:text-base font-black font-mono mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {sched.ip1Date}
+                      </div>
+                    </div>
+
+                    <div className={`p-2.5 rounded-xl border ${
+                      isDarkMode ? 'bg-slate-900/60 border-slate-700/60' : 'bg-white border-slate-200/80'
+                    }`}>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider truncate">IP - 2 ({sched.sem2})</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${sched.ip2BadgeClass}`}>
+                          {sched.ip2Status}
+                        </span>
+                      </div>
+                      <div className={`text-sm sm:text-base font-black font-mono mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {sched.ip2Date}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 8-Category Official Activity Breakdown from Master Sheet */}
             {Array.isArray(selectedStudent.activityBreakdown) && selectedStudent.activityBreakdown.length > 0 && (

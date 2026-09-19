@@ -10,7 +10,13 @@ import {
   Sliders,
   ArrowRight,
   Sparkles,
-  FlaskConical
+  FlaskConical,
+  Calendar,
+  CalendarDays,
+  CalendarCheck,
+  Clock,
+  Timer,
+  AlertCircle
 } from 'lucide-react';
 import {
   STUDENTS_INTERNAL_MARKS_LIST,
@@ -21,6 +27,173 @@ import { fetchStudentRewardPointsFromSheet, APPS_SCRIPT_SHEET_URL } from '../ser
 import { fetchLiveGradioInternalMarks } from '../services/internalMarksGradioService';
 import { getInstantStudentMentorData } from '../services/studentMentorService';
 const studentMentorData = getInstantStudentMentorData();
+
+// Official BIT Academic Redemption Deadlines by Year and Semester
+export const REDEMPTION_SCHEDULE_DATA = [
+  {
+    yearKey: 'I',
+    yearLabel: '1st Year',
+    romanYear: 'Year I',
+    semesters: 'S-1 & S-2',
+    sem1: 'S-1',
+    sem2: 'S-2',
+    ip1Date: '31.08.2026',
+    ip2Date: '23.10.2026',
+    ip1Status: 'Completed',
+    ip2Status: 'Active / Upcoming',
+    theme: {
+      border: 'border-emerald-500/30',
+      bg: 'bg-emerald-500/10',
+      text: 'text-emerald-500 dark:text-emerald-400',
+      badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+    }
+  },
+  {
+    yearKey: 'II',
+    yearLabel: '2nd Year',
+    romanYear: 'Year II',
+    semesters: 'S-3 & S-4',
+    sem1: 'S-3',
+    sem2: 'S-4',
+    ip1Date: '31.08.2026',
+    ip2Date: '23.10.2026',
+    ip1Status: 'Completed',
+    ip2Status: 'Active / Upcoming',
+    theme: {
+      border: 'border-amber-500/30',
+      bg: 'bg-amber-500/10',
+      text: 'text-amber-500 dark:text-amber-400',
+      badge: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+    }
+  },
+  {
+    yearKey: 'III',
+    yearLabel: '3rd Year',
+    romanYear: 'Year III',
+    semesters: 'S-5 & S-6',
+    sem1: 'S-5',
+    sem2: 'S-6',
+    ip1Date: '29.08.2026',
+    ip2Date: '17.10.2026',
+    ip1Status: 'Completed',
+    ip2Status: 'Active / Upcoming',
+    theme: {
+      border: 'border-cyan-500/30',
+      bg: 'bg-cyan-500/10',
+      text: 'text-cyan-500 dark:text-cyan-400',
+      badge: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border-cyan-300 dark:border-cyan-800'
+    }
+  },
+  {
+    yearKey: 'IV',
+    yearLabel: '4th Year',
+    romanYear: 'Year IV',
+    semesters: 'S-7 & S-8',
+    sem1: 'S-7',
+    sem2: 'S-8',
+    ip1Date: '29.08.2026',
+    ip2Date: '17.10.2026',
+    ip1Status: 'Completed',
+    ip2Status: 'Active / Upcoming',
+    theme: {
+      border: 'border-purple-500/30',
+      bg: 'bg-purple-500/10',
+      text: 'text-purple-500 dark:text-purple-400',
+      badge: 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+    }
+  }
+];
+
+/**
+ * Evaluates whether a DD.MM.YYYY deadline date is Expired, Closing Soon, or Active relative to current live time
+ */
+export function getDeadlineStatus(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') {
+    return { status: 'Active', isExpired: false, badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+  }
+
+  const parts = dateStr.trim().split('.');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    const deadline = new Date(year, month, day, 23, 59, 59);
+    const now = new Date();
+
+    if (now > deadline) {
+      return {
+        status: 'Expired',
+        isExpired: true,
+        diffDays: 0,
+        badgeClass: 'bg-rose-500/10 text-rose-500 dark:text-rose-400 border-rose-500/20'
+      };
+    }
+
+    const diffDays = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 3) {
+      return {
+        status: 'Closing Soon',
+        isExpired: false,
+        diffDays,
+        badgeClass: 'bg-amber-500/10 text-amber-500 dark:text-amber-400 border-amber-500/20 animate-pulse'
+      };
+    }
+
+    return {
+      status: 'Active',
+      isExpired: false,
+      diffDays,
+      badgeClass: 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border-emerald-500/20'
+    };
+  }
+
+  return { status: 'Active', isExpired: false, badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+}
+
+export function getStudentRedemptionSchedule(yearInput = '', rollNo = '') {
+  let yr = '';
+  const yStr = String(yearInput || '').trim().toUpperCase();
+  const rStr = String(rollNo || '').trim().toUpperCase();
+
+  // 1. PRIMARY: Extract from the student's verified profile year
+  if (yStr) {
+    if (yStr === 'IV' || yStr === '4' || yStr.includes('YEAR 4') || yStr.includes('YEAR IV') || yStr.includes('4TH') || yStr.includes('FINAL') || yStr.includes('FOURTH')) {
+      yr = 'IV';
+    } else if (yStr === 'III' || yStr === '3' || yStr.includes('YEAR 3') || yStr.includes('YEAR III') || yStr.includes('3RD') || yStr.includes('THIRD')) {
+      yr = 'III';
+    } else if (yStr === 'II' || yStr === '2' || yStr.includes('YEAR 2') || yStr.includes('YEAR II') || yStr.includes('2ND') || yStr.includes('SECOND')) {
+      yr = 'II';
+    } else if (yStr === 'I' || yStr === '1' || yStr.includes('YEAR 1') || yStr.includes('YEAR I') || yStr.includes('1ST') || yStr.includes('FIRST')) {
+      yr = 'I';
+    }
+  }
+
+  // 2. FALLBACK: Deduce from roll number if profile year was blank
+  if (!yr && rStr) {
+    if (rStr.startsWith('737622')) yr = 'IV';
+    else if (rStr.startsWith('737623')) yr = 'III';
+    else if (rStr.startsWith('737624')) yr = 'II';
+    else if (rStr.startsWith('737625') || rStr.startsWith('737626')) yr = 'I';
+  }
+
+  if (!yr) yr = 'IV';
+
+  const base = REDEMPTION_SCHEDULE_DATA.find(s => s.yearKey === yr) || REDEMPTION_SCHEDULE_DATA[3];
+  const ip1Meta = getDeadlineStatus(base.ip1Date);
+  const ip2Meta = getDeadlineStatus(base.ip2Date);
+
+  return {
+    ...base,
+    ip1Status: ip1Meta.status,
+    ip1BadgeClass: ip1Meta.badgeClass,
+    isIp1Expired: ip1Meta.isExpired,
+    ip1DiffDays: ip1Meta.diffDays,
+    ip2Status: ip2Meta.status,
+    ip2BadgeClass: ip2Meta.badgeClass,
+    isIp2Expired: ip2Meta.isExpired,
+    ip2DiffDays: ip2Meta.diffDays
+  };
+}
 
 const DEPT_CODE_TO_NAME = {
   'CT': 'COMPUTER TECHNOLOGY',
@@ -207,6 +380,7 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedScheduleYear, setSelectedScheduleYear] = useState(null);
 
   // Detect logged-in student roll or dynamic default from master sheet
   const defaultRoll = useMemo(() => {
@@ -692,6 +866,149 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
           </span>
         </button>
       </div>
+
+      {/* 3.5. Official IP-1 & IP-2 Redemption Schedule Card */}
+      {(() => {
+        const studentSchedule = getStudentRedemptionSchedule(activeStudent.year, activeStudent.rollNo);
+        const activeTabKey = selectedScheduleYear || studentSchedule.yearKey;
+        const currentSched = REDEMPTION_SCHEDULE_DATA.find(s => s.yearKey === activeTabKey) || studentSchedule;
+
+        return (
+          <div className={`p-4 sm:p-6 rounded-3xl border shadow-sm transition-all ${
+            isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            {/* Header with Title and Year Selector */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-sm sm:text-base font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Official IP Redemption Schedule
+                  </h3>
+                  <p className={`text-[11px] sm:text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Showing Deadlines for <span className="font-bold text-blue-500 dark:text-blue-400">{currentSched.yearLabel}</span> ({currentSched.semesters})
+                  </p>
+                </div>
+              </div>
+
+              {/* Year Filter Pill Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                {REDEMPTION_SCHEDULE_DATA.map(tab => {
+                  const isSelected = tab.yearKey === activeTabKey;
+                  const isStudentYear = tab.yearKey === studentSchedule.yearKey;
+                  return (
+                    <button
+                      key={tab.yearKey}
+                      type="button"
+                      onClick={() => setSelectedScheduleYear(tab.yearKey)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+                        isSelected
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                          : isDarkMode
+                            ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-slate-600 hover:text-white'
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>{tab.yearLabel}</span>
+                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-500/10 text-slate-500 dark:text-slate-400'
+                      }`}>
+                        {tab.semesters}
+                      </span>
+                      {isStudentYear && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-xs" title="Your Current Batch"></span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* IP-1 and IP-2 Dates Dual Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-4">
+              {/* IP - 1 Card */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                isDarkMode ? 'bg-slate-800/40 border-slate-700/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                    <span className="text-xs font-black uppercase tracking-wider text-blue-500 dark:text-blue-400">
+                      IP - 1 Redemption Deadline
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentSched.theme.badge}`}>
+                    {currentSched.sem1} Semester
+                  </span>
+                </div>
+                
+                <div className="flex items-baseline justify-between mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/50">
+                  <div>
+                    <span className={`text-[10px] sm:text-[11px] font-medium block uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Official Due Date
+                    </span>
+                    <span className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                      {currentSched.ip1Date}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    {(() => {
+                      const meta = getDeadlineStatus(currentSched.ip1Date);
+                      return (
+                        <span className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-lg border ${meta.badgeClass}`}>
+                          {meta.isExpired ? <AlertCircle className="w-3.5 h-3.5" /> : <CalendarCheck className="w-3.5 h-3.5" />}
+                          <span>{meta.status}</span>
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* IP - 2 Card */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                isDarkMode ? 'bg-slate-800/40 border-slate-700/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-500 dark:text-amber-400">
+                      IP - 2 Redemption Deadline
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentSched.theme.badge}`}>
+                    {currentSched.sem2} Semester
+                  </span>
+                </div>
+                
+                <div className="flex items-baseline justify-between mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/50">
+                  <div>
+                    <span className={`text-[10px] sm:text-[11px] font-medium block uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Official Due Date
+                    </span>
+                    <span className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                      {currentSched.ip2Date}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    {(() => {
+                      const meta = getDeadlineStatus(currentSched.ip2Date);
+                      return (
+                        <span className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-lg border ${meta.badgeClass}`}>
+                          {meta.isExpired ? <AlertCircle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                          <span>{meta.status}</span>
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 4. Exact Internal Marks Distribution Table (Matching Provided Sample UI) */}
       <div className={`p-6 sm:p-10 rounded-3xl border shadow-md transition-all ${
