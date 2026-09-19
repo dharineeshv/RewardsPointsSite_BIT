@@ -207,3 +207,209 @@ export function parseGradioMarksText(text, rollNo) {
     fetchedAt: new Date().toISOString()
   };
 }
+
+/**
+ * Fetch verified live student profile, full P-Skill completions, and category breakdown
+ * directly from Gradio Space (PraneshJs/RewardPointsSite - fn_index: 2).
+ */
+export async function fetchLiveGradioStudentProfile(rollNo, forceRefresh = false) {
+  if (!rollNo) return null;
+  const cleanRoll = String(rollNo).trim().toUpperCase();
+  const cacheKey = `bit_gradio_student_profile_${cleanRoll}`;
+
+  // 1. Check fresh local storage cache unless forced
+  if (!forceRefresh && typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.data && Date.now() - parsed.timestamp < GRADIO_CACHE_TTL) {
+          return parsed.data;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. Connect to Gradio SSE queue stream for fn_index: 2
+  try {
+    const sessionHash = 'prf_' + Math.random().toString(36).substring(2, 10);
+    const joinUrl = `${GRADIO_HOST}/gradio_api/queue/join?`;
+    const dataUrl = `${GRADIO_HOST}/gradio_api/queue/data?session_hash=${sessionHash}`;
+
+    const joinRes = await fetch(joinUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: [cleanRoll],
+        fn_index: 2,
+        session_hash: sessionHash
+      })
+    });
+
+    if (!joinRes.ok) {
+      throw new Error(`Gradio queue join HTTP status ${joinRes.status}`);
+    }
+
+    const sseRes = await fetch(dataUrl);
+    if (!sseRes.ok) {
+      throw new Error(`Gradio stream HTTP status ${sseRes.status}`);
+    }
+
+    const reader = sseRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let rawText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const payload = JSON.parse(line.slice(6));
+            if (payload.msg === 'process_completed' && payload.output?.data) {
+              rawText = String(payload.output.data[0] || '');
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+      if (rawText) break;
+    }
+
+    if (rawText && !rawText.startsWith('❌')) {
+      const parsedData = parseGradioStudentProfile(rawText, cleanRoll);
+      if (parsedData && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({
+            timestamp: Date.now(),
+            data: parsedData
+          }));
+        } catch (e) {}
+      }
+      return parsedData;
+    }
+  } catch (err) {
+    console.warn(`[GradioStudentProfile] Notice: ${err.message}`);
+  }
+
+  // 3. Return stale cache on network failure
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.data) return parsed.data;
+      }
+    } catch (e) {}
+  }
+
+  return null;
+}
+
+/**
+ * Parses full student profile, activities, and breakdown text from Gradio fn_index 2
+ */
+export function parseGradioStudentProfile(text, rollNo) {
+  if (!text || typeof text !== 'string') return null;
+
+  const result = {
+    rollNo,
+    name: '',
+    year: '',
+    department: '',
+    mentor: '',
+    cumulativePoints: 0,
+    redeemedPoints: 0,
+    balancePoints: 0,
+    carryForward: 0,
+    activities: [],
+    categories: [],
+    rawText: text,
+    isLiveGradio: true,
+    fetchedAt: new Date().toISOString()
+  };
+
+  const lines = text.split('\n').map(l => l.trim());
+  let section = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+
+    if (line.includes('YOUR DETAILS')) {
+      section = 'DETAILS';
+      continue;
+    } else if (line.includes('DETAILED ACTIVITY LIST')) {
+      section = 'ACTIVITIES';
+      continue;
+    } else if (line.includes('REWARD POINTS BREAKDOWN')) {
+      section = 'BREAKDOWN';
+      continue;
+    }
+
+    if (section === 'DETAILS') {
+      if (line.startsWith('ROLL NO.')) result.rollNo = line.split(':')[1]?.trim() || rollNo;
+      else if (line.startsWith('STUDENT NAME')) result.name = line.split(':')[1]?.trim() || '';
+      else if (line.startsWith('YEAR')) result.year = line.split(':')[1]?.trim() || '';
+      else if (line.startsWith('DEPARTMENT')) result.department = line.split(':')[1]?.trim() || '';
+      else if (line.startsWith('MENTOR NAME')) result.mentor = line.split(':')[1]?.trim() || '';
+      else if (line.startsWith('CUMULATIVE REWARD POINTS')) result.cumulativePoints = parseFloat((line.split(':')[1] || '0').replace(/,/g, '')) || 0;
+      else if (line.startsWith('REEDEMED POINTS') || line.startsWith('REDEEMED POINTS')) result.redeemedPoints = parseFloat((line.split(':')[1] || '0').replace(/,/g, '')) || 0;
+      else if (line.startsWith('BALANCE POINTS')) result.balancePoints = parseFloat((line.split(':')[1] || '0').replace(/,/g, '')) || 0;
+    } else if (section === 'ACTIVITIES') {
+      const match = line.match(/^\d+\.\s+([A-Z\s]+):\s+(.+)\s+-\s+([0-9.,]+)\s*pts/i);
+      if (match) {
+        const rawType = match[1].trim();
+        const rawName = match[2].trim();
+        const rawPts = parseFloat(match[3].replace(/,/g, '')) || 0;
+        const isPS = rawType.toUpperCase().includes('P SKILL') || rawType.toUpperCase().includes('PSKILL');
+        
+        const dateMatch = rawName.match(/\((\d{2}\/\d{2}\/\d{4}\s*-\s*\d{2}\/\d{2}\/\d{4})\)/);
+        const dateStr = dateMatch ? dateMatch[1] : 'Academic Year 2025-2026';
+
+        result.activities.push({
+          id: `gradio-act-${result.activities.length + 1}`,
+          code: `ACT_${result.activities.length + 1}`,
+          activity_code: `ACT_${result.activities.length + 1}`,
+          activity_type: isPS ? 'P Skill' : (rawType.includes('INITIATIVE') ? 'Initiative' : (rawType.includes('INTERVIEW') ? 'Interview' : rawType)),
+          raw_type: rawType,
+          activity_name: rawName,
+          course_name: rawName,
+          points: rawPts,
+          reward_points: rawPts.toLocaleString(),
+          date: dateStr,
+          organizer: 'BIT Center for Excellence',
+          type: 'positive',
+          isPS
+        });
+      }
+    } else if (section === 'BREAKDOWN') {
+      if (line.startsWith('📋 **')) {
+        const label = line.replace(/^📋 \*\*/, '').replace(/\*\*$/, '').trim();
+        const nextLine = lines[i + 1] || '';
+        if (nextLine.includes('Count:') && nextLine.includes('Points:')) {
+          const countMatch = nextLine.match(/Count:\s*([0-9-]+)/);
+          const ptsMatch = nextLine.match(/Points:\s*([0-9.,-]+)/);
+          const count = countMatch && countMatch[1] !== '-' ? parseInt(countMatch[1], 10) : 0;
+          const pts = ptsMatch ? parseFloat(ptsMatch[1].replace(/,/g, '')) : 0;
+          if (label !== 'TOTAL (2025-2026 EVEN)' && label !== 'CUMULATIVE POINTS' && label !== 'REDEEMED POINTS' && label !== 'BALANCE POINTS') {
+            result.categories.push({
+              id: label.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+              label,
+              count,
+              points: pts
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return result;
+}

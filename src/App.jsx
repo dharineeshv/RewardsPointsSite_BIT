@@ -9,6 +9,7 @@ import { getInstantPlacementData, fetchLivePlacementData, publishLivePlacementDa
 import { getInstantStudentMentorData } from './services/studentMentorService';
 const studentMentorData = getInstantStudentMentorData();
 import InternalMarksView from './components/InternalMarksView';
+import { fetchLiveGradioStudentProfile } from './services/internalMarksGradioService';
 import { fetchDepartmentSheetData, fetchStudentRewardPointsFromSheet, fetchAuthenticatedStudentPoints, fetchInstitutionalAveragesFromSheet, getInstantInitialAverages, calculateDynamicAveragesFromStudents, fetchAllLiveDepartmentsAndAverages, fetchLiveStudentEventLogs, fetchLiveMasterSpreadsheet, getCachedStudentPoints, cacheStudentPoints, AVERAGE_CHART_URL, SPREADSHEET_ID } from './services/googleSheetsService';
 import { COLLEGE_HOLIDAYS_AND_LEAVES } from './data/collegeLeaves';
 import { savePdfDocumentToDB, loadAllPdfDocumentsFromDB, removePdfDocumentFromDB } from './services/pdfStorageService';
@@ -4330,11 +4331,34 @@ export default function App() {
           ? STUDENTS_DATABASE.find(s => (s.id || '').toUpperCase() === roll)
           : null;
 
+        // Fetch live Gradio profile for full granular P-Skill completions and category breakdown
+        let gradioProfile = null;
+        try {
+          gradioProfile = await fetchLiveGradioStudentProfile(roll);
+          if (gradioProfile) {
+            setDisplayedStudent(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                cumulativePoints: (gradioProfile.cumulativePoints || prev.cumulativePoints || '0').toLocaleString(),
+                cumulative_points: gradioProfile.cumulativePoints || prev.cumulative_points,
+                cumulative_reward_points: (gradioProfile.cumulativePoints || prev.cumulative_reward_points || '0').toLocaleString(),
+                redeemedPoints: (gradioProfile.redeemedPoints || prev.redeemedPoints || '0').toLocaleString(),
+                redeemed_points: gradioProfile.redeemedPoints || prev.redeemed_points,
+                currentPoints: (gradioProfile.balancePoints || prev.currentPoints || '0').toLocaleString(),
+                balance_points: gradioProfile.balancePoints || prev.balance_points,
+                mentor_name: gradioProfile.mentor && gradioProfile.mentor !== 'BIT Faculty' ? gradioProfile.mentor : prev.mentor_name,
+                activityBreakdown: (gradioProfile.categories && gradioProfile.categories.length > 0) ? gradioProfile.categories : (prev.activityBreakdown || [])
+              };
+            });
+          }
+        } catch (gErr) {}
+
         let eventLogs = (STUDENT_EVENT_LOGS_MAP && STUDENT_EVENT_LOGS_MAP[roll]) || masterRecord?.eventLogs || [];
         try {
           const liveLogs = await fetchLiveStudentEventLogs(roll);
           if (Array.isArray(liveLogs) && liveLogs.length > 0) {
-            // Prefer live logs from Google Sheets
+            // Prefer live logs from Google Sheets & Gradio
             eventLogs = liveLogs;
           }
         } catch (e) {
@@ -4356,9 +4380,14 @@ export default function App() {
           }
         };
 
-        // 1. Add granular individual event participation & P-Skill logs from Apps Script / Google Sheets
-        let hasDirectPSLogs = false;
-        let hasDirectInitiativeLogs = false;
+        // 1. Add direct Gradio activities if available
+        if (gradioProfile && Array.isArray(gradioProfile.activities)) {
+          gradioProfile.activities.forEach(act => addActivity(act));
+        }
+
+        // 2. Add granular individual event participation & P-Skill logs from Apps Script / Google Sheets
+        let hasDirectPSLogs = (gradioProfile?.activities?.some(a => a.isPS)) || false;
+        let hasDirectInitiativeLogs = (gradioProfile?.activities?.some(a => (a.activity_type || '').toUpperCase().includes('INITIATIVE'))) || false;
 
         if (Array.isArray(eventLogs) && eventLogs.length > 0) {
           eventLogs.forEach(ev => {
@@ -4386,7 +4415,7 @@ export default function App() {
           });
         }
 
-        // 2. Student Verified Activities from database if available (deduplicated)
+        // 3. Student Verified Activities from database if available (deduplicated)
         if (dbStudent && Array.isArray(dbStudent.history)) {
           dbStudent.history.forEach((h, hIdx) => {
             const pts = parseFloat(String(h.points || '0').replace(/[^0-9.]/g, '')) || 0;
@@ -4404,19 +4433,23 @@ export default function App() {
           });
         }
 
-        // 3. Add Master Sheet Categories only for categories without direct logs (strictly avoiding duplicates)
-        if (masterRecord && Array.isArray(masterRecord.activityBreakdown)) {
-          masterRecord.activityBreakdown.forEach((act) => {
+        // 4. Add Master Sheet Categories only for categories without direct logs (strictly avoiding duplicates)
+        const categories = (gradioProfile?.categories && gradioProfile.categories.length > 0)
+          ? gradioProfile.categories
+          : (masterRecord?.activityBreakdown || []);
+
+        if (Array.isArray(categories)) {
+          categories.forEach((act) => {
             const pts = typeof act.points === 'number' ? act.points : parseFloat(String(act.points || '0').replace(/,/g, ''));
             if (pts > 0) {
               let title = act.label;
               let actType = act.label.split(' ')[0] || 'Technical';
 
-              if (act.id === 'pskill') {
+              if (act.id === 'pskill' || act.id === 'p_skill') {
                 if (hasDirectPSLogs) return; // omit summary duplicate
                 title = 'P-Skill';
                 actType = 'P Skill';
-              } else if (act.id === 'initiatives') {
+              } else if (act.id === 'initiatives' || act.id === 'student_initiatives') {
                 if (hasDirectInitiativeLogs) return; // omit summary duplicate
                 title = 'Student Initiatives & GP Challenge (BPI)';
                 actType = 'Initiative';
@@ -4464,11 +4497,34 @@ export default function App() {
           ? STUDENTS_INTERNAL_MARKS_LIST.find(s => (s.rollNo || '').toUpperCase() === roll)
           : null;
 
+        // Fetch live Gradio profile for full granular P-Skill completions and category breakdown
+        let gradioProfile = null;
+        try {
+          gradioProfile = await fetchLiveGradioStudentProfile(roll);
+          if (gradioProfile && isMounted) {
+            setSelectedStudent(prev => {
+              if (!prev || ((prev.id || '').toUpperCase() !== roll && (prev.roll_no || '').toUpperCase() !== roll && (prev.rollNo || '').toUpperCase() !== roll)) return prev;
+              return {
+                ...prev,
+                cumulativePoints: (gradioProfile.cumulativePoints || prev.cumulativePoints || '0').toLocaleString(),
+                cumulative_points: gradioProfile.cumulativePoints || prev.cumulative_points,
+                cumulative_reward_points: (gradioProfile.cumulativePoints || prev.cumulative_reward_points || '0').toLocaleString(),
+                redeemedPoints: (gradioProfile.redeemedPoints || prev.redeemedPoints || '0').toLocaleString(),
+                redeemed_points: gradioProfile.redeemedPoints || prev.redeemed_points,
+                currentPoints: (gradioProfile.balancePoints || prev.currentPoints || '0').toLocaleString(),
+                balance_points: gradioProfile.balancePoints || prev.balance_points,
+                mentor_name: gradioProfile.mentor && gradioProfile.mentor !== 'BIT Faculty' ? gradioProfile.mentor : prev.mentor_name,
+                activityBreakdown: (gradioProfile.categories && gradioProfile.categories.length > 0) ? gradioProfile.categories : (prev.activityBreakdown || [])
+              };
+            });
+          }
+        } catch (gErr) {}
+
         let eventLogs = (STUDENT_EVENT_LOGS_MAP && STUDENT_EVENT_LOGS_MAP[roll]) || masterRecord?.eventLogs || [];
         try {
           const liveLogs = await fetchLiveStudentEventLogs(roll);
           if (Array.isArray(liveLogs) && liveLogs.length > 0) {
-            // Prefer live logs from Google Sheets
+            // Prefer live logs from Google Sheets & Gradio
             eventLogs = liveLogs;
           }
         } catch (e) {
@@ -4490,11 +4546,16 @@ export default function App() {
           }
         };
 
-        const initialRaw = masterRecord?.initialPoints || selectedStudent.initialPoints || 0;
+        // 1. Add direct Gradio activities if available
+        if (gradioProfile && Array.isArray(gradioProfile.activities)) {
+          gradioProfile.activities.forEach(act => addModalActivity(act));
+        }
 
-        // 1. Add granular individual event participation & P-Skill logs (Live Apps Script + Sheets)
-        let hasDirectPSLogs = false;
-        let hasDirectInitiativeLogs = false;
+        const initialRaw = gradioProfile?.carryForward || masterRecord?.initialPoints || selectedStudent.initialPoints || 0;
+
+        // 2. Add granular individual event participation & P-Skill logs (Live Apps Script + Sheets)
+        let hasDirectPSLogs = (gradioProfile?.activities?.some(a => a.isPS)) || false;
+        let hasDirectInitiativeLogs = (gradioProfile?.activities?.some(a => (a.activity_type || '').toUpperCase().includes('INITIATIVE'))) || false;
 
         if (Array.isArray(eventLogs) && eventLogs.length > 0) {
           eventLogs.forEach(ev => {
@@ -4522,7 +4583,7 @@ export default function App() {
           });
         }
 
-        // 2. Student Verified Activities from database if available (deduplicated)
+        // 3. Student Verified Activities from database if available (deduplicated)
         const studentDbRecord = Array.isArray(STUDENTS_DATABASE)
           ? STUDENTS_DATABASE.find(s => (s.id || '').toUpperCase() === roll)
           : null;
@@ -4544,7 +4605,7 @@ export default function App() {
           });
         }
 
-        // 3. Carry-In / Previous Semester Verified Points (if any)
+        // 4. Carry-In / Previous Semester Verified Points (if any)
         const initNum = parseFloat(String(initialRaw).replace(/,/g, '')) || 0;
         if (initNum > 0) {
           addModalActivity({
@@ -4559,19 +4620,23 @@ export default function App() {
           });
         }
 
-        // 4. Add Master Sheet Categories only for categories without direct logs (strictly avoiding duplicates)
-        if (masterRecord && Array.isArray(masterRecord.activityBreakdown)) {
-          masterRecord.activityBreakdown.forEach((act) => {
+        // 5. Add Master Sheet Categories only for categories without direct logs (strictly avoiding duplicates)
+        const categories = (gradioProfile?.categories && gradioProfile.categories.length > 0)
+          ? gradioProfile.categories
+          : (masterRecord?.activityBreakdown || []);
+
+        if (Array.isArray(categories)) {
+          categories.forEach((act) => {
             const pts = typeof act.points === 'number' ? act.points : parseFloat(String(act.points || '0').replace(/,/g, ''));
             if (pts > 0) {
               let title = act.label;
               let actType = act.label.split(' ')[0] || 'Technical';
 
-              if (act.id === 'pskill') {
+              if (act.id === 'pskill' || act.id === 'p_skill') {
                 if (hasDirectPSLogs) return; // omit summary duplicate
                 title = 'P-Skill';
                 actType = 'P Skill';
-              } else if (act.id === 'initiatives') {
+              } else if (act.id === 'initiatives' || act.id === 'student_initiatives') {
                 if (hasDirectInitiativeLogs) return; // omit summary duplicate
                 title = 'Student Initiatives & GP Challenge (BPI)';
                 actType = 'Initiative';
@@ -4873,59 +4938,76 @@ export default function App() {
     setDisplayedStudent(transformed);
     setIsStudentPointsLoading(false);
 
-    // 2. Ultra-Fast Background Direct GViz Revalidation (~150ms)
+    // 2. Ultra-Fast Background Direct GViz & Gradio Live Revalidation (~150ms)
     try {
-      const liveData = await fetchStudentRewardPointsFromSheet(rollNo, apiItem.department);
-      if (liveData && (liveData.balance_points !== undefined || liveData.points !== undefined || liveData.currentPoints !== undefined)) {
-        const liveBal = parseFloat(String(liveData.balance_points ?? liveData.points ?? liveData.currentPoints ?? 0).replace(/,/g, '')) || 0;
-        const liveCum = parseFloat(String(liveData.cumulative_points ?? liveData.cumulativePoints ?? liveBal).replace(/,/g, '')) || liveBal;
-        const liveRed = parseFloat(String(liveData.redeemed_points ?? liveData.redeemedPoints ?? 0).replace(/,/g, '')) || 0;
-        const liveName = String(liveData.name || liveData.student_name || transformed.name).replace(/^(Mr\.|Ms\.|Mrs\.|Dr\.)\s+/i, '').trim().toUpperCase();
-        const initials = getStudentInitials(liveName, rollNo);
-        const avatarBg = getStudentAvatarBg(rollNo || liveName);
+      // Parallel fetch from Sheet and Gradio space
+      const [liveData, gradioProfile] = await Promise.allSettled([
+        fetchStudentRewardPointsFromSheet(rollNo, apiItem.department),
+        fetchLiveGradioStudentProfile(rollNo)
+      ]);
 
-        const photoUrl = liveData.picture || liveData.photo_url || `https://ips.bitsathy.ac.in/assets/images/${rollNo}.jpg`;
-        const studentEmail = liveData.email || transformed.email || `${rollNo.toLowerCase()}@bitsathy.ac.in`;
+      const sheetRes = liveData.status === 'fulfilled' ? liveData.value : null;
+      const gradioRes = gradioProfile.status === 'fulfilled' ? gradioProfile.value : null;
 
-        setDisplayedStudent(prev => ({
-          ...prev,
-          ...transformed,
-          id: rollNo,
-          rollNo: rollNo,
-          roll_no: rollNo,
-          name: liveName,
-          student_name: liveName,
-          initials: initials,
-          avatarBg: avatarBg,
-          picture: photoUrl,
-          photo_url: photoUrl,
-          email: studentEmail,
-          mentor_name: liveData.mentor || liveData.mentor_name || transformed.mentor_name,
-          mentor: liveData.mentor || liveData.mentor_name || transformed.mentor,
-          department: liveData.department || transformed.department,
-          year: liveData.year ? (String(liveData.year).startsWith('Year') ? String(liveData.year) : `Year ${liveData.year}`) : transformed.year,
-          balance_points: liveBal,
-          balancePoints: liveBal,
-          points: liveBal,
-          rawPoints: liveBal,
-          currentPoints: liveBal.toLocaleString(),
-          cumulative_points: liveCum,
-          cumulativePoints: liveCum.toLocaleString(),
-          cumulative_reward_points: liveCum.toLocaleString(),
-          redeemed_points: liveRed,
-          redeemedPoints: liveRed.toLocaleString(),
-          history: [
-            { id: 1, title: "Cumulative RP Earned", date: "Academic Year 2024-2025", points: `+${liveCum.toLocaleString()} RP`, category: "Activities", icon: Trophy, color: "text-amber-500 bg-amber-50" },
-            { id: 2, title: "Redeemed Points", date: "Benefits & Vouchers", points: `-${liveRed.toLocaleString()} RP`, category: "Redemption", icon: Gift, color: "text-indigo-500 bg-indigo-50" },
-            { id: 3, title: "Net Active Balance", date: "Current Academic Standing", points: `${liveBal.toLocaleString()} RP`, category: "Balance", icon: Award, color: "text-emerald-500 bg-emerald-50" }
-          ],
-          breakdown: [
-            { label: "Active Net Balance", pts: liveBal, percent: liveCum > 0 ? Math.round((liveBal / liveCum) * 100) : 100, color: "bg-[#4f46e5]" },
-            { label: "Cumulative Points", pts: liveCum, percent: 100, color: "bg-[#22d3ee]" },
-            { label: "Redeemed Points", pts: liveRed, percent: liveCum > 0 ? Math.round((liveRed / liveCum) * 100) : 0, color: "bg-amber-500" },
-          ]
-        }));
-      }
+      const liveBal = gradioRes?.balancePoints !== undefined 
+        ? gradioRes.balancePoints 
+        : (parseFloat(String(sheetRes?.balance_points ?? sheetRes?.points ?? sheetRes?.currentPoints ?? 0).replace(/,/g, '')) || 0);
+
+      const liveCum = gradioRes?.cumulativePoints !== undefined
+        ? gradioRes.cumulativePoints
+        : (parseFloat(String(sheetRes?.cumulative_points ?? sheetRes?.cumulativePoints ?? liveBal).replace(/,/g, '')) || liveBal);
+
+      const liveRed = gradioRes?.redeemedPoints !== undefined
+        ? gradioRes.redeemedPoints
+        : (parseFloat(String(sheetRes?.redeemed_points ?? sheetRes?.redeemedPoints ?? 0).replace(/,/g, '')) || 0);
+
+      const liveName = String(gradioRes?.name || sheetRes?.name || sheetRes?.student_name || transformed.name).replace(/^(Mr\.|Ms\.|Mrs\.|Dr\.)\s+/i, '').trim().toUpperCase();
+      const initials = getStudentInitials(liveName, rollNo);
+      const avatarBg = getStudentAvatarBg(rollNo || liveName);
+
+      const photoUrl = sheetRes?.picture || sheetRes?.photo_url || `https://ips.bitsathy.ac.in/assets/images/${rollNo}.jpg`;
+      const studentEmail = sheetRes?.email || transformed.email || `${rollNo.toLowerCase()}@bitsathy.ac.in`;
+      const categories = (gradioRes?.categories && gradioRes.categories.length > 0) ? gradioRes.categories : (transformed.activityBreakdown || []);
+
+      setDisplayedStudent(prev => ({
+        ...prev,
+        ...transformed,
+        id: rollNo,
+        rollNo: rollNo,
+        roll_no: rollNo,
+        name: liveName,
+        student_name: liveName,
+        initials: initials,
+        avatarBg: avatarBg,
+        picture: photoUrl,
+        photo_url: photoUrl,
+        email: studentEmail,
+        mentor_name: (gradioRes?.mentor && gradioRes.mentor !== 'BIT Faculty') ? gradioRes.mentor : (sheetRes?.mentor || sheetRes?.mentor_name || transformed.mentor_name),
+        mentor: (gradioRes?.mentor && gradioRes.mentor !== 'BIT Faculty') ? gradioRes.mentor : (sheetRes?.mentor || sheetRes?.mentor_name || transformed.mentor),
+        department: gradioRes?.department || sheetRes?.department || transformed.department,
+        year: (gradioRes?.year || sheetRes?.year) ? (String(gradioRes?.year || sheetRes?.year).startsWith('Year') ? String(gradioRes?.year || sheetRes?.year) : `Year ${gradioRes?.year || sheetRes?.year}`) : transformed.year,
+        balance_points: liveBal,
+        balancePoints: liveBal,
+        points: liveBal,
+        rawPoints: liveBal,
+        currentPoints: liveBal.toLocaleString(),
+        cumulative_points: liveCum,
+        cumulativePoints: liveCum.toLocaleString(),
+        cumulative_reward_points: liveCum.toLocaleString(),
+        redeemed_points: liveRed,
+        redeemedPoints: liveRed.toLocaleString(),
+        activityBreakdown: categories,
+        history: [
+          { id: 1, title: "Cumulative RP Earned", date: "Academic Year 2024-2025", points: `+${liveCum.toLocaleString()} RP`, category: "Activities", icon: Trophy, color: "text-amber-500 bg-amber-50" },
+          { id: 2, title: "Redeemed Points", date: "Benefits & Vouchers", points: `-${liveRed.toLocaleString()} RP`, category: "Redemption", icon: Gift, color: "text-indigo-500 bg-indigo-50" },
+          { id: 3, title: "Net Active Balance", date: "Current Academic Standing", points: `${liveBal.toLocaleString()} RP`, category: "Balance", icon: Award, color: "text-emerald-500 bg-emerald-50" }
+        ],
+        breakdown: [
+          { label: "Active Net Balance", pts: liveBal, percent: liveCum > 0 ? Math.round((liveBal / liveCum) * 100) : 100, color: "bg-[#4f46e5]" },
+          { label: "Cumulative Points", pts: liveCum, percent: 100, color: "bg-[#22d3ee]" },
+          { label: "Redeemed Points", pts: liveRed, percent: liveCum > 0 ? Math.round((liveRed / liveCum) * 100) : 0, color: "bg-amber-500" },
+        ]
+      }));
     } catch (e) {
       console.warn('[LiveStudentSync] Error fetching live student:', e);
     }

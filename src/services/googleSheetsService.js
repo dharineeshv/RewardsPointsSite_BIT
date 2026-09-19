@@ -6,6 +6,7 @@
  */
 
 import { STUDENTS_INTERNAL_MARKS_LIST } from '../data/rp_distribution';
+import { fetchLiveGradioStudentProfile } from './internalMarksGradioService';
 
 export const SPREADSHEET_ID = '1t5uHtrRMSXQkxrFRUudDpwuN23A6K61PhdrjDNZFaV8';
 export const AVERAGE_CHART_URL = 'https://docs.google.com/spreadsheets/u/0/d/e/2CAIWO3eknhiehRfdG1oU224872XJO0ssr4C5WPbdG4Dn3VQWYjCwztko0jDtm41g5_SgzdfNVdiLjwAclZw/gviz/chartiframe?oid=1492100559&resourcekey';
@@ -840,27 +841,57 @@ export async function fetchLiveStudentEventLogs(rollNo, token = null) {
   const accessToken = token || (typeof window !== 'undefined' ? localStorage.getItem('bit_rp_access_token') : null);
 
   const events = [];
+  const seenKeys = new Set();
 
-  // 1. First check live Apps Script P-Skill records
+  // 1. First check verified live Gradio Student Profile & granular P-Skill records
+  try {
+    const gradioProfile = await fetchLiveGradioStudentProfile(cleanRoll);
+    if (gradioProfile && Array.isArray(gradioProfile.activities) && gradioProfile.activities.length > 0) {
+      gradioProfile.activities.forEach(act => {
+        const actName = (act.activity_name || act.course_name || '').trim().toLowerCase();
+        const actCode = (act.code || act.activity_code || '').trim().toUpperCase();
+        const key = actCode ? `code_${actCode}` : `name_${actName}_${act.points}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          events.push({
+            ...act,
+            roll_no: cleanRoll,
+            isLiveGradio: true
+          });
+        }
+      });
+    }
+  } catch (gErr) {
+    console.warn('[GoogleSheetsService] Gradio student profile notice:', gErr);
+  }
+
+  // 2. Check live Apps Script P-Skill records
   try {
     const appsScriptLogs = await fetchLivePSkillLedgerFromAppsScript(cleanRoll, accessToken);
     if (Array.isArray(appsScriptLogs) && appsScriptLogs.length > 0) {
       const matched = appsScriptLogs.filter(r => (r.roll_no || r.rollNo || '').toUpperCase() === cleanRoll);
       matched.forEach((r, idx) => {
-        events.push({
-          id: `as-ps-${idx}`,
-          date: r.date || '2025-2026',
-          code: r.activity_code || r.code || '',
-          activity_code: r.activity_code || r.code || '',
-          points: r.points || cleanPointValue(r.reward_points),
-          activity_name: r.activity_name || r.course_name || 'P-Skill Activity',
-          course_name: r.course_name || r.activity_name || 'P-Skill Activity',
-          activity_type: r.activity_type || 'P Skill',
-          reward_points: (r.points || cleanPointValue(r.reward_points)).toLocaleString(),
-          organizer: r.organizer || '',
-          type: 'positive',
-          isPS: r.isPS !== undefined ? r.isPS : true
-        });
+        const actName = r.activity_name || r.course_name || 'P-Skill Activity';
+        const actKey = actName.trim().toLowerCase();
+        const code = (r.activity_code || r.code || '').trim().toUpperCase();
+        const key = code ? `code_${code}` : `name_${actKey}_${r.points}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          events.push({
+            id: `as-ps-${idx}`,
+            date: r.date || '2025-2026',
+            code: code,
+            activity_code: code,
+            points: r.points || cleanPointValue(r.reward_points),
+            activity_name: actName,
+            course_name: actName,
+            activity_type: r.activity_type || 'P Skill',
+            reward_points: (r.points || cleanPointValue(r.reward_points)).toLocaleString(),
+            organizer: r.organizer || '',
+            type: 'positive',
+            isPS: r.isPS !== undefined ? r.isPS : true
+          });
+        }
       });
     }
   } catch (asErr) {
