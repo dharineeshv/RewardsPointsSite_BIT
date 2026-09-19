@@ -1,16 +1,16 @@
 {
-  "lastUpdated": "September 18, 2026",
+  "lastUpdated": "September 19, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 532,
-  "totalCompaniesVisited": 95,
-  "editionDate": "18-09-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/9f888be55af330757a0914b77d6575be6843de78.pdf",
+  "totalStudentsPlaced": 533,
+  "totalCompaniesVisited": 96,
+  "editionDate": "19-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/f7054ad383742e4db6737e33995c87d0de9b2113.pdf",
   "totalPages": 7,
   "placementPageNumber": 6,
   "drivesPageNumber": 7,
   "upcomingDrives": [
     {
-      "company": "Sobha Limited",
+      "company": "Tiger Analytics",
       "role": "Software & AI Engineering Roles",
       "targetBatch": "2023-2027 Batch",
       "startDate": "07 Sep 2026",
@@ -70,16 +70,16 @@
       "tier": "6 - 7 LPA",
       "tierCategory": "Prime Tier",
       "range": "6.00 - 7.00 LPA",
-      "offerCount": 21,
+      "offerCount": 22,
       "color": "from-blue-500 to-cyan-500",
       "badgeColor": "bg-blue-500/10 text-blue-400 border-blue-500/20",
       "companies": [
         "CodeMagen",
         "EXL Service",
+        "Glowlogics",
         "IDP Education",
         "Infineon Technologies",
-        "The Alter Office",
-        "Zohocorp"
+        "The Alter"
       ]
     },
     {
