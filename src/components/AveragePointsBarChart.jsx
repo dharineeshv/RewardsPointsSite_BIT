@@ -254,7 +254,7 @@ export default function AveragePointsBarChart({
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                     <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                      IP - 1 ({sched.sem1})
+                      IP - 1
                     </span>
                   </div>
                   <div className={`text-base sm:text-lg font-black font-mono tracking-tight mt-0.5 ${
@@ -278,7 +278,7 @@ export default function AveragePointsBarChart({
                   <div className="flex items-center gap-1.5">
                     <CalendarCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                      IP - 2 ({sched.sem2})
+                      IP - 2
                     </span>
                   </div>
                   <div className={`text-base sm:text-lg font-black font-mono tracking-tight mt-0.5 ${

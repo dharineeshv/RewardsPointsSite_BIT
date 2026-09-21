@@ -2028,16 +2028,39 @@ function BitRobotChatAssistant({
     ) || student || {};
   }, [student, currentUser]);
 
-  const activeMentor = matchedStudentRecord?.mentor || 'Dr. ANANDAKUMAR K ISE';
-  const activeRollNo = matchedStudentRecord?.rollNo || student?.id || student?.roll_no || 'CT109';
-  const activeYear = matchedStudentRecord?.year || 'IV';
-  const activeDept = matchedStudentRecord?.department || department;
-  const activeBalanceRP = matchedStudentRecord?.balancePoints ?? (student?.currentPoints || currentUser?.currentPoints || '0');
-  const activeCumulativeRP = matchedStudentRecord?.cumulativePoints ?? (student?.cumulativePoints || activeBalanceRP);
-  const activeRedeemedRP = matchedStudentRecord?.redeemedPoints ?? (student?.redeemedPoints || '0');
-  const activeActivities = matchedStudentRecord?.activityBreakdown || [];
-  const activeTheoryCourses = matchedStudentRecord?.theoryCourses || [];
-  const activeGrandTotal = matchedStudentRecord?.grandTotal || '40.50';
+  const activeRollNo = student?.id || student?.roll_no || student?.rollNo || currentUser?.id || currentUser?.rollNo || matchedStudentRecord?.rollNo || 'CT109';
+  const activeMentor = student?.mentor_name || student?.mentor || currentUser?.mentor_name || currentUser?.mentor || matchedStudentRecord?.mentor || 'BIT Faculty Advisor';
+  const activeYear = student?.year || currentUser?.year || matchedStudentRecord?.year || 'IV';
+  const activeDept = student?.department || currentUser?.department || matchedStudentRecord?.department || department;
+
+  // Prioritize 100% live state from Google Sheets / Gradio / active student object
+  const activeBalanceRP = String(student?.currentPoints ?? student?.balance_points ?? student?.balancePoints ?? currentUser?.currentPoints ?? currentUser?.balance_points ?? matchedStudentRecord?.balancePoints ?? '0');
+  const activeCumulativeRP = String(student?.cumulativePoints ?? student?.cumulative_reward_points ?? student?.cumulative_points ?? currentUser?.cumulativePoints ?? currentUser?.cumulative_reward_points ?? matchedStudentRecord?.cumulativePoints ?? activeBalanceRP);
+  const activeRedeemedRP = String(student?.redeemedPoints ?? student?.redeemed_points ?? currentUser?.redeemedPoints ?? currentUser?.redeemed_points ?? matchedStudentRecord?.redeemedPoints ?? '0');
+
+  const activeActivities = (Array.isArray(student?.activityBreakdown) && student.activityBreakdown.length > 0)
+    ? student.activityBreakdown
+    : (Array.isArray(currentUser?.activityBreakdown) && currentUser.activityBreakdown.length > 0)
+      ? currentUser.activityBreakdown
+      : (matchedStudentRecord?.activityBreakdown || []);
+
+  const activeTheoryCourses = (Array.isArray(student?.theoryCourses) && student.theoryCourses.length > 0)
+    ? student.theoryCourses
+    : (Array.isArray(currentUser?.theoryCourses) && currentUser.theoryCourses.length > 0)
+      ? currentUser.theoryCourses
+      : (matchedStudentRecord?.theoryCourses || []);
+
+  const activeGrandTotal = student?.grandTotal || currentUser?.grandTotal || matchedStudentRecord?.grandTotal || '40.50';
+
+  // Compute live upcoming leaves relative to current date (e.g. September 2026 onwards)
+  const todayDateStr = new Date().toISOString().split('T')[0];
+  const sortedCollegeLeaves = useMemo(() => {
+    return [...(leavesList || [])].sort((a, b) => (a.from_date || a.fromDate || '').localeCompare(b.from_date || b.fromDate || ''));
+  }, [leavesList]);
+  const upcomingCollegeLeaves = useMemo(() => {
+    return sortedCollegeLeaves.filter(l => (l.to_date || l.toDate || l.from_date || l.fromDate || '') >= todayDateStr);
+  }, [sortedCollegeLeaves, todayDateStr]);
+  const nextUpcomingLeave = upcomingCollegeLeaves[0] || sortedCollegeLeaves[0];
 
   const [messages, setMessages] = useState(() => [
     {
@@ -2123,7 +2146,7 @@ function BitRobotChatAssistant({
       replyLink = 'https://www.bitsathy.ac.in';
       replyLinkText = 'Open BIT Website';
     } else if (lower.includes('point') || lower.includes('balance') || lower.includes('rp') || lower.includes('reward')) {
-      replyText = `🏆 **Your Reward Points Status**\n• Student: **${studentName}** (${activeRollNo})\n• Active Balance: **${activeBalanceRP} RP**\n• Cumulative Earned: **${activeCumulativeRP} RP**\n• Redeemed: **${activeRedeemedRP} RP**\n\nKeep attending technical events, hackathons, and certifications to earn more points!`;
+      replyText = `🏆 **Your Live Reward Points Status**\n• Student: **${studentName}** (${activeRollNo})\n• Active Balance: **${activeBalanceRP} RP**\n• Cumulative Earned: **${activeCumulativeRP} RP**\n• Redeemed: **${activeRedeemedRP} RP**\n\nKeep completing P-Skills, technical events, hackathons, and certifications to earn more points!`;
       replyNav = 'Dashboard';
     } else if (lower.includes('placement') || lower.includes('job') || lower.includes('salary') || lower.includes('drive')) {
       const totalPlaced = placementData?.totalStudentsPlaced || 510;
@@ -2136,8 +2159,8 @@ function BitRobotChatAssistant({
       replyText = `🍽️ **Hostel Mess Menu**\nLive daily menus for Boys and Girls hostels with breakfast, lunch, snacks, and dinner schedules are available in the Mess Menu tab.`;
       replyNav = 'Mess Menu';
     } else if (lower.includes('leave') || lower.includes('holiday') || lower.includes('gp') || lower.includes('gate pass')) {
-      const nextLeave = leavesList?.[0];
-      replyText = `📅 **Academic Leave & Gate Pass Schedule**\n${nextLeave ? `• Next Event: **${nextLeave.name}** (${nextLeave.from_date} to ${nextLeave.to_date})` : '• You can view the full semester leave schedule and upcoming Gate Pass dates.'}`;
+      const topUpcoming = upcomingCollegeLeaves.slice(0, 3).map(l => `• **${l.name}**: ${l.dateDisplay || `${l.from_date} to ${l.to_date}`}`).join('\n');
+      replyText = `📅 **Upcoming Academic Leaves & Gate Pass**\n${nextUpcomingLeave ? `• **Next Upcoming:** **${nextUpcomingLeave.name}** (${nextUpcomingLeave.dateDisplay || `${nextUpcomingLeave.from_date} to ${nextUpcomingLeave.to_date}`})` : ''}\n\n**Upcoming Schedule:**\n${topUpcoming || '• All semester leaves are recorded in the Leave Schedule view.'}`;
       replyNav = 'Leave Schedule';
     } else if (lower.includes('exam') || lower.includes('hall') || lower.includes('seat')) {
       replyText = `🪑 **Exam Hall & Seating Finder**\nFind your exact exam hall number, block, and desk number instantly using your register number.`;
@@ -2186,9 +2209,11 @@ function BitRobotChatAssistant({
         ? activeTheoryCourses.map(c => `  - ${c.code} (${c.slot}): IP-1 = ${c.ip1 || '0.00'}, IP-2 = ${c.ip2 || '0.00'}, Total = ${c.total || '0.00'}`).join('\n')
         : '  - Theory courses list available in Internal Marks view';
 
+      const upcomingLeavesStr = upcomingCollegeLeaves.slice(0, 5).map(l => `  - ${l.name}: ${l.dateDisplay || `${l.from_date} to ${l.to_date}`}`).join('\n');
+
       const systemPrompt = `You are "Tara", the intelligent, cheerful, smiling, and highly accurate AI campus assistant for Bannari Amman Institute of Technology (BIT Sathy).
 
-Current Active Student Profile (Ground Truth Data):
+Current Active Student Profile (Ground Truth Live Data):
 - Full Name: ${studentName}
 - Roll Number: ${activeRollNo}
 - Department: ${activeDept}
@@ -2206,18 +2231,15 @@ ${theoryCoursesStr}
 Student's 8 Activity Points Breakdown:
 ${activitySummaryStr}
 
-Official College Portals & URLs:
-- BIP Portal (BIT Innovation Platform): https://bip.bitsathy.ac.in (Project submissions, special lab reviews, hackathons)
-- PS Portal (Periodic Skills Portal): https://ps.bitsathy.ac.in (Skill assessments, coding tracks, problem statements)
-- PCDP App (Personality & Career Development Program): https://pcdp.bitsathy.ac.in (Placement training, aptitude, mock interviews)
-- BIT Wiki: https://wiki.bitsathy.ac.in (Student handbook, campus rules, clubs, syllabus)
-- Official BIT Website: https://www.bitsathy.ac.in (Campus news, circulars, department updates)
+Upcoming Academic Leaves & Gate Pass Schedule (Current Live Calendar):
+${upcomingLeavesStr || '  - Scheduled academic leaves available in Leave Schedule view'}
+Next Event: ${nextUpcomingLeave ? `${nextUpcomingLeave.name} (${nextUpcomingLeave.dateDisplay || nextUpcomingLeave.from_date})` : 'Check calendar'}
 
 Key Campus Features:
 - Dashboard: Active RP Balance, store to redeem gadgets, vouchers
 - BIT Placements: ${placementData?.totalStudentsPlaced || 510}+ placed across ${placementData?.totalCompaniesVisited || 87}+ companies (Highest Tier: 10+ LPA)
 - Mess Menu: Live breakfast, lunch, snacks, dinner schedules for boys & girls hostels
-- Leave Schedule: Semester holidays & gate pass schedule (${leavesList?.[0]?.name ? `Next: ${leavesList[0].name} on ${leavesList[0].from_date}` : 'Scheduled academic leaves'})
+- Leave Schedule: Semester holidays & gate pass schedule (${nextUpcomingLeave ? `Next: ${nextUpcomingLeave.name} on ${nextUpcomingLeave.dateDisplay || nextUpcomingLeave.from_date}` : 'Scheduled academic leaves'})
 - Exam Seating: Search exam hall, block, and desk allocation by register number
 - Campus Bus Routes: Bus routes across Coimbatore, Erode, Tirupur, Salem, Gobi, Mettupalayam
 - Faculty Directory: Cabin locations, contact numbers, official emails
@@ -9971,7 +9993,7 @@ export default function App() {
                       isDarkMode ? 'bg-slate-900/60 border-slate-700/60' : 'bg-white border-slate-200/80'
                     }`}>
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider truncate">IP - 1 ({sched.sem1})</span>
+                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider truncate">IP - 1</span>
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${sched.ip1BadgeClass}`}>
                           {sched.ip1Status}
                         </span>
@@ -9985,7 +10007,7 @@ export default function App() {
                       isDarkMode ? 'bg-slate-900/60 border-slate-700/60' : 'bg-white border-slate-200/80'
                     }`}>
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider truncate">IP - 2 ({sched.sem2})</span>
+                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider truncate">IP - 2</span>
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${sched.ip2BadgeClass}`}>
                           {sched.ip2Status}
                         </span>
