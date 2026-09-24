@@ -1,13 +1,13 @@
 {
-  "lastUpdated": "September 23, 2026",
+  "lastUpdated": "September 24, 2026",
   "targetBatch": "2023-2027 Batch",
   "totalStudentsPlaced": 536,
-  "totalCompaniesVisited": 97,
-  "editionDate": "23-09-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/93c39406e0ee8b51bf4db0dab5bb968b549bb3a6.pdf",
-  "totalPages": 6,
-  "placementPageNumber": 5,
-  "drivesPageNumber": 6,
+  "totalCompaniesVisited": 98,
+  "editionDate": "24-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/1dcc025e924ea843973fc6ce17c0e70015a75f22.pdf",
+  "totalPages": 5,
+  "placementPageNumber": 4,
+  "drivesPageNumber": 5,
   "upcomingDrives": [
     {
       "company": "Tiger Analytics",
@@ -33,7 +33,7 @@
       "tier": "10 LPA & Above",
       "tierCategory": "Super Dream",
       "range": ">= 10.00 LPA",
-      "offerCount": 18,
+      "offerCount": 19,
       "color": "from-amber-500 to-orange-500",
       "badgeColor": "bg-amber-500/10 text-amber-400 border-amber-500/20",
       "companies": [
@@ -107,7 +107,7 @@
       "tier": "4 - 5 LPA",
       "tierCategory": "Standard Tier",
       "range": "4.00 - 5.00 LPA",
-      "offerCount": 130,
+      "offerCount": 129,
       "color": "from-sky-500 to-blue-500",
       "badgeColor": "bg-sky-500/10 text-sky-400 border-sky-500/20",
       "companies": [
