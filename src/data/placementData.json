@@ -1,13 +1,13 @@
 {
-  "lastUpdated": "September 24, 2026",
+  "lastUpdated": "September 25, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 536,
-  "totalCompaniesVisited": 98,
-  "editionDate": "24-09-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/1dcc025e924ea843973fc6ce17c0e70015a75f22.pdf",
-  "totalPages": 5,
-  "placementPageNumber": 4,
-  "drivesPageNumber": 5,
+  "totalStudentsPlaced": 553,
+  "totalCompaniesVisited": 101,
+  "editionDate": "25-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/cb398c6d8763561fda0c289cb1378baf0f638ff6.pdf",
+  "totalPages": 4,
+  "placementPageNumber": 3,
+  "drivesPageNumber": 4,
   "upcomingDrives": [
     {
       "company": "Tiger Analytics",
@@ -79,8 +79,7 @@
         "Glowlogics",
         "IDP Education",
         "Infineon Technologies",
-        "The Alter Office",
-        "Zohocorp"
+        "The Alter"
       ]
     },
     {
@@ -107,7 +106,7 @@
       "tier": "4 - 5 LPA",
       "tierCategory": "Standard Tier",
       "range": "4.00 - 5.00 LPA",
-      "offerCount": 129,
+      "offerCount": 145,
       "color": "from-sky-500 to-blue-500",
       "badgeColor": "bg-sky-500/10 text-sky-400 border-sky-500/20",
       "companies": [
@@ -133,7 +132,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 236,
+      "offerCount": 237,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [
