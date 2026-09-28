@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "September 28, 2026",
+  "lastUpdated": "September 25, 2026",
   "targetBatch": "2023-2027 Batch",
   "totalStudentsPlaced": 553,
   "totalCompaniesVisited": 101,
-  "editionDate": "28-09-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/cb398c6d8763561fda0c289cb1378baf0f638ff6.pdf",
+  "editionDate": "25-09-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3\\/cb398c6d8763561fda0c289cb1378baf0f638ff6-1.pdf",
   "totalPages": 4,
   "placementPageNumber": 3,
   "drivesPageNumber": 4,
@@ -13,61 +13,19 @@
       "company": "Tiger Analytics",
       "role": "Software & AI Engineering Roles",
       "targetBatch": "2023-2027 Batch",
-      "startDate": "28 Sep 2026",
-      "endDate": "10 Oct 2026",
+      "startDate": "07 Sep 2026",
+      "endDate": "26 Sep 2026",
       "status": "Active On-Campus Drive",
-      "badge": "Active Recruitment Drive",
-      "eligibility": "All Circuit & Tech Branches"
-    },
-    {
-      "company": "Zoho Corporation",
-      "role": "Software Developer & Product Engineer",
-      "targetBatch": "2023-2027 Batch",
-      "startDate": "03 Oct 2026",
-      "endDate": "18 Oct 2026",
-      "status": "Registration Open",
-      "badge": "Upcoming Campus Drive",
-      "eligibility": "All Engineering Branches"
-    },
-    {
-      "company": "Cognizant (CTS)",
-      "role": "GenC Next & GenC Pro Roles",
-      "targetBatch": "2023-2027 Batch",
-      "startDate": "06 Oct 2026",
-      "endDate": "24 Oct 2026",
-      "status": "Scheduled",
       "badge": "Upcoming Recruitment Drive",
-      "eligibility": "B.E. / B.Tech Eligible Students"
-    },
-    {
-      "company": "Soliton Technologies",
-      "role": "Systems & Core Software Engineer",
-      "targetBatch": "2023-2027 Batch",
-      "startDate": "10 Oct 2026",
-      "endDate": "28 Oct 2026",
-      "status": "Scheduled",
-      "badge": "Upcoming Premium Drive",
-      "eligibility": "CSE, IT, CT, ECE, EEE, AIDS"
+      "eligibility": "All Circuit & Tech Branches"
     }
   ],
   "upcomingContests": [
     {
-      "name": "TCS CodeVita Season 12",
-      "type": "Global Competitive Programming & Direct Hiring Contest",
-      "status": "Registrations Open",
-      "endDate": "October – November 2026"
-    },
-    {
-      "name": "BIT Hackfest & Ideathon 2026",
-      "type": "Campus Innovation, AI & Full-Stack Hackathon",
-      "status": "Submissions Open",
-      "endDate": "Till 15 October 2026"
-    },
-    {
-      "name": "Datathon 2026 (Phase 2)",
-      "type": "Data Science & Machine Learning Challenge",
-      "status": "Active / Ongoing",
-      "endDate": "Till 12 October 2026"
+      "name": "Datathon 2026",
+      "type": "Data Science & Machine Learning Contest",
+      "status": "Open / Ongoing",
+      "endDate": "September 2026"
     }
   ],
   "salaryTiers": [
@@ -121,7 +79,8 @@
         "Glowlogics",
         "IDP Education",
         "Infineon Technologies",
-        "The Alter"
+        "The Alter Office",
+        "Zohocorp"
       ]
     },
     {
