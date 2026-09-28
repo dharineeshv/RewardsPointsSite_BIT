@@ -7,7 +7,7 @@
 
 import seedPlacementData from '../data/placementData.json';
 
-const PLACEMENT_CACHE_KEY = 'bit_live_placement_data_v4';
+const PLACEMENT_CACHE_KEY = 'bit_live_placement_data_v5';
 const FIREBASE_PLACEMENT_URL = 'https://rewards-site-7a5a8-default-rtdb.firebaseio.com/analytics/daily_placement.json';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzAHx23UPhPZUjpy7nK-S-d-KyqaQpRH8ufctshUvk7IIEFm3A4bp5XBFvKwdr5Xhp3/exec?action=getPlacementData';
 export const DEFAULT_NEWSPAPER_PDF_URL = 'https://cdnm.heyzine.com/files/uploaded/v2/ebd96b74cffb571ad751b13eafacd4d185537f7f.pdf';
@@ -452,4 +452,67 @@ export async function publishLivePlacementData(data) {
     } catch (e) {}
   }
   return { success: true, data };
+}
+
+/**
+ * Dynamically computes whether a drive date range is Active Today, Upcoming, or Completed
+ */
+export function getDynamicDriveStatus(startDateStr, endDateStr) {
+  const now = new Date();
+  try {
+    const parseCustomDate = (str) => {
+      if (!str) return null;
+      const parts = str.trim().split(/\s+/);
+      if (parts.length >= 3) {
+        const d = parseInt(parts[0], 10);
+        const mStr = parts[1].toLowerCase().slice(0, 3);
+        const y = parseInt(parts[2], 10);
+        const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+        if (!isNaN(d) && months[mStr] !== undefined && !isNaN(y)) {
+          return new Date(y, months[mStr], d, 23, 59, 59);
+        }
+      }
+      return null;
+    };
+
+    const start = parseCustomDate(startDateStr);
+    const end = parseCustomDate(endDateStr);
+
+    if (start && end) {
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      if (todayStart < new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0)) {
+        return {
+          status: 'Upcoming Drive',
+          badge: 'Upcoming Recruitment Drive',
+          isActive: false,
+          isCompleted: false,
+          colorClass: 'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border-indigo-500/20'
+        };
+      }
+      if (now <= end) {
+        return {
+          status: 'Active On-Campus Drive',
+          badge: 'Live Drive Today',
+          isActive: true,
+          isCompleted: false,
+          colorClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+        };
+      }
+      return {
+        status: 'Drive Completed',
+        badge: 'Completed / Result Awaited',
+        isActive: false,
+        isCompleted: true,
+        colorClass: 'text-slate-500 dark:text-slate-400 bg-slate-500/10 border-slate-500/20'
+      };
+    }
+  } catch (e) {}
+
+  return {
+    status: 'Active On-Campus Drive',
+    badge: 'Campus Drive',
+    isActive: true,
+    isCompleted: false,
+    colorClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+  };
 }

@@ -6,7 +6,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import placementDataSeed from './data/placementData.json';
-import { getInstantPlacementData, fetchLivePlacementData, publishLivePlacementData, getBitsathyFlipbookUrl } from './services/placementService';
+import { getInstantPlacementData, fetchLivePlacementData, publishLivePlacementData } from './services/placementService';
 import { getInstantStudentMentorData } from './services/studentMentorService';
 const studentMentorData = getInstantStudentMentorData();
 import InternalMarksView, { getStudentRedemptionSchedule } from './components/InternalMarksView';
@@ -1129,7 +1129,7 @@ function PlacementHeroSlider({ placementData, setPlacementActiveTab, setPlacemen
   const touchStartX = useRef(null);
   const touchEndX = useRef(null);
 
-  const totalSlides = 5;
+  const totalSlides = 4;
 
   const nextSlide = useCallback(() => {
     setCurrentSlide(prev => (prev + 1) % totalSlides);
@@ -1168,7 +1168,6 @@ function PlacementHeroSlider({ placementData, setPlacementActiveTab, setPlacemen
   const dream = safePlacement.salaryTiers?.[1];
   const prime = safePlacement.salaryTiers?.[2];
   const core = safePlacement.salaryTiers?.[3];
-  const upcomingDrive = safePlacement.upcomingDrives?.[0];
 
   return (
     <div 
@@ -1340,39 +1339,6 @@ function PlacementHeroSlider({ placementData, setPlacementActiveTab, setPlacemen
               className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-all cursor-pointer shadow-md inline-flex items-center gap-2"
             >
               <span>Explore Prime Tiers</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* SLIDE 5: UPCOMING ON-CAMPUS DRIVES */}
-        <div className="w-full flex-shrink-0 min-h-[210px] sm:min-h-[230px] p-6 sm:p-8 bg-gradient-to-r from-indigo-700 via-violet-800 to-slate-900 text-white relative overflow-hidden flex flex-col justify-between">
-          <div className="absolute -right-6 -bottom-8 opacity-20 text-[130px] sm:text-[160px] pointer-events-none select-none">
-            📅
-          </div>
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30 flex items-center gap-1.5">
-                <CalendarCheck className="w-3.5 h-3.5 text-violet-300" />
-                <span>Upcoming Recruitment Drive</span>
-              </span>
-              <span className="text-xs text-violet-200 font-semibold">
-                {upcomingDrive?.targetBatch || safePlacement.targetBatch || '2023-2027 Batch'}
-              </span>
-            </div>
-            <h3 className="text-2xl sm:text-4xl font-black text-white tracking-tight mt-1">
-              {upcomingDrive?.company || 'Cytrusst Intelligence Pvt. Ltd.'}
-            </h3>
-            <p className="text-xs sm:text-sm text-violet-100/90 mt-1 max-w-xl">
-              Drive Window: <strong className="text-white font-mono">{upcomingDrive?.startDate} – {upcomingDrive?.endDate}</strong> • {upcomingDrive?.eligibility || 'Circuit & Tech Branches'}
-            </p>
-          </div>
-          <div className="relative z-10 mt-3 flex items-center gap-3">
-            <button
-              onClick={() => setPlacementActiveTab('drives')}
-              className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs transition-all cursor-pointer shadow-md inline-flex items-center gap-2"
-            >
-              <span>View Drive Details & Contests</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -2190,7 +2156,7 @@ function BitRobotChatAssistant({
       const totalComp = placementData?.totalCompaniesVisited || 87;
       const batch = placementData?.targetBatch || '2023-2027 Batch';
       const topTier = placementData?.salaryTiers?.[0]?.offerCount || 17;
-      replyText = `📰 **BIT Placements Overview (${batch})**\n• Total Students Placed: **${totalPlaced}**\n• Total Companies Visited: **${totalComp}**\n• Super Dream Offers (≥10 LPA): **${topTier} offers**\n\nCheck out the interactive breakdown, hero slider, and upcoming drives!`;
+      replyText = `📰 **BIT Placements Overview (${batch})**\n• Total Students Placed: **${totalPlaced}**\n• Total Companies Visited: **${totalComp}**\n• Super Dream Offers (≥10 LPA): **${topTier} offers**\n\nCheck out the interactive breakdown and salary tier directory!`;
       replyNav = 'BIT Placements';
     } else if (lower.includes('mess') || lower.includes('food') || lower.includes('lunch') || lower.includes('dinner') || lower.includes('breakfast')) {
       replyText = `🍽️ **Hostel Mess Menu**\nLive daily menus for Boys and Girls hostels with breakfast, lunch, snacks, and dinner schedules are available in the Mess Menu tab.`;
@@ -2318,6 +2284,11 @@ Response Guidelines:
             body: JSON.stringify({
               systemInstruction: { parts: [{ text: systemPrompt }] },
               contents,
+              tools: [
+                {
+                  googleSearch: {}
+                }
+              ],
               generationConfig: {
                 temperature: 0.4,
                 maxOutputTokens: 800
@@ -2818,6 +2789,7 @@ export default function App() {
   // BIT Daily Newspaper & Placement State (Pure Dynamic SWR)
   const [placementData, setPlacementData] = useState(() => getInstantPlacementData());
   const [loadingPlacementData, setLoadingPlacementData] = useState(false);
+  const [isRefreshingPlacement, setIsRefreshingPlacement] = useState(false);
   const [lastPlacementSyncTime, setLastPlacementSyncTime] = useState(() => new Date().toLocaleTimeString());
   const [newspaperDate, setNewspaperDate] = useState('2026-09-05');
   const [isNewspaperFullscreen, setIsNewspaperFullscreen] = useState(false);
@@ -3096,12 +3068,11 @@ export default function App() {
 
     if (savedEdition && savedEdition !== currentEdition) {
       lastProcessedPlacementRef.current = `${userKey}_${currentEdition}`;
-      const recentDrive = placementData.upcomingDrives?.[0]?.company || 'On-Campus Drive';
       const placementNotif = {
         id: `placement_${Date.now()}`,
         type: 'placement_update',
         title: `📰 Placement Updated (${placementData.targetBatch})`,
-        description: `${placementData.totalStudentsPlaced} students placed across ${placementData.totalCompaniesVisited || 60}+ companies. New drive: ${recentDrive}.`,
+        description: `${placementData.totalStudentsPlaced} students placed across ${placementData.totalCompaniesVisited || 60}+ companies.`,
         timestamp: new Date().toISOString(),
         read: false,
         linkTab: 'BIT Placements'
@@ -8458,7 +8429,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Header Actions */}
+                  {/* Header Badge */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className={`text-xs font-semibold px-3.5 py-2 rounded-xl border flex items-center gap-2 ${
                       isDarkMode ? 'bg-slate-900/90 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-2xs'
@@ -8476,303 +8447,153 @@ export default function App() {
                   setPlacementSelectedTier={setPlacementSelectedTier}
                 />
 
-                {/* Sub-view Navigation Tabs with Left/Right Arrows */}
-                <div className="relative flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const el = document.getElementById('placement-nav-tabs');
-                      if (el) el.scrollBy({ left: -150, behavior: 'smooth' });
-                    }}
-                    className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 ${
-                      isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 shadow-2xs'
-                    }`}
-                    aria-label="Scroll Tabs Left"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-
-                  <div id="placement-nav-tabs" className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none scroll-smooth flex-1">
-                    <button
-                      type="button"
-                      onClick={() => setPlacementActiveTab('insights')}
-                      className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border shrink-0 ${
-                        placementActiveTab === 'insights'
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : isDarkMode
-                            ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-                            : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                      }`}
-                    >
-                      <Briefcase className="w-4 h-4" />
-                      <span>Placed Offers & Companies</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPlacementActiveTab('drives')}
-                      className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border shrink-0 ${
-                        placementActiveTab === 'drives'
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : isDarkMode
-                            ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-                            : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                      }`}
-                    >
-                      <CalendarCheck className="w-4 h-4" />
-                      <span>Upcoming Drives & Contests</span>
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const el = document.getElementById('placement-nav-tabs');
-                      if (el) el.scrollBy({ left: 150, behavior: 'smooth' });
-                    }}
-                    className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 ${
-                      isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 shadow-2xs'
-                    }`}
-                    aria-label="Scroll Tabs Right"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* TAB 1: STRUCTURED PLACEMENT DIRECTORY */}
-                {placementActiveTab === 'insights' && (
-                  <div className="space-y-4">
-                    {/* Search & Tier Filter Bar */}
-                    <div className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border space-y-4 ${
-                      isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-                    }`}>
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        {/* Search Input */}
-                        <div className="relative flex-1">
-                          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                          <input
-                            type="text"
-                            value={placementSearchQuery}
-                            onChange={(e) => setPlacementSearchQuery(e.target.value)}
-                            placeholder="Search by company name (e.g. Zoho, Caterpillar, TCS, Soliton)..."
-                            className={`w-full pl-10 pr-10 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
-                              isDarkMode
-                                ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500'
-                                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                            }`}
-                          />
-                          {placementSearchQuery && (
-                            <button
-                              type="button"
-                              onClick={() => setPlacementSearchQuery('')}
-                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Salary Tier Selector Pills with Left/Right Arrows */}
-                      <div className="relative flex items-center gap-1.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const el = document.getElementById('placement-tier-pills');
-                            if (el) el.scrollBy({ left: -140, behavior: 'smooth' });
-                          }}
-                          className={`p-1.5 rounded-xl border transition-all cursor-pointer shrink-0 ${
-                            isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-                          }`}
-                          aria-label="Scroll Tiers Left"
-                        >
-                          <ChevronLeft className="w-3.5 h-3.5" />
-                        </button>
-
-                        <div id="placement-tier-pills" className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none scroll-smooth flex-1">
-                          {['All', '10 LPA & Above', '7 - 10 LPA', '6 - 7 LPA', '5 - 6 LPA', '4 - 5 LPA', '3 - 4 LPA'].map((tierName, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => setPlacementSelectedTier(tierName)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border shrink-0 ${
-                                placementSelectedTier === tierName
-                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                                  : isDarkMode
-                                    ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-                                    : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                              }`}
-                            >
-                              {tierName === 'All' ? 'All Salary Tiers' : tierName}
-                            </button>
-                          ))}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const el = document.getElementById('placement-tier-pills');
-                            if (el) el.scrollBy({ left: 140, behavior: 'smooth' });
-                          }}
-                          className={`p-1.5 rounded-xl border transition-all cursor-pointer shrink-0 ${
-                            isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-                          }`}
-                          aria-label="Scroll Tiers Right"
-                        >
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Salary Tier Cards Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredTiers.map((tier, idx) => (
-                        <div
-                          key={idx}
-                          className={`p-5 sm:p-6 rounded-3xl border space-y-4 flex flex-col justify-between transition-all hover:shadow-lg ${
+                {/* Structured Placement Directory */}
+                <div className="space-y-4">
+                  {/* Search & Tier Filter Bar */}
+                  <div className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border space-y-4 ${
+                    isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                  }`}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      {/* Search Input */}
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={placementSearchQuery}
+                          onChange={(e) => setPlacementSearchQuery(e.target.value)}
+                          placeholder="Search by company name (e.g. Zoho, Caterpillar, TCS, Soliton)..."
+                          className={`w-full pl-10 pr-10 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
                             isDarkMode
-                              ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
-                              : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+                              ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500'
+                              : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
                           }`}
-                        >
-                          <div>
-                            {/* Card Header */}
-                            <div className="flex items-start justify-between gap-3 mb-2">
-                              <div>
-                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${tier.badgeColor}`}>
-                                  {tier.tierCategory}
-                                </span>
-                                <h3 className={`text-lg sm:text-xl font-extrabold tracking-tight mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                  {tier.tier}
-                                </h3>
-                              </div>
+                        />
+                        {placementSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setPlacementSearchQuery('')}
+                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-                              <div className="text-right">
-                                <span className="text-xl sm:text-2xl font-black font-mono text-emerald-500">
-                                  {tier.offerCount}
-                                </span>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                                  Offers
-                                </span>
-                              </div>
-                            </div>
+                    {/* Salary Tier Selector Pills with Left/Right Arrows */}
+                    <div className="relative flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('placement-tier-pills');
+                          if (el) el.scrollBy({ left: -140, behavior: 'smooth' });
+                        }}
+                        className={`p-1.5 rounded-xl border transition-all cursor-pointer shrink-0 ${
+                          isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                        }`}
+                        aria-label="Scroll Tiers Left"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
 
-                            {/* Companies Visited in this Tier */}
-                            <div className="space-y-2 pt-2">
-                              <span className={`text-[10px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Hiring Partners ({tier.companies.length} Companies):
-                              </span>
-                              <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
-                                {tier.companies.map((company, cIdx) => (
-                                  <span
-                                    key={cIdx}
-                                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
-                                      isDarkMode
-                                        ? 'bg-slate-800/80 border-slate-700 text-slate-200'
-                                        : 'bg-slate-100 border-slate-200 text-slate-800'
-                                    }`}
-                                  >
-                                    {company}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
+                      <div id="placement-tier-pills" className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none scroll-smooth flex-1">
+                        {['All', '10 LPA & Above', '7 - 10 LPA', '6 - 7 LPA', '5 - 6 LPA', '4 - 5 LPA', '3 - 4 LPA'].map((tierName, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setPlacementSelectedTier(tierName)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border shrink-0 ${
+                              placementSelectedTier === tierName
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                : isDarkMode
+                                  ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                                  : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                            }`}
+                          >
+                            {tierName === 'All' ? 'All Salary Tiers' : tierName}
+                          </button>
+                        ))}
+                      </div>
 
-                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
-                            <span>Range: {tier.range}</span>
-                            <span className="text-emerald-500 font-bold">{tier.offerCount} Placed</span>
-                          </div>
-                        </div>
-                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('placement-tier-pills');
+                          if (el) el.scrollBy({ left: 140, behavior: 'smooth' });
+                        }}
+                        className={`p-1.5 rounded-xl border transition-all cursor-pointer shrink-0 ${
+                          isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                        }`}
+                        aria-label="Scroll Tiers Right"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                )}
 
-                {/* TAB 2: UPCOMING DRIVES & CONTESTS (PAGE 7 DATA) */}
-                {placementActiveTab === 'drives' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* Upcoming Placement Drive Card */}
-                      {(placementData?.upcomingDrives || []).map((drive, dIdx) => (
-                        <div
-                          key={dIdx}
-                          className={`p-6 rounded-3xl border space-y-4 relative overflow-hidden ${
-                            isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
+                  {/* Salary Tier Cards Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredTiers.map((tier, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-5 sm:p-6 rounded-3xl border space-y-4 flex flex-col justify-between transition-all hover:shadow-lg ${
+                          isDarkMode
+                            ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                            : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+                        }`}
+                      >
+                        <div>
+                          {/* Card Header */}
+                          <div className="flex items-start justify-between gap-3 mb-2">
                             <div>
-                              <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-wider">
-                                {drive.badge}
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${tier.badgeColor}`}>
+                                {tier.tierCategory}
                               </span>
-                              <h3 className={`text-xl font-extrabold tracking-tight mt-1.5 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                {drive.company}
+                              <h3 className={`text-lg sm:text-xl font-extrabold tracking-tight mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {tier.tier}
                               </h3>
-                              <p className="text-xs text-slate-400 font-medium mt-0.5">{drive.role}</p>
                             </div>
 
-                            <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping self-start mt-1" />
+                            <div className="text-right">
+                              <span className="text-xl sm:text-2xl font-black font-mono text-emerald-500">
+                                {tier.offerCount}
+                              </span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                Offers
+                              </span>
+                            </div>
                           </div>
 
-                          <div className={`p-4 rounded-2xl border space-y-2 text-xs ${
-                            isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'
-                          }`}>
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400 font-semibold">Target Batch:</span>
-                              <strong className="text-slate-900 dark:text-white">{drive.targetBatch}</strong>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400 font-semibold">Drive Window:</span>
-                              <strong className="text-indigo-500 font-mono">{drive.startDate} – {drive.endDate}</strong>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400 font-semibold">Eligibility:</span>
-                              <strong className="text-emerald-500">{drive.eligibility}</strong>
+                          {/* Companies Visited in this Tier */}
+                          <div className="space-y-2 pt-2">
+                            <span className={`text-[10px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Hiring Partners ({tier.companies.length} Companies):
+                            </span>
+                            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
+                              {tier.companies.map((company, cIdx) => (
+                                <span
+                                  key={cIdx}
+                                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
+                                    isDarkMode
+                                      ? 'bg-slate-800/80 border-slate-700 text-slate-200'
+                                      : 'bg-slate-100 border-slate-200 text-slate-800'
+                                  }`}
+                                >
+                                  {company}
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>
-                      ))}
 
-                      {/* Contests Card */}
-                      {(placementData?.upcomingContests || []).map((contest, cIdx) => (
-                        <div
-                          key={cIdx}
-                          className={`p-6 rounded-3xl border space-y-4 relative overflow-hidden ${
-                            isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <span className="px-2.5 py-0.5 rounded-md bg-purple-500/10 text-purple-500 dark:text-purple-400 border border-purple-500/20 text-[10px] font-bold uppercase tracking-wider">
-                                Technical Contest & Hiring
-                              </span>
-                              <h3 className={`text-xl font-extrabold tracking-tight mt-1.5 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                {contest.name}
-                              </h3>
-                              <p className="text-xs text-slate-400 font-medium mt-0.5">{contest.type}</p>
-                            </div>
-
-                            <Sparkles className="w-5 h-5 text-purple-500" />
-                          </div>
-
-                          <div className={`p-4 rounded-2xl border space-y-2 text-xs ${
-                            isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'
-                          }`}>
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400 font-semibold">Status:</span>
-                              <strong className="text-emerald-500">{contest.status}</strong>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400 font-semibold">Timeline:</span>
-                              <strong className="text-purple-500 font-mono">{contest.endDate}</strong>
-                            </div>
-                          </div>
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+                          <span>Range: {tier.range}</span>
+                          <span className="text-emerald-500 font-bold">{tier.offerCount} Placed</span>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
               </div>
             );
           })()}
@@ -10601,7 +10422,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Floating Interactive Toast Notification */}
+      {/* Floating Interactive Toast Notification (Top Right Corner) */}
       {activeToast && (
         <div 
           onClick={() => {
@@ -10609,7 +10430,11 @@ export default function App() {
             markNotificationAsRead(activeToast.id);
             setActiveToast(null);
           }}
-          className="fixed bottom-5 right-5 z-50 max-w-sm sm:max-w-md w-[calc(100vw-40px)] p-4 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-indigo-500/30 shadow-2xl shadow-indigo-500/20 backdrop-blur-xl cursor-pointer transition-all hover:scale-[1.02] flex items-start gap-3 animate-fadeIn"
+          className={`fixed top-4 right-4 sm:top-6 sm:right-6 z-[999999] max-w-sm sm:max-w-md w-[calc(100vw-32px)] sm:w-auto p-4 rounded-2xl border shadow-2xl backdrop-blur-2xl cursor-pointer transition-all hover:scale-[1.02] flex items-start gap-3.5 animate-fadeIn ${
+            isDarkMode 
+              ? 'bg-slate-900/95 border-slate-700/80 text-white shadow-black/50 shadow-2xl' 
+              : 'bg-white/95 border-slate-200 text-slate-900 shadow-xl shadow-slate-900/10'
+          }`}
           role="alert"
         >
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
@@ -10631,14 +10456,14 @@ export default function App() {
               <BellRing className="w-5 h-5 text-blue-500" />
             )}
           </div>
-          <div className="flex-1 min-w-0 pr-2">
+          <div className="flex-1 min-w-0 pr-1">
             <div className="flex items-center justify-between gap-1 mb-0.5">
-              <span className="text-xs font-black text-slate-900 dark:text-white truncate">
+              <span className={`text-xs font-black truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                 {activeToast.title}
               </span>
               <span className="text-[10px] text-slate-400 font-semibold shrink-0">Just now</span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+            <p className={`text-xs line-clamp-2 leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
               {activeToast.description}
             </p>
           </div>
@@ -10648,7 +10473,11 @@ export default function App() {
               e.stopPropagation();
               setActiveToast(null);
             }}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className={`p-1 rounded-lg transition-colors cursor-pointer ${
+              isDarkMode 
+                ? 'text-slate-400 hover:text-white hover:bg-slate-800' 
+                : 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'
+            }`}
             title="Dismiss"
           >
             <X className="w-4 h-4" />

@@ -346,7 +346,7 @@ export default function NotificationCenter({ isDarkMode, setActiveNav }) {
 
       {/* Floating Toast Message */}
       {showToast && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-emerald-600 text-white font-bold text-xs flex items-center gap-2 shadow-2xl animate-fadeIn">
+        <div className="fixed top-6 right-6 z-[999999] p-4 rounded-2xl bg-emerald-600 text-white font-bold text-xs flex items-center gap-2 shadow-2xl animate-fadeIn">
           <ShieldCheck className="w-4 h-4" />
           <span>{toastMessage}</span>
         </div>
