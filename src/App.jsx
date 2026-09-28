@@ -1,4 +1,5 @@
 import StudentMentorMappingView, { resolveUserDeptCode } from './components/StudentMentorMappingView';
+import SpecialLabsView from './components/SpecialLabsView';
 import AveragePointsBarChart from './components/AveragePointsBarChart';
 import PointsToMarksSkewView from './components/PointsToMarksSkewView';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -18,6 +19,7 @@ import FACULTY_DIRECTORY_DATA from './data/facultyDirectory.json';
 import EXAM_HALL_INDEX_DATA from './data/examHallIndex.json';
 import { STUDENTS_INTERNAL_MARKS_LIST, STUDENT_EVENT_LOGS_MAP, ALL_REWARD_POINTS_ENTRIES, TOTAL_PS_COMPLETIONS_COUNT, STUDENT_SPECIAL_LAB_MAP } from './data/rp_distribution';
 import {
+  FlaskConical,
   FileSpreadsheet,
   LayoutGrid,
   BarChart2,
@@ -706,7 +708,7 @@ function DashboardHeroSlider({
     return endDate >= todayStr;
   }) || sortedLeavesList[0];
 
-  const totalSlides = 7;
+  const totalSlides = 8;
 
   const nextSlide = useCallback(() => {
     setCurrentSlide(prev => (prev + 1) % totalSlides);
@@ -1041,6 +1043,41 @@ function DashboardHeroSlider({
             <span className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-emerald-300 flex items-center gap-1.5 font-mono">
               <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
               <span>7,500+ Students • Live Sync</span>
+            </span>
+          </div>
+        </div>
+
+        {/* SLIDE 8: BIT SPECIAL LABS DIRECTORY */}
+        <div className="w-full flex-shrink-0 min-h-[200px] sm:min-h-[220px] p-6 sm:p-8 bg-gradient-to-r from-indigo-950 via-blue-900 to-slate-900 text-white relative overflow-hidden flex flex-col justify-between border-l-4 border-indigo-500">
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
+                <FlaskConical className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Special Labs</span>
+              </span>
+              <span className="text-xs text-indigo-200 font-medium">
+                Research & Innovation Directory
+              </span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
+              23 Official Special Labs • 5 Tech Clusters
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
+              Explore AI, Robotics, IoT, Biotech, and Automation labs. Connect with faculty coordinators and submit BIP projects to earn up to +500 RP.
+            </p>
+          </div>
+
+          <div className="relative z-10 mt-3 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setActiveNav && setActiveNav('Special Labs')}
+              className="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs transition-all cursor-pointer shadow-md inline-flex items-center gap-2"
+            >
+              <span>Explore Special Labs</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-indigo-300 flex items-center gap-1.5 font-mono">
+              <Award className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Earn +500 RP via BIP</span>
             </span>
           </div>
         </div>
@@ -2171,6 +2208,9 @@ function BitRobotChatAssistant({
     } else if (lower.includes('faculty') || lower.includes('staff') || lower.includes('teacher') || lower.includes('hod')) {
       replyText = `👥 **Faculty & Staff Directory**\nSearch faculty by department, find office cabins, phone numbers, and official email addresses.`;
       replyNav = 'Faculty Directory';
+    } else if (lower.includes('special lab') || lower.includes('special labs') || lower.includes('slab') || lower.includes('slabs') || lower.includes('lab coordinator') || lower.includes('fab lab') || lower.includes('robotics lab') || lower.includes('iot lab') || lower.includes('ai lab')) {
+      replyText = `🧪 **BIT Special Labs Directory (23 Labs • 5 Clusters)**\nExplore all 23 official BIT Special Labs across AI, Robotics, IoT, Biotech, and Automation. View faculty in-charge contacts, tech stacks, and submit project initiatives for up to **+500 RP**!`;
+      replyNav = 'Special Labs';
     } else if (lower.includes('who are you') || lower.includes('your name') || lower.includes('tara')) {
       replyText = `🤖✨ I am **Tara**, your intelligent and smiling BIT campus assistant! I'm here to help you navigate college portals, track your Reward Points, find exam halls, and stay updated on placements.`;
     } else if (lower.includes('about') || lower.includes('who made') || lower.includes('developer') || lower.includes('creator') || lower.includes('contact') || lower.includes('email')) {
@@ -2178,7 +2218,7 @@ function BitRobotChatAssistant({
       replyLink = 'https://www.linkedin.com/in/dharineesh-v-8ba7022ba';
       replyLinkText = 'Connect on LinkedIn';
     } else {
-      replyText = `😊 **Tara is here to help!** You can ask me about:\n• **Academics**: My RP Balance (${activeBalanceRP} RP), Mentor (${activeMentor}), Internal Marks (${activeGrandTotal})\n• **Portals**: BIP, PS, PCDP, Wiki, Website\n• **Campus Life**: Placements, Mess Menu, Leave Schedule, Bus Routes\n• **About Us**: Developer info & contact`;
+      replyText = `😊 **Tara is here to help!** You can ask me about:\n• **Academics**: My RP Balance (${activeBalanceRP} RP), Mentor (${activeMentor}), Internal Marks (${activeGrandTotal})\n• **Portals**: BIP, PS, PCDP, Wiki, Website\n• **Special Labs**: 23 Special Labs, Coordinators, Tech Stacks\n• **Campus Life**: Placements, Mess Menu, Leave Schedule, Bus Routes\n• **About Us**: Developer info & contact`;
     }
 
     return { replyText, replyNav, replyLink, replyLinkText };
@@ -2237,6 +2277,7 @@ Next Event: ${nextUpcomingLeave ? `${nextUpcomingLeave.name} (${nextUpcomingLeav
 
 Key Campus Features:
 - Dashboard: Active RP Balance, store to redeem gadgets, vouchers
+- Special Labs: 23 official BIT Special Labs across 5 clusters (AI & Software, Electronics & IoT, Mechanical & Automation, Bio & Ag, Civil & Design) with faculty in-charges and project bonus points (+500 RP via BIP portal)
 - BIT Placements: ${placementData?.totalStudentsPlaced || 510}+ placed across ${placementData?.totalCompaniesVisited || 87}+ companies (Highest Tier: 10+ LPA)
 - Mess Menu: Live breakfast, lunch, snacks, dinner schedules for boys & girls hostels
 - Leave Schedule: Semester holidays & gate pass schedule (${nextUpcomingLeave ? `Next: ${nextUpcomingLeave.name} on ${nextUpcomingLeave.dateDisplay || nextUpcomingLeave.from_date}` : 'Scheduled academic leaves'})
@@ -2337,6 +2378,8 @@ Response Guidelines:
 
       if (queryLower.includes('internal mark') || queryLower.includes('marks') || queryLower.includes('cie') || queryLower.includes('breakdown')) {
         replyNav = 'Internal Marks';
+      } else if (queryLower.includes('special lab') || queryLower.includes('special labs') || queryLower.includes('slab') || queryLower.includes('slabs') || queryLower.includes('fab lab') || queryLower.includes('robotics lab') || queryLower.includes('iot lab') || queryLower.includes('ai lab')) {
+        replyNav = 'Special Labs';
       } else if (queryLower.includes('placement') || queryLower.includes('job') || queryLower.includes('salary package')) {
         replyNav = 'BIT Placements';
       } else if (queryLower.includes('mess') || queryLower.includes('food') || queryLower.includes('lunch') || queryLower.includes('dinner') || queryLower.includes('breakfast')) {
@@ -3232,6 +3275,20 @@ export default function App() {
   }, []);
 
   const isDarkMode = themeMode === 'system' ? systemIsDark : themeMode === 'dark';
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+        document.body.className = 'bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white';
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        document.body.className = 'bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white';
+      }
+    }
+  }, [isDarkMode]);
 
   const setTheme = (mode) => {
     setThemeMode(mode);
@@ -5706,46 +5763,57 @@ export default function App() {
         />
       )}
 
-      <aside className={`fixed top-0 left-0 bottom-0 z-50 w-72 sm:w-80 max-w-[85vw] flex flex-col py-5 px-4 shadow-2xl transition-transform duration-300 ease-in-out ${
+      <aside className={`fixed top-0 left-0 bottom-0 z-50 w-72 sm:w-80 max-w-[85vw] flex flex-col py-4 px-3.5 shadow-2xl transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
       } ${
         isDarkMode ? 'bg-slate-900 border-r border-slate-800 text-slate-100' : 'bg-white border-r border-slate-200 text-slate-900'
       }`}>
         
         {/* Drawer Header */}
-        <div className={`flex items-center justify-between pb-4 mb-3 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+        <div className={`flex items-center justify-between pb-3.5 mb-2.5 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
           <div className="flex items-center gap-2.5">
-            <img 
-              src="/bit-logo.png" 
-              alt="Bannari Amman Institute of Technology" 
-              className="h-8 sm:h-9 object-contain rounded-md bg-white p-0.5 shadow-xs"
-            />
+            <div className={`w-9 h-9 rounded-xl p-1 shadow-xs border flex items-center justify-center shrink-0 ${
+              isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+            }`}>
+              <img 
+                src="/bit-logo.png" 
+                alt="BIT" 
+                className="w-full h-full object-contain"
+              />
+            </div>
             <div>
-              <span className="text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-400 block leading-tight">
-                Rewards BIT
-              </span>
-              <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Navigation Menu
+              <div className="flex items-center gap-1.5">
+                <span className={`text-sm font-black leading-tight ${
+                  isDarkMode ? 'text-white' : 'text-slate-900'
+                }`}>
+                  Rewards BIT
+                </span>
+              </div>
+              <span className={`text-[10px] font-medium block ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Campus Academic Portal
               </span>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setIsSidebarOpen(false)}
-            className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
               isDarkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'
             }`}
             title="Close Menu"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Student Profile Quick Details Card in Drawer */}
-        <div className={`mb-4 p-3 rounded-2xl border transition-all ${
-          isDarkMode ? 'bg-slate-800/60 border-slate-700/80 text-white' : 'bg-slate-50 border-slate-200 text-slate-900 shadow-xs'
+        <div className={`mb-3 p-3 rounded-2xl border transition-all ${
+          isDarkMode 
+            ? 'bg-gradient-to-br from-slate-800/90 to-slate-900/90 border-slate-700/80 shadow-md shadow-black/20' 
+            : 'bg-gradient-to-br from-slate-50 to-indigo-50/40 border-slate-200 shadow-xs'
         }`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden shadow-xs border border-indigo-400/40 flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-xs border-2 border-indigo-500/30 shrink-0">
               <AvatarImage
                 src={currentUser.picture || currentUser.photo_url}
                 alt={currentUser.name}
@@ -5754,231 +5822,333 @@ export default function App() {
               />
             </div>
             <div className="min-w-0 flex-1">
-              <h4 className="text-xs font-bold truncate leading-tight">{currentUser.name}</h4>
-              <p className={`text-[10px] font-mono mt-0.5 truncate ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                {currentUser.id} • {currentUser.department}
+              <h4 className={`text-xs font-black truncate leading-tight tracking-tight ${
+                isDarkMode ? 'text-white' : 'text-slate-900'
+              }`}>
+                {currentUser.name}
+              </h4>
+              <p className={`text-[10px] font-mono mt-0.5 truncate flex items-center gap-1 ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-500'
+              }`}>
+                <span>{currentUser.id}</span>
+                <span>•</span>
+                <span className="truncate">{currentUser.department}</span>
               </p>
             </div>
           </div>
-          <div className={`mt-2.5 pt-2 border-t flex items-center justify-between text-[11px] ${
+          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-[11px] ${
             isDarkMode ? 'border-slate-700/60' : 'border-slate-200'
           }`}>
-            <span className={`text-[10px] uppercase font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Active Balance:
+            <span className={`text-[10px] uppercase font-bold tracking-wider ${
+              isDarkMode ? 'text-slate-400' : 'text-slate-500'
+            }`}>
+              Active Balance
             </span>
-            <span className="font-black text-emerald-500 dark:text-emerald-400">
-              {currentUser.currentPoints} RP
+            <span className={`inline-flex items-center gap-1 text-xs font-black font-mono ${
+              isDarkMode ? 'text-emerald-400' : 'text-emerald-600'
+            }`}>
+              <Trophy className="w-3 h-3 text-emerald-500" />
+              <span>{currentUser.currentPoints} RP</span>
             </span>
           </div>
         </div>
 
-        {/* Navigation Items Group */}
-        <div className={`text-[10px] font-bold uppercase tracking-wider px-2 mb-1.5 ${
-          isDarkMode ? 'text-slate-400' : 'text-slate-500'
-        }`}>
-          Navigation
-        </div>
-
-        <nav className="space-y-1.5 flex-1 overflow-y-auto pr-0.5">
-          <button
-            onClick={() => { setActiveNav('Dashboard'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Dashboard'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <LayoutGrid className="w-5 h-5" strokeWidth={activeNav === 'Dashboard' ? 2.2 : 1.8} />
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('Leaderboard'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Leaderboard'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <BarChart2 className="w-5 h-5" strokeWidth={activeNav === 'Leaderboard' ? 2.2 : 1.8} />
-            <span>Leaderboard</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('Internal Marks'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Internal Marks'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <FileSpreadsheet className="w-5 h-5" strokeWidth={activeNav === 'Internal Marks' ? 2.2 : 1.8} />
-            <span>Internal Mark</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('Points to Marks'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Points to Marks'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Sliders className="w-5 h-5" strokeWidth={activeNav === 'Points to Marks' ? 2.2 : 1.8} />
-            <span>Marks Conversion</span>
-          </button>
-
+        {/* Scrollable Navigation Groups */}
+        <nav className="space-y-4 flex-1 overflow-y-auto pr-0.5 scrollbar-none">
           
+          {/* GROUP 1: OVERVIEW */}
+          <div className="space-y-1">
+            <div className={`text-[10px] font-black uppercase tracking-wider px-2.5 mb-1 ${
+              isDarkMode ? 'text-slate-500' : 'text-slate-400'
+            }`}>
+              Overview
+            </div>
 
-          <button
-            onClick={() => { setActiveNav('Menu Details'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Menu Details'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <UtensilsCrossed className="w-5 h-5" strokeWidth={activeNav === 'Menu Details' ? 2.2 : 1.8} />
-            <span>Menu Details</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('Leave Schedule'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Leave Schedule'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <CalendarDays className="w-5 h-5" strokeWidth={activeNav === 'Leave Schedule' ? 2.2 : 1.8} />
-            <span>Leave Schedule</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('Faculty Directory'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Faculty Directory'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <GraduationCap className="w-5 h-5" strokeWidth={activeNav === 'Faculty Directory' ? 2.2 : 1.8} />
-            <span>Faculty Directory</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('Student Mentors'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Student Mentors'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <UserCheck className="w-5 h-5" strokeWidth={activeNav === 'Student Mentors' ? 2.2 : 1.8} />
-            <span>Student Mentors</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('GeoBITS'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'GeoBITS'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Navigation className="w-5 h-5" strokeWidth={activeNav === 'GeoBITS' ? 2.2 : 1.8} />
-            <span>BIT Map</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('BIT Placements'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'BIT Placements'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Briefcase className="w-5 h-5" strokeWidth={activeNav === 'BIT Placements' ? 2.2 : 1.8} />
-            <span>BIT Placements</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveNav('Settings'); setIsSidebarOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
-              activeNav === 'Settings'
-                ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/25'
-                : isDarkMode
-                  ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Settings className="w-5 h-5" strokeWidth={activeNav === 'Settings' ? 2.2 : 1.8} />
-            <span>Settings</span>
-          </button>
-
-          {/* Admin & Developer Console (Only visible to Dharineesh & Kaushi) */}
-          {isAdminUser && (
             <button
-              onClick={() => { setActiveNav('Admin Console'); setIsSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer border ${
-                activeNav === 'Admin Console'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white shadow-lg shadow-purple-500/25'
+              onClick={() => { setActiveNav('Dashboard'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Dashboard'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
                   : isDarkMode
-                    ? 'border-purple-900/40 bg-purple-950/20 text-purple-300 hover:text-white hover:bg-purple-900/30'
-                    : 'border-purple-200 bg-purple-50/70 text-purple-800 hover:bg-purple-100/80 shadow-xs'
-              }`}
-            >
-              <ShieldCheck className="w-5 h-5 text-purple-400" strokeWidth={activeNav === 'Admin Console' ? 2.2 : 1.8} />
-              <div className="flex items-center justify-between w-full">
-                <span>Admin Console</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 border border-purple-400/40">DEV</span>
-              </div>
-            </button>
-          )}
-
-          {/* PWA Install App Button */}
-          {isInstallable && (
-            <button
-              onClick={() => { handleInstallClick(); setIsSidebarOpen(false); }}
-              className={`mt-2.5 w-full flex items-center justify-between p-3 rounded-2xl border text-xs font-semibold transition-all cursor-pointer group ${
-                isDarkMode 
-                  ? 'bg-gradient-to-r from-slate-800/90 to-indigo-950/50 border-indigo-500/30 text-slate-200 hover:border-indigo-400 hover:bg-slate-800 shadow-xs' 
-                  : 'bg-gradient-to-r from-indigo-50/80 to-blue-50/50 border-indigo-200 text-indigo-950 hover:bg-indigo-100/70 hover:border-indigo-300 shadow-2xs'
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                  <Download className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-left">
-                  <span className="font-bold text-xs block leading-tight">Install Web App</span>
-                  <span className={`text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Add to Home Screen</span>
-                </div>
+                <LayoutGrid className="w-4 h-4" strokeWidth={activeNav === 'Dashboard' ? 2.4 : 1.8} />
+                <span>Dashboard</span>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                Install
+              {activeNav === 'Dashboard' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+
+            <button
+              onClick={() => { setActiveNav('Leaderboard'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Leaderboard'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <BarChart2 className="w-4 h-4" strokeWidth={activeNav === 'Leaderboard' ? 2.4 : 1.8} />
+                <span>Leaderboard</span>
+              </div>
+              {activeNav === 'Leaderboard' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+          </div>
+
+          {/* GROUP 2: ACADEMICS & REWARDS */}
+          <div className="space-y-1">
+            <div className={`text-[10px] font-black uppercase tracking-wider px-2.5 mb-1 ${
+              isDarkMode ? 'text-slate-500' : 'text-slate-400'
+            }`}>
+              Academics & Rewards
+            </div>
+
+            <button
+              onClick={() => { setActiveNav('Internal Marks'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Internal Marks'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-4 h-4" strokeWidth={activeNav === 'Internal Marks' ? 2.4 : 1.8} />
+                <span>Internal Marks</span>
+              </div>
+              {activeNav === 'Internal Marks' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+
+            <button
+              onClick={() => { setActiveNav('Points to Marks'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Points to Marks'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Sliders className="w-4 h-4" strokeWidth={activeNav === 'Points to Marks' ? 2.4 : 1.8} />
+                <span>Marks Conversion</span>
+              </div>
+              {activeNav === 'Points to Marks' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+
+            <button
+              onClick={() => { setActiveNav('Special Labs'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Special Labs'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <FlaskConical className="w-4 h-4 text-indigo-400" strokeWidth={activeNav === 'Special Labs' ? 2.4 : 1.8} />
+                <span>Special Labs</span>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                activeNav === 'Special Labs'
+                  ? 'bg-white/20 text-white'
+                  : isDarkMode
+                    ? 'bg-indigo-500/20 text-indigo-400'
+                    : 'bg-indigo-100 text-indigo-700'
+              }`}>
+                23 Labs
               </span>
             </button>
+
+            <button
+              onClick={() => { setActiveNav('Student Mentors'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Student Mentors'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <UserCheck className="w-4 h-4" strokeWidth={activeNav === 'Student Mentors' ? 2.4 : 1.8} />
+                <span>Student Mentors</span>
+              </div>
+              {activeNav === 'Student Mentors' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+
+            <button
+              onClick={() => { setActiveNav('Faculty Directory'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Faculty Directory'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <GraduationCap className="w-4 h-4" strokeWidth={activeNav === 'Faculty Directory' ? 2.4 : 1.8} />
+                <span>Faculty Directory</span>
+              </div>
+              {activeNav === 'Faculty Directory' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+          </div>
+
+          {/* GROUP 3: CAMPUS LIFE & SERVICES */}
+          <div className="space-y-1">
+            <div className={`text-[10px] font-black uppercase tracking-wider px-2.5 mb-1 ${
+              isDarkMode ? 'text-slate-500' : 'text-slate-400'
+            }`}>
+              Campus Life
+            </div>
+
+            <button
+              onClick={() => { setActiveNav('Menu Details'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Menu Details'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <UtensilsCrossed className="w-4 h-4" strokeWidth={activeNav === 'Menu Details' ? 2.4 : 1.8} />
+                <span>Mess Menu</span>
+              </div>
+              {activeNav === 'Menu Details' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+
+            <button
+              onClick={() => { setActiveNav('Leave Schedule'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Leave Schedule'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <CalendarDays className="w-4 h-4" strokeWidth={activeNav === 'Leave Schedule' ? 2.4 : 1.8} />
+                <span>Leave Schedule</span>
+              </div>
+              {activeNav === 'Leave Schedule' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+
+            <button
+              onClick={() => { setActiveNav('GeoBITS'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'GeoBITS'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Navigation className="w-4 h-4" strokeWidth={activeNav === 'GeoBITS' ? 2.4 : 1.8} />
+                <span>Campus Map</span>
+              </div>
+              {activeNav === 'GeoBITS' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+
+            <button
+              onClick={() => { setActiveNav('BIT Placements'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'BIT Placements'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Briefcase className="w-4 h-4" strokeWidth={activeNav === 'BIT Placements' ? 2.4 : 1.8} />
+                <span>BIT Placements</span>
+              </div>
+              {activeNav === 'BIT Placements' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+          </div>
+
+          {/* GROUP 4: PREFERENCES & DEV */}
+          <div className="space-y-1 pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
+            <button
+              onClick={() => { setActiveNav('Settings'); setIsSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                activeNav === 'Settings'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
+                  : isDarkMode
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Settings className="w-4 h-4" strokeWidth={activeNav === 'Settings' ? 2.4 : 1.8} />
+                <span>Settings</span>
+              </div>
+              {activeNav === 'Settings' && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+            </button>
+
+            {/* Admin & Developer Console (Only visible to Dharineesh & Kaushi) */}
+            {isAdminUser && (
+              <button
+                onClick={() => { setActiveNav('Admin Console'); setIsSidebarOpen(false); }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeNav === 'Admin Console'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white shadow-lg shadow-purple-500/25'
+                    : isDarkMode
+                      ? 'border-purple-900/40 bg-purple-950/20 text-purple-300 hover:text-white hover:bg-purple-900/30'
+                      : 'border-purple-200 bg-purple-50/70 text-purple-800 hover:bg-purple-100/80 shadow-xs'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" strokeWidth={activeNav === 'Admin Console' ? 2.4 : 1.8} />
+                  <span>Admin Console</span>
+                </div>
+                <span className={`text-[9px] font-black px-1.5 py-0.2 rounded border ${
+                  isDarkMode 
+                    ? 'bg-purple-500/30 text-purple-300 border-purple-400/40' 
+                    : 'bg-purple-200/80 text-purple-800 border-purple-300'
+                }`}>
+                  DEV
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* PWA Install App Button */}
+          {isInstallable && (
+            <div className="pt-2">
+              <button
+                onClick={() => { handleInstallClick(); setIsSidebarOpen(false); }}
+                className={`w-full flex items-center justify-between p-2.5 rounded-2xl border text-xs font-semibold transition-all cursor-pointer group ${
+                  isDarkMode 
+                    ? 'bg-gradient-to-r from-slate-800/90 to-indigo-950/50 border-indigo-500/30 text-slate-200 hover:border-indigo-400 hover:bg-slate-800 shadow-xs' 
+                    : 'bg-gradient-to-r from-indigo-50/80 to-blue-50/50 border-indigo-200 text-indigo-950 hover:bg-indigo-100/70 hover:border-indigo-300 shadow-2xs'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                    <Download className="w-3 h-3" />
+                  </div>
+                  <div className="text-left">
+                    <span className="font-bold text-[11px] block leading-tight">Install Web App</span>
+                    <span className={`text-[9px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Add to Home Screen</span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  Install
+                </span>
+              </button>
+            </div>
           )}
         </nav>
       </aside>
@@ -7685,6 +7855,16 @@ export default function App() {
               <StudentMentorMappingView
                 currentUser={currentUser}
                 isDarkMode={isDarkMode}
+              />
+            </div>
+          )}
+
+          {/* VIEW: BIT SPECIAL LABS DIRECTORY */}
+          {activeNav === 'Special Labs' && (
+            <div className="max-w-6xl mx-auto w-full">
+              <SpecialLabsView
+                isDarkMode={isDarkMode}
+                setActiveNav={setActiveNav}
               />
             </div>
           )}

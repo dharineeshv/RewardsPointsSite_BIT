@@ -888,7 +888,7 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
                     Official IP Redemption Schedule
                   </h3>
                   <p className={`text-[11px] sm:text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Showing Deadlines for <span className="font-bold text-blue-500 dark:text-blue-400">{currentSched.yearLabel}</span> ({currentSched.semesters})
+                    Showing Deadlines for <span className="font-bold text-blue-500 dark:text-blue-400">{currentSched.yearLabel}</span>
                   </p>
                 </div>
               </div>
@@ -912,11 +912,6 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
                       }`}
                     >
                       <span>{tab.yearLabel}</span>
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
-                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-500/10 text-slate-500 dark:text-slate-400'
-                      }`}>
-                        {tab.semesters}
-                      </span>
                       {isStudentYear && (
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-xs" title="Your Current Batch"></span>
                       )}
@@ -939,9 +934,6 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
                       IP - 1 Redemption Deadline
                     </span>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentSched.theme.badge}`}>
-                    {currentSched.sem1} Semester
-                  </span>
                 </div>
                 
                 <div className="flex items-baseline justify-between mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/50">
@@ -978,9 +970,6 @@ export default function InternalMarksView({ currentUser, isDarkMode, onNavigateT
                       IP - 2 Redemption Deadline
                     </span>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentSched.theme.badge}`}>
-                    {currentSched.sem2} Semester
-                  </span>
                 </div>
                 
                 <div className="flex items-baseline justify-between mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/50">
