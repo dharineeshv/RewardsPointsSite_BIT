@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "October 01, 2026",
+  "lastUpdated": "October 03, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 636,
-  "totalCompaniesVisited": 106,
-  "editionDate": "01-10-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/c8802cc6447979194f753922a84b93e2b4f82cfd.pdf",
+  "totalStudentsPlaced": 638,
+  "totalCompaniesVisited": 108,
+  "editionDate": "03-10-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/85538b2357c3985ea8760a4314c69d2a88defc83.pdf",
   "totalPages": 6,
   "placementPageNumber": 5,
   "drivesPageNumber": 6,
@@ -70,7 +70,7 @@
       "tier": "6 - 7 LPA",
       "tierCategory": "Prime Tier",
       "range": "6.00 - 7.00 LPA",
-      "offerCount": 22,
+      "offerCount": 24,
       "color": "from-blue-500 to-cyan-500",
       "badgeColor": "bg-blue-500/10 text-blue-400 border-blue-500/20",
       "companies": [
@@ -79,6 +79,7 @@
         "Glowlogics",
         "IDP Education",
         "Infineon Technologies",
+        "Tessolve",
         "The Alter Office",
         "Zohocorp"
       ]
