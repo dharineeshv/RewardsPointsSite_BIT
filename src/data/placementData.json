@@ -1,13 +1,13 @@
 {
-  "lastUpdated": "October 09, 2026",
+  "lastUpdated": "October 10, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 647,
-  "totalCompaniesVisited": 115,
-  "editionDate": "09-10-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/a1d3e72d9d9890a0aaff8b386f5eedefee73c4d5.pdf",
-  "totalPages": 10,
-  "placementPageNumber": 9,
-  "drivesPageNumber": 10,
+  "totalStudentsPlaced": 650,
+  "totalCompaniesVisited": 116,
+  "editionDate": "10-10-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/v3/27b0f0ad10fabfac50246137a4da4181b2016d61.pdf",
+  "totalPages": 9,
+  "placementPageNumber": 8,
+  "drivesPageNumber": 9,
   "upcomingDrives": [
     {
       "company": "Tiger Analytics",
@@ -140,7 +140,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 278,
+      "offerCount": 281,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [
@@ -170,6 +170,7 @@
         "Mechatronics Control and Equipments",
         "Mobitech",
         "Motherson",
+        "Neo Foods",
         "Orchid Pharma",
         "Pharmag Instruments",
         "RK Ecran",
