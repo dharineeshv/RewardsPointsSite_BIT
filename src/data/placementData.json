@@ -1,13 +1,13 @@
 {
-  "lastUpdated": "October 23, 2026",
+  "lastUpdated": "October 24, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 653,
-  "totalCompaniesVisited": 118,
-  "editionDate": "23-10-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/12ac1b0760a95ed96a192e4c250442f3e85c823d.pdf",
-  "totalPages": 5,
-  "placementPageNumber": 4,
-  "drivesPageNumber": 5,
+  "totalStudentsPlaced": 661,
+  "totalCompaniesVisited": 121,
+  "editionDate": "24-10-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/1243dfbb46d8dbe91302e5cba59f34edec419637.pdf",
+  "totalPages": 6,
+  "placementPageNumber": 5,
+  "drivesPageNumber": 6,
   "upcomingDrives": [
     {
       "company": "Tiger Analytics",
@@ -33,7 +33,7 @@
       "tier": "10 LPA & Above",
       "tierCategory": "Super Dream",
       "range": ">= 10.00 LPA",
-      "offerCount": 19,
+      "offerCount": 21,
       "color": "from-amber-500 to-orange-500",
       "badgeColor": "bg-amber-500/10 text-amber-400 border-amber-500/20",
       "companies": [
@@ -45,14 +45,15 @@
         "NETGEAR",
         "PayPal",
         "Presidio",
-        "Soliton"
+        "Soliton",
+        "Thoughtworks"
       ]
     },
     {
       "tier": "7 - 10 LPA",
       "tierCategory": "Dream Tier",
       "range": "7.00 - 10.00 LPA",
-      "offerCount": 88,
+      "offerCount": 87,
       "color": "from-purple-500 to-indigo-500",
       "badgeColor": "bg-purple-500/10 text-purple-400 border-purple-500/20",
       "companies": [
@@ -110,7 +111,7 @@
       "tier": "4 - 5 LPA",
       "tierCategory": "Standard Tier",
       "range": "4.00 - 5.00 LPA",
-      "offerCount": 193,
+      "offerCount": 199,
       "color": "from-sky-500 to-blue-500",
       "badgeColor": "bg-sky-500/10 text-sky-400 border-sky-500/20",
       "companies": [
@@ -122,6 +123,7 @@
         "Forvia Hella",
         "HCL",
         "Hexaware",
+        "Johnson Electric",
         "Killis Bird",
         "Leaf Corporation",
         "LMW",
@@ -140,7 +142,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 284,
+      "offerCount": 285,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [
@@ -184,6 +186,7 @@
         "Shanthi Gears",
         "SiMaxTech",
         "Slicktronix Medisens",
+        "Struzon Technologies",
         "Sublime Structures",
         "Surinova",
         "Tata Elxsi",
