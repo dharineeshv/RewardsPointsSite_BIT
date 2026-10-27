@@ -1,13 +1,13 @@
 {
-  "lastUpdated": "October 26, 2026",
+  "lastUpdated": "October 27, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 662,
-  "totalCompaniesVisited": 121,
-  "editionDate": "26-10-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/9f9dfc842f3635f0173e901518f90e6274e372a4.pdf",
-  "totalPages": 8,
-  "placementPageNumber": 7,
-  "drivesPageNumber": 8,
+  "totalStudentsPlaced": 665,
+  "totalCompaniesVisited": 122,
+  "editionDate": "27-10-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/6ac833757a143fc2f5203162399d47b73bc01330.pdf",
+  "totalPages": 6,
+  "placementPageNumber": 5,
+  "drivesPageNumber": 6,
   "upcomingDrives": [
     {
       "company": "Tiger Analytics",
@@ -53,7 +53,7 @@
       "tier": "7 - 10 LPA",
       "tierCategory": "Dream Tier",
       "range": "7.00 - 10.00 LPA",
-      "offerCount": 87,
+      "offerCount": 91,
       "color": "from-purple-500 to-indigo-500",
       "badgeColor": "bg-purple-500/10 text-purple-400 border-purple-500/20",
       "companies": [
@@ -65,6 +65,7 @@
         "SurveySparrow",
         "TCS",
         "VISTEON",
+        "ZenStatement",
         "Zohocorp"
       ]
     },
@@ -142,7 +143,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 286,
+      "offerCount": 285,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [
