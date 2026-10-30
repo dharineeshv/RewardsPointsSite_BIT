@@ -1,16 +1,16 @@
 {
-  "lastUpdated": "October 29, 2026",
+  "lastUpdated": "October 30, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 676,
-  "totalCompaniesVisited": 126,
-  "editionDate": "29-10-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/b4e5437b1adbed6f82a3088753a6cbd5f68f3175.pdf",
-  "totalPages": 5,
-  "placementPageNumber": 4,
-  "drivesPageNumber": 5,
+  "totalStudentsPlaced": 678,
+  "totalCompaniesVisited": 127,
+  "editionDate": "30-10-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/13efd4f26c08ce0787dc7c615aba19c5fb297d87.pdf",
+  "totalPages": 7,
+  "placementPageNumber": 6,
+  "drivesPageNumber": 7,
   "upcomingDrives": [
     {
-      "company": "Tiger Analytics",
+      "company": "SISCO Energy Private Limited",
       "role": "Software & AI Engineering Roles",
       "targetBatch": "2023-2027 Batch",
       "startDate": "07 Sep 2026",
@@ -33,7 +33,7 @@
       "tier": "10 LPA & Above",
       "tierCategory": "Super Dream",
       "range": ">= 10.00 LPA",
-      "offerCount": 25,
+      "offerCount": 27,
       "color": "from-amber-500 to-orange-500",
       "badgeColor": "bg-amber-500/10 text-amber-400 border-amber-500/20",
       "companies": []
@@ -54,7 +54,6 @@
         "SurveySparrow",
         "TCS",
         "VISTEON",
-        "ZenStatement",
         "Zohocorp"
       ]
     },
@@ -62,7 +61,7 @@
       "tier": "6 - 7 LPA",
       "tierCategory": "Prime Tier",
       "range": "6.00 - 7.00 LPA",
-      "offerCount": 24,
+      "offerCount": 25,
       "color": "from-blue-500 to-cyan-500",
       "badgeColor": "bg-blue-500/10 text-blue-400 border-blue-500/20",
       "companies": [
@@ -132,7 +131,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 296,
+      "offerCount": 295,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [
