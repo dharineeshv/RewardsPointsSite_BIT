@@ -1,16 +1,16 @@
 {
-  "lastUpdated": "November 02, 2026",
+  "lastUpdated": "November 03, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 686,
-  "totalCompaniesVisited": 132,
-  "editionDate": "02-11-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/f2686fead5bf7d1914bb705e50aaaccd19caf6bf.pdf",
-  "totalPages": 6,
-  "placementPageNumber": 5,
-  "drivesPageNumber": 6,
+  "totalStudentsPlaced": 687,
+  "totalCompaniesVisited": 133,
+  "editionDate": "03-11-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/4a1e13bdc4c7baf294e559f6ea4a2b177739c932.pdf",
+  "totalPages": 7,
+  "placementPageNumber": 6,
+  "drivesPageNumber": 7,
   "upcomingDrives": [
     {
-      "company": "Tiger Analytics",
+      "company": "SISCO Energy Private Limited",
       "role": "Software & AI Engineering Roles",
       "targetBatch": "2023-2027 Batch",
       "startDate": "07 Sep 2026",
@@ -36,7 +36,19 @@
       "offerCount": 27,
       "color": "from-amber-500 to-orange-500",
       "badgeColor": "bg-amber-500/10 text-amber-400 border-amber-500/20",
-      "companies": []
+      "companies": [
+        "Caterpillar",
+        "EXL Service",
+        "Integra Connect",
+        "JUSPAY",
+        "Multicoreware",
+        "NETGEAR",
+        "PayPal",
+        "Presidio",
+        "Soliton",
+        "Thoughtworks",
+        "ZenStatement"
+      ]
     },
     {
       "tier": "7 - 10 LPA",
@@ -132,7 +144,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 302,
+      "offerCount": 303,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [
@@ -143,6 +155,7 @@
         "Aspire Biozymes",
         "Bassh Clothing",
         "Bannari Amman Public School",
+        "Biocon Biologics",
         "BPL Medical Technologies",
         "Confluence Valley Flavors",
         "Data Platr",
