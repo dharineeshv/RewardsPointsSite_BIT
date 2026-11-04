@@ -1,16 +1,16 @@
 {
-  "lastUpdated": "November 03, 2026",
+  "lastUpdated": "November 04, 2026",
   "targetBatch": "2023-2027 Batch",
   "totalStudentsPlaced": 687,
   "totalCompaniesVisited": 133,
-  "editionDate": "03-11-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/4a1e13bdc4c7baf294e559f6ea4a2b177739c932.pdf",
-  "totalPages": 7,
-  "placementPageNumber": 6,
-  "drivesPageNumber": 7,
+  "editionDate": "04-11-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/1ba04b594508e42aea08519fbb2ab39c907935d6.pdf",
+  "totalPages": 6,
+  "placementPageNumber": 5,
+  "drivesPageNumber": 6,
   "upcomingDrives": [
     {
-      "company": "SISCO Energy Private Limited",
+      "company": "Maestro Technology Services Private Limited",
       "role": "Software & AI Engineering Roles",
       "targetBatch": "2023-2027 Batch",
       "startDate": "07 Sep 2026",
