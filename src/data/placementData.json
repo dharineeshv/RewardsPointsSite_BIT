@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "November 05, 2026",
+  "lastUpdated": "November 06, 2026",
   "targetBatch": "2023-2027 Batch",
-  "totalStudentsPlaced": 688,
-  "totalCompaniesVisited": 134,
-  "editionDate": "05-11-2026",
-  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/d870ff74e2dc89243672a561e7e2fc3871711cf8.pdf",
+  "totalStudentsPlaced": 697,
+  "totalCompaniesVisited": 137,
+  "editionDate": "06-11-2026",
+  "pdfUrl": "https://cdnm.heyzine.com/files/uploaded/baf929a7ff66f617a3ba6b058c31769debd1e08e.pdf",
   "totalPages": 6,
   "placementPageNumber": 5,
   "drivesPageNumber": 6,
@@ -54,7 +54,7 @@
       "tier": "7 - 10 LPA",
       "tierCategory": "Dream Tier",
       "range": "7.00 - 10.00 LPA",
-      "offerCount": 87,
+      "offerCount": 92,
       "color": "from-purple-500 to-indigo-500",
       "badgeColor": "bg-purple-500/10 text-purple-400 border-purple-500/20",
       "companies": [
@@ -65,6 +65,7 @@
         "Rocket India (Mr. Cooper)",
         "SurveySparrow",
         "TCS",
+        "Tiger Analytics",
         "VISTEON",
         "Zohocorp"
       ]
@@ -73,7 +74,7 @@
       "tier": "6 - 7 LPA",
       "tierCategory": "Prime Tier",
       "range": "6.00 - 7.00 LPA",
-      "offerCount": 25,
+      "offerCount": 26,
       "color": "from-blue-500 to-cyan-500",
       "badgeColor": "bg-blue-500/10 text-blue-400 border-blue-500/20",
       "companies": [
@@ -84,6 +85,7 @@
         "Infineon Technologies",
         "Tessolve",
         "The Alter Office",
+        "XYMA Analytics",
         "Zohocorp"
       ]
     },
@@ -112,7 +114,7 @@
       "tier": "4 - 5 LPA",
       "tierCategory": "Standard Tier",
       "range": "4.00 - 5.00 LPA",
-      "offerCount": 200,
+      "offerCount": 198,
       "color": "from-sky-500 to-blue-500",
       "badgeColor": "bg-sky-500/10 text-sky-400 border-sky-500/20",
       "companies": [
@@ -144,7 +146,7 @@
       "tier": "3 - 4 LPA",
       "tierCategory": "Base Tier",
       "range": "3.00 - 4.00 LPA",
-      "offerCount": 304,
+      "offerCount": 309,
       "color": "from-slate-500 to-zinc-500",
       "badgeColor": "bg-slate-500/10 text-slate-400 border-slate-500/20",
       "companies": [
@@ -192,6 +194,7 @@
         "Schaeffler India",
         "Schnell Energy Equipments",
         "Shanthi Gears",
+        "Shree Abirami Engineering Works",
         "SiMaxTech",
         "Slicktronix Medisens",
         "Struzon Technologies",
